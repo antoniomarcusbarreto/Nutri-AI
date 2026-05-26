@@ -147,50 +147,50 @@ export const PreConsulta = () => {
           <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-8">
             {/* Seção 1: Dados Clínicos */}
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 border-b border-slate-200 pb-2 mb-4">Dados Clínicos e Restrições</h3>
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4">Dados Clínicos e Restrições</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Alergias e Intolerâncias Alimentares</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Alergias e Intolerâncias Alimentares</label>
                   <p className="text-xs text-slate-500 mb-2">Ex: Glúten, Lactose, Oleaginosas, Frutos do Mar.</p>
                   <textarea
                     rows={2}
                     value={formData.allergies}
                     onChange={e => setFormData({...formData, allergies: e.target.value})}
                     placeholder="Se não possuir, deixe em branco ou escreva 'Nenhuma'"
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm font-normal"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Restrições Culturais ou Opções Alimentares</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Restrições Culturais ou Opções Alimentares</label>
                   <p className="text-xs text-slate-500 mb-2">Ex: Vegano, Vegetariano, Kosher, Halal.</p>
                   <input
                     type="text"
                     value={formData.dietary_restrictions}
                     onChange={e => setFormData({...formData, dietary_restrictions: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm font-normal"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Patologias ou Doenças Crônicas</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Patologias ou Doenças Crônicas</label>
                   <p className="text-xs text-slate-500 mb-2">Ex: Diabetes Tipo 1/2, Hipertensão, Gastrite, Síndrome do Intestino Irritável.</p>
                   <textarea
                     rows={2}
                     value={formData.pathologies}
                     onChange={e => setFormData({...formData, pathologies: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm font-normal"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Uso de Medicamentos / Suplementos Atuais</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Uso de Medicamentos / Suplementos Atuais</label>
                   <textarea
                     rows={2}
                     value={formData.medications}
                     onChange={e => setFormData({...formData, medications: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm font-normal"
                   />
                 </div>
               </div>
@@ -198,16 +198,16 @@ export const PreConsulta = () => {
 
             {/* Seção 2: Hábitos e Estilo de Vida */}
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 border-b border-slate-200 pb-2 mb-4">Hábitos e Estilo de Vida</h3>
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4">Hábitos e Estilo de Vida</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nível de Atividade Física *</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Nível de Atividade Física *</label>
                   <select
                     required
                     value={formData.physical_activity_level}
                     onChange={e => setFormData({...formData, physical_activity_level: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm font-normal bg-white"
                   >
                     <option value="" disabled>Selecione...</option>
                     <option value="Sedentário">Sedentário (Nenhuma atividade física)</option>
@@ -218,19 +218,19 @@ export const PreConsulta = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Profissão / Rotina de Trabalho *</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Profissão / Rotina de Trabalho *</label>
                   <p className="text-xs text-slate-500 mb-2">Fica mais tempo sentado, em pé, caminhando?</p>
                   <input
                     type="text"
                     required
                     value={formData.profession}
                     onChange={e => setFormData({...formData, profession: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm font-normal"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Qualidade do Sono *</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Qualidade do Sono *</label>
                   <p className="text-xs text-slate-500 mb-2">Quantas horas por noite? Acorda descansado?</p>
                   <input
                     type="text"
@@ -238,7 +238,7 @@ export const PreConsulta = () => {
                     value={formData.sleep_quality}
                     onChange={e => setFormData({...formData, sleep_quality: e.target.value})}
                     placeholder="Ex: 6h por noite, acordo cansado"
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm font-normal"
                   />
                 </div>
               </div>

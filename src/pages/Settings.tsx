@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Palette, Check, RefreshCw, Lock, Unlock, Key, Search, UserCheck, X } from 'lucide-react';
+import { Palette, Check, RefreshCw, Lock, Unlock, Key, Search, UserCheck, X, Info, AlertTriangle } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 
 export const Settings: React.FC = () => {
-  const { profile, clinic, updateTheme } = useAuth();
+  const { profile, clinic, updateTheme, remainingTrialDays, isReadOnly } = useAuth();
   const { showToast } = useToast();
   const currentMode = profile?.theme_mode || 'light';
   const currentColor = profile?.theme_color || 'white';
@@ -25,14 +25,172 @@ export const Settings: React.FC = () => {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  // Team states
+  const [teamList, setTeamList] = useState<any[]>([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [searchTeam, setSearchTeam] = useState('');
+  const [showAddEditTeamModal, setShowAddEditTeamModal] = useState(false);
+  const [selectedTeamMember, setSelectedTeamMember] = useState<any | null>(null);
+  const [teamFormData, setTeamFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    crn: '',
+    role: 'nutritionist',
+    password: ''
+  });
+  const [teamError, setTeamError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (activeTab === 'services' && clinic?.id) {
+    if (activeTab === 'team' && clinic?.id) {
+      loadTeam();
+    } else if (activeTab === 'services' && clinic?.id) {
       loadServices();
-    }
-    if (activeTab === 'patient_access' && clinic?.id) {
+    } else if (activeTab === 'patient_access' && clinic?.id) {
       loadPatientsAccess();
     }
   }, [activeTab, clinic?.id]);
+
+  const loadTeam = async () => {
+    if (!clinic?.id) return;
+    setLoadingTeam(true);
+    try {
+      const { data: members, error: membersError } = await supabase
+        .from('clinic_members')
+        .select('user_id, role')
+        .eq('clinic_id', clinic.id);
+
+      if (membersError) throw membersError;
+      if (members && members.length > 0) {
+        const userIds = members.map(m => m.user_id).filter(Boolean);
+        if (userIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, full_name, phone, crn, is_active, created_at')
+            .in('id', userIds);
+
+          if (profilesError) throw profilesError;
+          if (profiles) {
+            const merged = profiles.map(p => {
+              const member = members.find(m => m.user_id === p.id);
+              return {
+                ...p,
+                role: member?.role || 'nutritionist'
+              };
+            });
+            setTeamList(merged);
+          }
+        } else {
+          setTeamList([]);
+        }
+      } else {
+        setTeamList([]);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar equipe:', err);
+      showToast('Erro ao carregar lista de funcionários.', 'error');
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
+  const handleSaveTeamMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clinic?.id) return;
+    setSaving(true);
+    setTeamError(null);
+
+    const { name, email, phone, crn, role, password } = teamFormData;
+
+    try {
+      if (selectedTeamMember) {
+        const { error } = await supabase.rpc('update_staff_member', {
+          p_clinic_id: clinic.id,
+          p_user_id: selectedTeamMember.id,
+          p_name: name,
+          p_phone: phone,
+          p_crn: crn || null,
+          p_role: role
+        });
+
+        if (error) throw error;
+        showToast('Funcionário atualizado com sucesso!', 'success');
+      } else {
+        if (!email || !password) {
+          setTeamError('E-mail e Senha são obrigatórios para cadastro.');
+          setSaving(false);
+          return;
+        }
+
+        const { error } = await supabase.rpc('create_staff_member', {
+          p_clinic_id: clinic.id,
+          p_name: name,
+          p_email: email,
+          p_phone: phone,
+          p_crn: crn || null,
+          p_role: role,
+          p_password: password
+        });
+
+        if (error) throw error;
+        showToast('Funcionário cadastrado com sucesso!', 'success');
+      }
+
+      setShowAddEditTeamModal(false);
+      loadTeam();
+    } catch (err: any) {
+      console.error('Erro ao salvar funcionário:', err);
+      setTeamError(err.message || 'Erro ao processar solicitação no banco.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleTeamMemberStatus = async (member: any) => {
+    if (!clinic?.id || !member.id) return;
+    setSaving(true);
+    try {
+      const newActive = !member.is_active;
+      const { error } = await supabase.rpc('toggle_staff_member_status', {
+        p_clinic_id: clinic.id,
+        p_user_id: member.id,
+        p_is_active: newActive
+      });
+
+      if (error) throw error;
+
+      showToast(newActive ? 'Acesso reativado!' : 'Acesso desativado!', 'success');
+      loadTeam();
+    } catch (err: any) {
+      console.error('Erro ao alternar status do funcionário:', err);
+      showToast(err.message || 'Erro ao alterar status de acesso.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteTeamMember = async (member: any) => {
+    if (!clinic?.id || !member.id) return;
+    if (!window.confirm(`Tem certeza que deseja remover ${member.full_name} da equipe?`)) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc('delete_staff_member', {
+        p_clinic_id: clinic.id,
+        p_user_id: member.id
+      });
+
+      if (error) throw error;
+
+      showToast('Membro removido da equipe!', 'success');
+      loadTeam();
+    } catch (err: any) {
+      console.error('Erro ao remover funcionário:', err);
+      showToast(err.message || 'Erro ao remover membro da equipe.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadServices = async () => {
     if (!clinic?.id) return;
@@ -215,11 +373,11 @@ export const Settings: React.FC = () => {
     },
     {
       id: 'dark',
-      name: 'Escuro (Dark Mode)',
-      description: 'Fundo chumbo escuro para menor cansaço visual.',
-      bgColor: 'bg-slate-900',
+      name: 'Escuro (Dark Mode Harmony)',
+      description: 'Fundo azul-escuro profundo e refinado com acentos em verde clínico.',
+      bgColor: 'bg-[#0b132b]',
       textColor: 'text-white',
-      borderColor: 'border-slate-800',
+      borderColor: 'border-[#1c2541]',
       action: () => handleSelectTheme('dark', 'dark')
     }
   ];
@@ -228,7 +386,7 @@ export const Settings: React.FC = () => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12 max-w-4xl">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             <Palette className="h-8 w-8 text-primary-600" />
             Configurações
           </h1>
@@ -242,6 +400,29 @@ export const Settings: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Trial Banner */}
+      {!isReadOnly ? (
+        <div className="rounded-2xl bg-blue-50 border border-blue-200 p-5 flex items-start gap-4 shadow-sm transition-all hover:shadow-md">
+          <Info className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-bold text-blue-900">Período de Degustação</h3>
+            <p className="mt-1.5 text-base font-medium text-blue-700 leading-relaxed">
+              Você tem <strong>{remainingTrialDays} {remainingTrialDays === 1 ? 'dia restante' : 'dias restantes'}</strong> no seu período de teste grátis. Aproveite todos os recursos!
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-red-50 border border-red-200 p-5 flex items-start gap-4 shadow-sm transition-all hover:shadow-md">
+          <AlertTriangle className="h-6 w-6 text-red-650 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-bold text-red-950">Período de Degustação Encerrado</h3>
+            <p className="mt-1.5 text-base font-medium text-red-800 leading-relaxed">
+              O sistema agora encontra-se em modo <strong>somente leitura</strong>. Assine um plano para voltar a cadastrar e editar informações.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="border-b border-slate-200">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
@@ -261,7 +442,7 @@ export const Settings: React.FC = () => {
             onClick={() => setActiveTab('team')}
             className={`${activeTab === 'team' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
           >
-            Membros e Convites
+            Equipe
           </button>
           <button
             onClick={() => setActiveTab('services')}
@@ -291,6 +472,7 @@ export const Settings: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {themeOptions.map((option) => {
                 const isSelected = selectedProfile === option.id;
+                const isDarkThemeOption = option.id === 'dark';
                 return (
                   <button
                     key={option.id}
@@ -298,8 +480,12 @@ export const Settings: React.FC = () => {
                     disabled={saving}
                     className={`relative flex flex-col text-left p-5 border rounded-2xl transition-all duration-300 hover:shadow-md ${
                       isSelected 
-                        ? 'border-primary-500 bg-primary-50/50 ring-2 ring-primary-500 ring-offset-2' 
-                        : 'border-slate-200 bg-white hover:border-slate-300'
+                        ? isDarkThemeOption
+                          ? 'border-primary-500 bg-[#0b132b] text-white ring-2 ring-primary-500 ring-offset-2'
+                          : 'border-primary-500 bg-primary-50/50 ring-2 ring-primary-500 ring-offset-2' 
+                        : isDarkThemeOption
+                          ? 'border-slate-800 bg-[#0b132b] text-white hover:border-slate-700'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-start justify-between w-full">
@@ -316,8 +502,20 @@ export const Settings: React.FC = () => {
                       )}
                     </div>
 
-                    <h3 className="text-sm font-semibold text-slate-900">{option.name}</h3>
-                    <p className="text-xs text-slate-500 mt-1">{option.description}</p>
+                    <h3 className={`text-sm font-semibold ${
+                      isDarkThemeOption 
+                        ? isSelected 
+                          ? 'text-white' 
+                          : 'text-slate-200' 
+                        : 'text-slate-900'
+                    }`}>{option.name}</h3>
+                    <p className={`text-xs ${
+                      isDarkThemeOption 
+                        ? isSelected 
+                          ? 'text-slate-200 font-semibold' 
+                          : 'text-slate-400' 
+                        : 'text-slate-500'
+                    } mt-1`}>{option.description}</p>
                   </button>
                 );
               })}
@@ -356,53 +554,53 @@ export const Settings: React.FC = () => {
             }} className="space-y-4">
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700">CEP</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">CEP</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="cep" defaultValue={clinic?.cep || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="text" name="cep" defaultValue={clinic?.cep || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
                 <div className="sm:col-span-4">
-                  <label className="block text-sm font-medium text-slate-700">Endereço</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Endereço</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="address" defaultValue={clinic?.address || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="text" name="address" defaultValue={clinic?.address || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700">Número/Complemento</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Número/Complemento</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="complement" defaultValue={clinic?.complement || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="text" name="complement" defaultValue={clinic?.complement || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700">Bairro</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Bairro</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="neighborhood" defaultValue={clinic?.neighborhood || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="text" name="neighborhood" defaultValue={clinic?.neighborhood || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-sm font-medium text-slate-700">Cidade</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Cidade</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="city" defaultValue={clinic?.city || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="text" name="city" defaultValue={clinic?.city || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-sm font-medium text-slate-700">Estado</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Estado</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="state" defaultValue={clinic?.state || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="text" name="state" defaultValue={clinic?.state || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
                 <div className="sm:col-span-3">
-                  <label className="block text-sm font-medium text-slate-700">Telefone da Clínica</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Telefone da Clínica</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="phone" defaultValue={clinic?.phone || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="text" name="phone" defaultValue={clinic?.phone || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
                 <div className="sm:col-span-3">
-                  <label className="block text-sm font-medium text-slate-700">E-mail da Clínica</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">E-mail da Clínica</label>
                   {/* @ts-ignore */}
-                  <input type="email" name="email" defaultValue={clinic?.email || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="email" name="email" defaultValue={clinic?.email || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
                 <div className="sm:col-span-6">
-                  <label className="block text-sm font-medium text-slate-700">Horário de Funcionamento</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Horário de Funcionamento</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="operating_hours" defaultValue={clinic?.operating_hours || ''} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                  <input type="text" name="operating_hours" defaultValue={clinic?.operating_hours || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
                 </div>
               </div>
-              <div className="pt-4 flex justify-end">
-                <button type="submit" disabled={saving} className="bg-primary-600 text-white px-4 py-2 rounded-md font-medium">Salvar Dados</button>
+              <div className="pt-6 flex justify-end">
+                <button type="submit" disabled={saving} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-sm">Salvar Dados</button>
               </div>
             </form>
           </div>
@@ -411,15 +609,182 @@ export const Settings: React.FC = () => {
 
       {activeTab === 'team' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-800">Membros e Convites</h2>
-            <p className="text-sm text-slate-500">Gerencie quem tem acesso ao sistema da clínica.</p>
+          <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Equipe da Clínica</h2>
+              <p className="text-sm text-slate-500">Cadastre e gerencie o acesso de nutricionistas e secretárias.</p>
+            </div>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTeamMember(null);
+                  setTeamFormData({
+                    name: '',
+                    email: '',
+                    phone: '',
+                    crn: '',
+                    role: 'nutritionist',
+                    password: ''
+                  });
+                  setTeamError(null);
+                  setShowAddEditTeamModal(true);
+                }}
+                className="bg-primary-600 hover:bg-primary-500 text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm hover:shadow transition-all duration-200 cursor-pointer"
+              >
+                Cadastrar Funcionário
+              </button>
+            )}
           </div>
-          <div className="p-6">
-            <p className="text-sm text-slate-500">
-              Lista de membros atuais e envio de novos convites serão renderizados aqui.
-              {/* TODO: Implementar lista de clinic_members e clinic_invites */}
-            </p>
+          
+          <div className="p-6 space-y-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar funcionário pelo nome..."
+                value={searchTeam}
+                onChange={e => setSearchTeam(e.target.value)}
+                className="pl-10 block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 focus:bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 sm:text-sm transition-all"
+              />
+            </div>
+
+            {loadingTeam ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-500 gap-2">
+                <RefreshCw className="w-8 h-8 animate-spin text-primary-600" />
+                <span className="text-sm font-medium animate-pulse">Carregando equipe...</span>
+              </div>
+            ) : (() => {
+              const filteredList = teamList.filter(p =>
+                p.full_name?.toLowerCase().includes(searchTeam.toLowerCase()) ||
+                (p.role === 'nutritionist' ? 'nutricionista' : 'secretária').includes(searchTeam.toLowerCase())
+              );
+
+              if (filteredList.length === 0) {
+                return (
+                  <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl">
+                    <UserCheck className="mx-auto h-12 w-12 text-slate-300" />
+                    <h3 className="mt-2 text-sm font-semibold text-slate-900">Nenhum funcionário encontrado</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {searchTeam ? 'Experimente buscar por outro termo.' : 'Você não possui nenhum funcionário cadastrado.'}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredList.map(member => {
+                    const isSelf = member.id === profile?.id;
+                    return (
+                      <div
+                        key={member.id}
+                        className="flex flex-col justify-between p-5 border border-slate-200 rounded-2xl bg-white hover:shadow-md transition-all duration-300 gap-4"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-700 uppercase">
+                              {member.full_name?.substring(0, 2) || 'ST'}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-semibold text-slate-900 truncate max-w-[180px] sm:max-w-xs">{member.full_name} {isSelf && '(Você)'}</h4>
+                              <p className="text-xs text-slate-500 truncate max-w-[180px] sm:max-w-xs">{member.phone || 'Sem telefone'}</p>
+                              {member.crn && (
+                                <p className="text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-100 rounded px-1.5 py-0.5 mt-1 w-fit">
+                                  CRN: {member.crn}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col items-end gap-1.5 text-right shrink-0">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${
+                              member.role === 'owner' 
+                                ? 'bg-purple-50 text-purple-700 ring-purple-600/20' 
+                                : member.role === 'nutritionist'
+                                ? 'bg-blue-50 text-blue-700 ring-blue-600/20'
+                                : 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                            }`}>
+                              {member.role === 'owner' ? 'Proprietário' : member.role === 'nutritionist' ? 'Nutricionista' : 'Secretária'}
+                            </span>
+                            
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                              member.is_active 
+                                ? 'bg-green-50 text-green-700 border border-green-250' 
+                                : 'bg-slate-105 text-slate-650 border border-slate-200'
+                            }`}>
+                              {member.is_active ? 'Ativo' : 'Bloqueado'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                          {!isReadOnly && !isSelf && member.role !== 'owner' && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleTeamMemberStatus(member)}
+                              disabled={saving}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer ${
+                                member.is_active
+                                  ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                                  : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                              }`}
+                            >
+                              {member.is_active ? (
+                                <>
+                                  <Lock className="w-3.5 h-3.5" />
+                                  Desativar
+                                </>
+                              ) : (
+                                <>
+                                  <Unlock className="w-3.5 h-3.5" />
+                                  Ativar
+                                </>
+                              )}
+                            </button>
+                          )}
+                          
+                          {!isReadOnly && member.role !== 'owner' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTeamMember(member);
+                                  setTeamFormData({
+                                    name: member.full_name,
+                                    email: '',
+                                    phone: member.phone || '',
+                                    crn: member.crn || '',
+                                    role: member.role,
+                                    password: ''
+                                  });
+                                  setTeamError(null);
+                                  setShowAddEditTeamModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 cursor-pointer"
+                              >
+                                Editar
+                              </button>
+
+                              {!isSelf && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteTeamMember(member)}
+                                  disabled={saving}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 bg-white text-red-650 hover:bg-red-50 hover:border-red-300 transition-all duration-200 cursor-pointer"
+                                >
+                                  Remover
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -431,30 +796,30 @@ export const Settings: React.FC = () => {
             <p className="text-sm text-slate-500">Cadastre os tipos de consultas e procedimentos da clínica.</p>
           </div>
           <div className="p-6 space-y-6">
-            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-slate-700">Nome do Serviço</label>
-                  <input type="text" placeholder="Ex: Primeira Consulta" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border" />
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Nome do Serviço</label>
+                  <input type="text" placeholder="Ex: Primeira Consulta" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal" />
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-xs font-medium text-slate-700">Duração (min)</label>
-                  <input type="number" value={newService.duration_minutes} onChange={e => setNewService({...newService, duration_minutes: parseInt(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border" />
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Duração (min)</label>
+                  <input type="number" value={newService.duration_minutes} onChange={e => setNewService({...newService, duration_minutes: parseInt(e.target.value) || 0})} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal" />
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-xs font-medium text-slate-700">Preço (R$)</label>
-                  <input type="number" value={newService.price} onChange={e => setNewService({...newService, price: parseFloat(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border" />
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Preço (R$)</label>
+                  <input type="number" value={newService.price} onChange={e => setNewService({...newService, price: parseFloat(e.target.value) || 0})} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-slate-700">Modalidade</label>
-                  <select value={newService.modality} onChange={e => setNewService({...newService, modality: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border bg-white">
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Modalidade</label>
+                  <select value={newService.modality} onChange={e => setNewService({...newService, modality: e.target.value})} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal">
                     <option value="presencial">Presencial</option>
                     <option value="online">Online</option>
                     <option value="hibrido">Híbrido</option>
                   </select>
                 </div>
                 <div className="sm:col-span-2 flex items-end">
-                  <button type="button" onClick={addService} disabled={saving} className="w-full bg-slate-800 text-white py-2 px-4 rounded-md text-sm hover:bg-slate-700">
+                  <button type="button" onClick={addService} disabled={saving} className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 px-6 rounded-xl text-base font-bold transition-all shadow-sm">
                     Adicionar Serviço
                   </button>
                 </div>
@@ -631,9 +996,9 @@ export const Settings: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-6">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Nova Senha Temporária</label>
+                <label className="block text-base font-bold text-slate-700 mb-1.5">Nova Senha Temporária</label>
                 <input
                   type="password"
                   required
@@ -641,7 +1006,7 @@ export const Settings: React.FC = () => {
                   minLength={6}
                   value={newPatientPassword}
                   onChange={e => setNewPatientPassword(e.target.value)}
-                  className="block w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none"
+                  className="block w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
                   autoFocus
                 />
               </div>
@@ -650,14 +1015,14 @@ export const Settings: React.FC = () => {
                 <button 
                   type="button" 
                   onClick={() => setPasswordModalPatient(null)} 
-                  className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  className="px-5 py-2.5 text-base font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
                   disabled={passwordSaving}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+                  className="px-5 py-2.5 text-base font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
                 >
                   {passwordSaving ? (
                     <>
@@ -667,6 +1032,143 @@ export const Settings: React.FC = () => {
                   ) : (
                     <>
                       Salvar Nova Senha
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cadastro/Edição de Funcionário */}
+      {showAddEditTeamModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="flex justify-between items-start mb-4 shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {selectedTeamMember ? 'Editar Integrante da Equipe' : 'Cadastrar Novo Funcionário'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Preencha os dados do profissional ou secretário(a).
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowAddEditTeamModal(false)} 
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {teamError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium shrink-0">
+                {teamError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveTeamMember} className="space-y-4 flex-1 overflow-y-auto pr-1">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Nome Completo</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nome do profissional"
+                  value={teamFormData.name}
+                  onChange={e => setTeamFormData({ ...teamFormData, name: e.target.value })}
+                  className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                />
+              </div>
+
+              {!selectedTeamMember && (
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">E-mail (Login)</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="email@clinica.com"
+                    value={teamFormData.email}
+                    onChange={e => setTeamFormData({ ...teamFormData, email: e.target.value })}
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Telefone</label>
+                <input
+                  type="text"
+                  placeholder="(00) 00000-0000"
+                  value={teamFormData.phone}
+                  onChange={e => setTeamFormData({ ...teamFormData, phone: e.target.value })}
+                  className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Função / Cargo</label>
+                <select
+                  value={teamFormData.role}
+                  onChange={e => setTeamFormData({ ...teamFormData, role: e.target.value })}
+                  className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                >
+                  <option value="nutritionist">Nutricionista</option>
+                  <option value="secretary">Secretária(o)</option>
+                </select>
+              </div>
+
+              {teamFormData.role === 'nutritionist' && (
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">CRN (Conselho Regional de Nutrição)</label>
+                  <input
+                    type="text"
+                    required={teamFormData.role === 'nutritionist'}
+                    placeholder="CRN-X 00000"
+                    value={teamFormData.crn}
+                    onChange={e => setTeamFormData({ ...teamFormData, crn: e.target.value })}
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                  />
+                </div>
+              )}
+
+              {!selectedTeamMember && (
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Senha de Acesso Inicial</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Mínimo 6 caracteres"
+                    minLength={6}
+                    value={teamFormData.password}
+                    onChange={e => setTeamFormData({ ...teamFormData, password: e.target.value })}
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                  />
+                </div>
+              )}
+              
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddEditTeamModal(false)} 
+                  className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={saving}
+                  className="px-5 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      Salvar Funcionário
                     </>
                   )}
                 </button>

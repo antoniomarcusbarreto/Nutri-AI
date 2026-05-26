@@ -14,8 +14,6 @@ import {
   AlertCircle, 
   X, 
   Sparkles, 
-  Users, 
-  FileText, 
   Info,
   ChevronRight as ChevronRightIcon,
   Copy
@@ -30,8 +28,7 @@ import {
   addWeeks, 
   subWeeks, 
   addDays, 
-  subDays, 
-  parseISO 
+  subDays
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '../lib/supabase';
@@ -159,7 +156,8 @@ export const Agenda: React.FC = () => {
           nutritionist_id,
           service_id,
           patients ( id, name, email, phone ),
-          services ( id, name, duration_minutes, price )
+          services ( id, name, duration_minutes, price ),
+          consultations ( id, anamnese_notes )
         `)
         .eq('clinic_id', clinic.id)
         .order('date_time', { ascending: true });
@@ -174,6 +172,21 @@ export const Agenda: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const isAttention = (apt: any) => {
+    if (!apt) return false;
+    if (apt.status === 'cancelado' || apt.status === 'concluido') return false;
+    
+    const isPast = new Date(apt.date_time) < new Date();
+    if (!isPast) return false;
+    
+    const hasNotes = apt.consultations && 
+                     apt.consultations.length > 0 && 
+                     apt.consultations[0].anamnese_notes && 
+                     apt.consultations[0].anamnese_notes.trim() !== '';
+                     
+    return !hasNotes;
   };
 
   useEffect(() => {
@@ -319,7 +332,7 @@ export const Agenda: React.FC = () => {
     try {
       const combinedDateTime = new Date(`${date}T${time}:00`);
       
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('appointments')
         .insert([{
           clinic_id: clinic.id,
@@ -328,8 +341,7 @@ export const Agenda: React.FC = () => {
           nutritionist_id,
           date_time: combinedDateTime.toISOString(),
           status
-        }])
-        .select();
+        }]);
 
       if (error) throw error;
       
@@ -364,7 +376,7 @@ export const Agenda: React.FC = () => {
       
       // Update local state
       setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, status: newStatus } : a));
-      setSelectedAppointment(prev => prev ? { ...prev, status: newStatus } : null);
+      setSelectedAppointment((prev: any) => prev ? { ...prev, status: newStatus } : null);
       showToast('Status da consulta atualizado com sucesso!', 'success');
     } catch (err) {
       console.error('Erro ao atualizar status da consulta:', err);
@@ -434,6 +446,10 @@ export const Agenda: React.FC = () => {
               <span className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
                 <span className="w-2 h-2 rounded-full bg-rose-500" />
                 Cancelado
+              </span>
+              <span className="flex items-center gap-1 text-[11px] font-bold text-slate-605">
+                <span className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-amber-400/50 animate-pulse" />
+                Atenção
               </span>
             </div>
           </div>
@@ -584,23 +600,29 @@ export const Agenda: React.FC = () => {
                               const initials = prof
                                 ? prof.full_name.split(' ').filter(Boolean).map((n: any) => n[0]).join('').slice(0, 2).toUpperCase()
                                 : '';
+                              const attention = isAttention(apt);
                               return (
                                 <div 
                                   key={apt.id}
                                   onClick={(e) => handleAppointmentClick(apt, e)}
-                                  title={`Consulta com ${prof?.full_name || 'Nutricionista'}`}
+                                  title={attention 
+                                    ? `Atenção: Consulta pendente de prontuário com ${prof?.full_name || 'Nutricionista'}` 
+                                    : `Consulta com ${prof?.full_name || 'Nutricionista'}`}
                                   className={`text-[10px] px-2 py-0.5 rounded-md border flex items-center justify-between gap-1 transition-all hover:translate-x-0.5 shadow-sm min-w-0 ${
+                                    attention ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold ring-1 ring-amber-500/25' :
                                     apt.status === 'confirmado' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 
                                     apt.status === 'pendente' ? 'bg-amber-50 border-amber-100 text-amber-800' : 
                                     'bg-rose-50 border-rose-100 text-rose-800'
                                   }`}
                                 >
-                                  <span className="truncate pr-0.5">
+                                  <span className="truncate pr-0.5 flex items-center gap-0.5">
+                                    {attention && <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />}
                                     <strong>{format(new Date(apt.date_time), 'HH:mm')}</strong> {apt.patients?.name || 'Paciente'}
                                   </span>
                                   {initials && (
                                     <span 
                                       className={`shrink-0 text-[8px] font-black px-1 py-px rounded-md border scale-90 ${
+                                        attention ? 'bg-amber-100/50 border-amber-250/50 text-amber-900' :
                                         apt.status === 'confirmado' ? 'bg-emerald-100/50 border-emerald-200/50 text-emerald-900' : 
                                         apt.status === 'pendente' ? 'bg-amber-100/50 border-amber-200/50 text-amber-900' : 
                                         'bg-rose-100/50 border-rose-200/50 text-rose-900'
@@ -669,12 +691,16 @@ export const Agenda: React.FC = () => {
                           ) : (
                             dayAppointments.map(apt => {
                               const prof = professionals.find(p => p.id === apt.nutritionist_id);
+                              const attention = isAttention(apt);
                               return (
                                 <div 
                                   key={apt.id}
                                   onClick={(e) => handleAppointmentClick(apt, e)}
-                                  title={`Consulta com ${prof?.full_name || 'Nutricionista'}`}
+                                  title={attention 
+                                    ? `Atenção: Consulta pendente de prontuário com ${prof?.full_name || 'Nutricionista'}` 
+                                    : `Consulta com ${prof?.full_name || 'Nutricionista'}`}
                                   className={`p-3 rounded-xl border text-left cursor-pointer transition-all hover:translate-x-0.5 hover:shadow-sm ${
+                                    attention ? 'bg-amber-50/80 border-amber-300 text-amber-950 ring-1 ring-amber-500/25' :
                                     apt.status === 'confirmado' ? 'bg-emerald-50/60 border-emerald-100 text-emerald-900' : 
                                     apt.status === 'pendente' ? 'bg-amber-50/60 border-amber-100 text-amber-900' : 
                                     'bg-rose-50/60 border-rose-100 text-rose-900'
@@ -685,11 +711,18 @@ export const Agenda: React.FC = () => {
                                       <Clock className="w-3.5 h-3.5" />
                                       {format(new Date(apt.date_time), 'HH:mm')}
                                     </span>
-                                    <span className={`h-1.5 w-1.5 rounded-full ${
-                                      apt.status === 'confirmado' ? 'bg-emerald-500' : 
-                                      apt.status === 'pendente' ? 'bg-amber-500' : 
-                                      'bg-rose-500'
-                                    }`} />
+                                    {attention ? (
+                                      <span className="text-[9px] font-extrabold text-amber-700 flex items-center gap-0.5 bg-amber-100/60 px-1.5 py-0.5 rounded border border-amber-250 animate-pulse">
+                                        <AlertCircle className="w-2.5 h-2.5 text-amber-600" />
+                                        Atenção
+                                      </span>
+                                    ) : (
+                                      <span className={`h-1.5 w-1.5 rounded-full ${
+                                        apt.status === 'confirmado' ? 'bg-emerald-500' : 
+                                        apt.status === 'pendente' ? 'bg-amber-500' : 
+                                        'bg-rose-500'
+                                      }`} />
+                                    )}
                                   </div>
                                   <p className="text-xs font-bold truncate">{apt.patients?.name || 'Paciente'}</p>
                                   <p className="text-[10px] text-slate-500 truncate mt-0.5">{apt.services?.name || 'Serviço'}</p>
@@ -736,62 +769,74 @@ export const Agenda: React.FC = () => {
                           <p className="mt-1 text-xs text-slate-400 max-w-xs">Não existem consultas agendadas para esta data.</p>
                         </div>
                       ) : (
-                        selectedDayAppointments.map(apt => (
-                          <div 
-                            key={apt.id}
-                            onClick={(e) => handleAppointmentClick(apt, e)}
-                            className="group relative bg-white border border-slate-100 hover:border-slate-200/85 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm hover:shadow transition-all duration-300 cursor-pointer"
-                          >
-                            <div className={`absolute top-0 bottom-0 left-0 w-1.5 rounded-l-2xl ${
-                              apt.status === 'confirmado' ? 'bg-emerald-500' : 
-                              apt.status === 'pendente' ? 'bg-amber-500' : 
-                              'bg-rose-500'
-                            }`} />
-                            
-                            <div className="flex flex-col items-center justify-center sm:w-24 shrink-0 sm:border-r border-slate-100 pr-4 pl-2">
-                              <span className="text-2xl font-black text-slate-800">
-                                {format(new Date(apt.date_time), 'HH:mm')}
-                              </span>
-                              <span className="text-[10px] font-semibold text-slate-400 mt-1 flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5" />
-                                {apt.services?.duration_minutes || 60} min
-                              </span>
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="text-base font-extrabold text-slate-800 truncate">
-                                  {apt.patients?.name || 'Paciente'}
-                                </h4>
-                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                  apt.status === 'confirmado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 
-                                  apt.status === 'pendente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
-                                  'bg-rose-50 text-rose-700 border border-rose-100'
-                                }`}>
-                                  {apt.status === 'confirmado' ? 'Confirmado' : apt.status === 'pendente' ? 'Pendente' : 'Cancelado'}
+                        selectedDayAppointments.map(apt => {
+                          const attention = isAttention(apt);
+                          return (
+                            <div 
+                              key={apt.id}
+                              onClick={(e) => handleAppointmentClick(apt, e)}
+                              className={`group relative bg-white border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm hover:shadow transition-all duration-300 cursor-pointer ${
+                                attention ? 'border-amber-250 bg-amber-50/30' : 'border-slate-100 hover:border-slate-200/85'
+                              }`}
+                            >
+                              <div className={`absolute top-0 bottom-0 left-0 w-1.5 rounded-l-2xl ${
+                                attention ? 'bg-amber-500 ring-2 ring-amber-400/50' :
+                                apt.status === 'confirmado' ? 'bg-emerald-500' : 
+                                apt.status === 'pendente' ? 'bg-amber-500' : 
+                                'bg-rose-500'
+                              }`} />
+                              
+                              <div className="flex flex-col items-center justify-center sm:w-24 shrink-0 sm:border-r border-slate-100 pr-4 pl-2">
+                                <span className="text-2xl font-black text-slate-800">
+                                  {format(new Date(apt.date_time), 'HH:mm')}
+                                </span>
+                                <span className="text-[10px] font-semibold text-slate-400 mt-1 flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  {apt.services?.duration_minutes || 60} min
                                 </span>
                               </div>
-                              <p className="text-sm font-semibold text-slate-500 mt-1">
-                                {apt.services?.name || 'Serviço'}
-                              </p>
                               
-                              {/* Show professional details */}
-                              {professionals.find(p => p.id === apt.nutritionist_id) && (
-                                <p className="text-xs font-medium text-slate-400 mt-2.5 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded w-fit">
-                                  <User className="w-3.5 h-3.5 text-slate-400" />
-                                  Nutricionista: {professionals.find(p => p.id === apt.nutritionist_id)?.full_name}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-base font-extrabold text-slate-800 truncate">
+                                    {apt.patients?.name || 'Paciente'}
+                                  </h4>
+                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                    apt.status === 'confirmado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 
+                                    apt.status === 'pendente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
+                                    'bg-rose-50 text-rose-700 border border-rose-100'
+                                  }`}>
+                                    {apt.status === 'confirmado' ? 'Confirmado' : apt.status === 'pendente' ? 'Pendente' : 'Cancelado'}
+                                  </span>
+                                  {attention && (
+                                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm animate-pulse">
+                                      <AlertCircle className="w-3 h-3 text-amber-600" />
+                                      Sem Anotações
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm font-semibold text-slate-500 mt-1">
+                                  {apt.services?.name || 'Serviço'}
                                 </p>
-                              )}
+                                
+                                {/* Show professional details */}
+                                {professionals.find(p => p.id === apt.nutritionist_id) && (
+                                  <p className="text-xs font-medium text-slate-400 mt-2.5 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded w-fit">
+                                    <User className="w-3.5 h-3.5 text-slate-400" />
+                                    Nutricionista: {professionals.find(p => p.id === apt.nutritionist_id)?.full_name}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center justify-end shrink-0 sm:pl-4">
+                                <span className="text-xs font-bold text-slate-400 group-hover:text-primary-600 transition-colors">
+                                  Gerenciar
+                                </span>
+                                <ChevronRightIcon className="w-4 h-4 text-slate-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all ml-1" />
+                              </div>
                             </div>
-                            
-                            <div className="flex items-center justify-end shrink-0 sm:pl-4">
-                              <span className="text-xs font-bold text-slate-400 group-hover:text-primary-600 transition-colors">
-                                Gerenciar
-                              </span>
-                              <ChevronRightIcon className="w-4 h-4 text-slate-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all ml-1" />
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -1056,6 +1101,18 @@ export const Agenda: React.FC = () => {
             {/* Content body */}
             <div className="p-6 space-y-6">
               
+              {isAttention(selectedAppointment) && (
+                <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4 flex gap-3 animate-in fade-in duration-300">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-extrabold text-amber-900">Atenção: Consulta pendente de prontuário</p>
+                    <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                      Esta consulta ocorreu no passado mas está sem nenhuma anotação registrada. Acesse a tela de <strong>Consultas</strong> para realizar o atendimento e preencher o prontuário do paciente.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Main summary card */}
               <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex gap-3.5 relative">
                 <div className={`absolute top-0 bottom-0 left-0 w-1.5 rounded-l-2xl ${

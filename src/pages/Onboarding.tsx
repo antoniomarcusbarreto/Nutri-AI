@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Building2, Users, ClipboardList, CheckCircle2, User, Apple, Upload } from 'lucide-react';
@@ -9,10 +8,9 @@ export const Onboarding: React.FC = () => {
   const [step, setStep] = useState(1);
   const { clinic, session, profile } = useAuth();
   const { showToast } = useToast();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  const formatToBrDate = (dateString?: string) => {
+  const formatToBrDate = (dateString?: string | null) => {
     if (!dateString) return '';
     if (dateString.includes('/')) return dateString;
     const [year, month, day] = dateString.split('-');
@@ -404,20 +402,20 @@ export const Onboarding: React.FC = () => {
                 
                 <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700">Nome Completo</label>
-                    <input type="text" required value={profileData.full_name} onChange={e => setProfileData({...profileData, full_name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Nome Completo</label>
+                    <input type="text" required value={profileData.full_name} onChange={e => setProfileData({...profileData, full_name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Data de Nascimento</label>
-                    <input type="text" placeholder="DD/MM/AAAA" maxLength={10} value={profileData.birth_date} onChange={handleDateChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border text-slate-700" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Data de Nascimento</label>
+                    <input type="text" placeholder="DD/MM/AAAA" maxLength={10} value={profileData.birth_date} onChange={handleDateChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border text-slate-700" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Celular</label>
-                    <input type="text" placeholder="(00) 00000-0000" maxLength={15} value={profileData.phone} onChange={handlePhoneChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Celular</label>
+                    <input type="text" placeholder="(00) 00000-0000" maxLength={15} value={profileData.phone} onChange={handlePhoneChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700">CRN / CRM</label>
-                    <input type="text" placeholder="Ex: CRN-3 123456" maxLength={15} value={profileData.crn} onChange={handleCrnChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">CRN / CRM</label>
+                    <input type="text" placeholder="Ex: CRN-3 123456" maxLength={15} value={profileData.crn} onChange={handleCrnChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                 </div>
 
@@ -444,44 +442,44 @@ export const Onboarding: React.FC = () => {
                 
                 <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                   <div className="sm:col-span-6">
-                    <label className="block text-sm font-medium text-slate-700">Nome da Clínica/Consultório</label>
-                    <input type="text" placeholder="Ex: Consultório de Nutrição" value={clinicData.name} onChange={e => setClinicData({...clinicData, name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Nome da Clínica/Consultório</label>
+                    <input type="text" placeholder="Ex: Consultório de Nutrição" value={clinicData.name} onChange={e => setClinicData({...clinicData, name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700">CEP</label>
-                    <input type="text" value={clinicData.cep} onChange={e => setClinicData({...clinicData, cep: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">CEP</label>
+                    <input type="text" value={clinicData.cep} onChange={e => setClinicData({...clinicData, cep: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-4">
-                    <label className="block text-sm font-medium text-slate-700">Endereço</label>
-                    <input type="text" value={clinicData.address} onChange={e => setClinicData({...clinicData, address: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Endereço</label>
+                    <input type="text" value={clinicData.address} onChange={e => setClinicData({...clinicData, address: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700">Número/Complemento</label>
-                    <input type="text" value={clinicData.complement} onChange={e => setClinicData({...clinicData, complement: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Número/Complemento</label>
+                    <input type="text" value={clinicData.complement} onChange={e => setClinicData({...clinicData, complement: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700">Bairro</label>
-                    <input type="text" value={clinicData.neighborhood} onChange={e => setClinicData({...clinicData, neighborhood: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Bairro</label>
+                    <input type="text" value={clinicData.neighborhood} onChange={e => setClinicData({...clinicData, neighborhood: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-1">
-                    <label className="block text-sm font-medium text-slate-700">Cidade</label>
-                    <input type="text" value={clinicData.city} onChange={e => setClinicData({...clinicData, city: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Cidade</label>
+                    <input type="text" value={clinicData.city} onChange={e => setClinicData({...clinicData, city: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-1">
-                    <label className="block text-sm font-medium text-slate-700">Estado</label>
-                    <input type="text" value={clinicData.state} onChange={e => setClinicData({...clinicData, state: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Estado</label>
+                    <input type="text" value={clinicData.state} onChange={e => setClinicData({...clinicData, state: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-3">
-                    <label className="block text-sm font-medium text-slate-700">Telefone da Clínica</label>
-                    <input type="text" placeholder="(00) 0000-0000" maxLength={15} value={clinicData.phone} onChange={handleClinicPhoneChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Telefone da Clínica</label>
+                    <input type="text" placeholder="(00) 0000-0000" maxLength={15} value={clinicData.phone} onChange={handleClinicPhoneChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-3">
-                    <label className="block text-sm font-medium text-slate-700">E-mail da Clínica</label>
-                    <input type="email" value={clinicData.email} onChange={e => setClinicData({...clinicData, email: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">E-mail da Clínica</label>
+                    <input type="email" value={clinicData.email} onChange={e => setClinicData({...clinicData, email: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-6">
-                    <label className="block text-sm font-medium text-slate-700">Horário de Funcionamento</label>
-                    <input type="text" placeholder="Ex: Seg a Sex das 08h às 18h" value={clinicData.operating_hours} onChange={e => setClinicData({...clinicData, operating_hours: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border" />
+                    <label className="block text-base font-bold text-slate-700 mb-1">Horário de Funcionamento</label>
+                    <input type="text" placeholder="Ex: Seg a Sex das 08h às 18h" value={clinicData.operating_hours} onChange={e => setClinicData({...clinicData, operating_hours: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                 </div>
 
@@ -509,22 +507,22 @@ export const Onboarding: React.FC = () => {
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-slate-700">Nome</label>
-                      <input type="text" value={newInvite.name} onChange={e => setNewInvite({...newInvite, name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border" />
+                      <label className="block text-base font-bold text-slate-700 mb-1">Nome</label>
+                      <input type="text" value={newInvite.name} onChange={e => setNewInvite({...newInvite, name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 text-base px-4 py-3 border" />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-slate-700">E-mail</label>
-                      <input type="email" value={newInvite.email} onChange={e => setNewInvite({...newInvite, email: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border" />
+                      <label className="block text-base font-bold text-slate-700 mb-1">E-mail</label>
+                      <input type="email" value={newInvite.email} onChange={e => setNewInvite({...newInvite, email: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 text-base px-4 py-3 border" />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-slate-700">Função</label>
-                      <select value={newInvite.role} onChange={e => setNewInvite({...newInvite, role: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border bg-white">
+                      <label className="block text-base font-bold text-slate-700 mb-1">Função</label>
+                      <select value={newInvite.role} onChange={e => setNewInvite({...newInvite, role: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 text-base px-4 py-3 border bg-white">
                         <option value="nutritionist">Nutricionista</option>
                         <option value="secretary">Secretária</option>
                       </select>
                     </div>
                     <div className="sm:col-span-2 flex items-end">
-                      <button type="button" onClick={addInvite} className="w-full bg-slate-800 text-white py-2 px-4 rounded-md text-sm hover:bg-slate-700">
+                      <button type="button" onClick={addInvite} className="w-full bg-slate-800 text-white py-2.5 px-4 rounded-md text-sm hover:bg-slate-700 font-bold transition-colors">
                         Adicionar à lista
                       </button>
                     </div>
@@ -569,27 +567,27 @@ export const Onboarding: React.FC = () => {
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-slate-700">Nome do Serviço</label>
-                      <input type="text" placeholder="Ex: Primeira Consulta" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border" />
+                      <label className="block text-base font-bold text-slate-700 mb-1">Nome do Serviço</label>
+                      <input type="text" placeholder="Ex: Primeira Consulta" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 text-base px-4 py-3 border" />
                     </div>
                     <div className="sm:col-span-1">
-                      <label className="block text-xs font-medium text-slate-700">Duração (min)</label>
-                      <input type="number" value={newService.duration_minutes} onChange={e => setNewService({...newService, duration_minutes: parseInt(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border" />
+                      <label className="block text-base font-bold text-slate-700 mb-1">Duração (min)</label>
+                      <input type="number" value={newService.duration_minutes} onChange={e => setNewService({...newService, duration_minutes: parseInt(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 text-base px-4 py-3 border" />
                     </div>
                     <div className="sm:col-span-1">
-                      <label className="block text-xs font-medium text-slate-700">Preço (R$)</label>
-                      <input type="number" value={newService.price} onChange={e => setNewService({...newService, price: parseFloat(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border" />
+                      <label className="block text-base font-bold text-slate-700 mb-1">Preço (R$)</label>
+                      <input type="number" value={newService.price} onChange={e => setNewService({...newService, price: parseFloat(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 text-base px-4 py-3 border" />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-slate-700">Modalidade</label>
-                      <select value={newService.modality} onChange={e => setNewService({...newService, modality: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 sm:text-sm px-3 py-2 border bg-white">
+                      <label className="block text-base font-bold text-slate-700 mb-1">Modalidade</label>
+                      <select value={newService.modality} onChange={e => setNewService({...newService, modality: e.target.value})} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 text-base px-4 py-3 border bg-white">
                         <option value="presencial">Presencial</option>
                         <option value="online">Online</option>
                         <option value="hibrido">Híbrido</option>
                       </select>
                     </div>
                     <div className="sm:col-span-2 flex items-end">
-                      <button type="button" onClick={addService} className="w-full bg-slate-800 text-white py-2 px-4 rounded-md text-sm hover:bg-slate-700">
+                      <button type="button" onClick={addService} className="w-full bg-slate-800 text-white py-2.5 px-4 rounded-md text-sm hover:bg-slate-700 font-bold transition-colors">
                         Adicionar à lista
                       </button>
                     </div>

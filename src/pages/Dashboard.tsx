@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, CalendarCheck, Clock, AlertTriangle, Info, CheckCircle, Circle, Trash2, Plus, ChevronLeft, ChevronRight, Lock, Utensils, Copy } from 'lucide-react';
+import { Users, CalendarCheck, Clock, CheckCircle, Circle, Trash2, Plus, ChevronLeft, ChevronRight, Lock, Utensils, Copy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 
 export const Dashboard: React.FC = () => {
-  const { remainingTrialDays, isReadOnly, clinic, profile } = useAuth();
+  const { isReadOnly, clinic, profile } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
@@ -155,34 +155,15 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Trial Banner */}
-      {!isReadOnly ? (
-        <div className="rounded-2xl bg-blue-50 border border-blue-200 p-5 flex items-start gap-4 shadow-sm transition-all hover:shadow-md">
-          <Info className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-lg font-bold text-blue-900">Período de Degustação</h3>
-            <p className="mt-1.5 text-base font-medium text-blue-700 leading-relaxed">
-              Você tem <strong>{remainingTrialDays} {remainingTrialDays === 1 ? 'dia restante' : 'dias restantes'}</strong> no seu período de teste grátis. Aproveite todos os recursos!
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl bg-red-50 border border-red-200 p-5 flex items-start gap-4 shadow-sm transition-all hover:shadow-md">
-          <AlertTriangle className="h-6 w-6 text-red-650 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-lg font-bold text-red-950">Período de Degustação Encerrado</h3>
-            <p className="mt-1.5 text-base font-medium text-red-800 leading-relaxed">
-              O sistema agora encontra-se em modo <strong>somente leitura</strong>. Assine um plano para voltar a cadastrar e editar informações.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Header Visão Geral */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 shrink-0">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-800">Visão Geral</h1>
-          <p className="text-base font-medium text-slate-500 mt-1">Acompanhe os resultados da sua clínica no período selecionado.</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            Visão Geral
+          </h1>
+          <p className="text-sm font-medium text-slate-500 mt-1">
+            Acompanhe os resultados da sua clínica no período selecionado.
+          </p>
         </div>
         
         <div className="flex items-center gap-4 bg-white px-5 py-2.5 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-slate-300">
@@ -209,7 +190,7 @@ export const Dashboard: React.FC = () => {
               <p className="ml-18 truncate text-xs font-bold uppercase tracking-wider text-slate-400">{stat.name}</p>
             </dt>
             <dd className="ml-18 flex items-baseline pb-1 mt-1 sm:pb-2">
-              <p className="text-3xl font-extrabold text-slate-900 tracking-tight">{stat.value}</p>
+              <p className="text-2xl font-black text-slate-900 tracking-tight">{stat.value}</p>
               <p
                 className={`ml-2.5 flex items-baseline text-xs font-semibold px-2 py-0.5 rounded-full ${
                   stat.changeType === 'positive' ? 'text-green-700 bg-green-50' : stat.changeType === 'negative' ? 'text-red-700 bg-red-50' : 'text-slate-500 bg-slate-50'
@@ -228,7 +209,7 @@ export const Dashboard: React.FC = () => {
         {/* Upcoming appointments card */}
         <div className="bg-white rounded-3xl p-6.5 shadow-sm border border-slate-200/60 flex flex-col max-h-[480px]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 shrink-0">
-            <h2 className="text-2xl font-extrabold tracking-tight text-slate-800">Próximos Agendamentos</h2>
+            <h2 className="text-lg font-black text-slate-800">Próximos Agendamentos</h2>
             <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-2xl shrink-0">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status:</span>
               <span className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
@@ -324,7 +305,7 @@ export const Dashboard: React.FC = () => {
         {/* Reminders Card */}
         <div className="bg-white rounded-3xl p-6.5 shadow-sm border border-slate-200/60 flex flex-col max-h-[480px]">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-2xl font-extrabold tracking-tight text-slate-800">Lembretes</h2>
+            <h2 className="text-lg font-black text-slate-800">Lembretes</h2>
             {isPastMonth() ? (
               <span className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
                 <Lock className="w-3.5 h-3.5" />

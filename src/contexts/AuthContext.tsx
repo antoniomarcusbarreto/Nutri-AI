@@ -11,6 +11,8 @@ interface Profile {
   theme_mode?: string;
   theme_color?: string;
   avatar_url?: string;
+  birth_date?: string | null;
+  phone?: string;
 }
 
 interface Clinic {
@@ -20,6 +22,15 @@ interface Clinic {
   created_at: string;
   subscription_status?: 'trial' | 'active' | 'inactive';
   subscription_end_date?: string | null;
+  cep?: string;
+  address?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  complement?: string;
+  operating_hours?: string;
+  email?: string;
+  phone?: string;
 }
 
 interface AuthContextType {
@@ -105,13 +116,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const { remainingTrialDays, isReadOnly, isTrialActive } = calculateTrial(clinic);
 
-  const applyTheme = (mode: string, color: string) => {
+  const applyTheme = (_mode: string, color: string) => {
     const root = document.documentElement;
-    if (mode === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
     root.setAttribute('data-theme', color);
   };
 

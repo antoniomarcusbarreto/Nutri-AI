@@ -23,6 +23,7 @@ import { PatientPortal } from './pages/PatientPortal';
 import { PreConsulta } from './pages/PreConsulta';
 import { ConfirmAppointment } from './pages/ConfirmAppointment';
 import { ToastProvider } from './contexts/ToastContext';
+import { Exams } from './pages/Exams';
 
 function App() {
   return (
@@ -57,9 +58,10 @@ function App() {
             <Route path="/pacientes" element={<Patients />} />
             <Route path="/servicos" element={<Services />} />
             <Route path="/financeiro" element={<Financial />} />
-            <Route path="/atas" element={<Consultations />} />
+            <Route path="/consultas" element={<Consultations />} />
             <Route path="/acompanhamento" element={<Tracking />} />
             <Route path="/planos" element={<MealPlans />} />
+            <Route path="/exames" element={<Exams />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/settings" element={<Settings />} />
             {/* Catch-all redirect to dashboard for logged in users */}

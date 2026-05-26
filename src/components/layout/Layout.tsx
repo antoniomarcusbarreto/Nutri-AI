@@ -11,7 +11,6 @@ export const Layout: React.FC = () => {
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const themeMode = profile?.theme_mode || 'light';
   const themeColor = profile?.theme_color || 'white';
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,21 +44,20 @@ export const Layout: React.FC = () => {
       }
     }
   };
-
   const getHeaderTheme = () => {
-    if (themeMode === 'dark') return 'bg-slate-900 border-b border-slate-800/40 text-white';
-    if (themeMode === 'light' && themeColor === 'teal') return 'bg-[#115e59] border-b border-teal-700/20 text-white';
-    if (themeMode === 'light' && themeColor === 'blue') return 'bg-blue-800 border-b border-blue-700/20 text-white';
+    if (themeColor === 'dark') return 'bg-[#0b132b] border-b border-[#1c2541] text-white';
+    if (themeColor === 'teal') return 'bg-[#115e59] border-b border-teal-700/20 text-white';
+    if (themeColor === 'blue') return 'bg-blue-800 border-b border-blue-700/20 text-white';
     return 'bg-white border-b border-slate-100 text-slate-700'; // Default fallback
   };
 
   const getTextColor = () => {
-    if (themeMode === 'dark' || themeColor === 'blue' || themeColor === 'teal') return 'text-slate-100';
+    if (themeColor === 'blue' || themeColor === 'teal' || themeColor === 'dark') return 'text-slate-100';
     return 'text-slate-700';
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 font-sans">
+    <div className={`flex h-screen overflow-hidden ${themeColor === 'dark' ? 'bg-[#0f172a] theme-dark' : 'bg-[#f8fafc]'} font-sans transition-colors duration-200`}>
       <Sidebar />
       <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
         {/* Header Superior Simples */}

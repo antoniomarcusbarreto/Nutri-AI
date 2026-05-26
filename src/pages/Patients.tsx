@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MoreVertical, Mail, Phone, Lock, X, Edit, Power, PowerOff, Check, ClipboardList } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Lock, X, Edit, Power, PowerOff, Check, ClipboardList } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -186,7 +186,7 @@ export const Patients: React.FC = () => {
         // Create new patient via RPC
         const generatedPassword = formData.has_app_access ? formData.password : Math.random().toString(36).slice(-8) + 'A1@';
         
-        const { data, error: rpcError } = await supabase.rpc('create_patient_account', {
+        const { error: rpcError } = await supabase.rpc('create_patient_account', {
           p_clinic_id: clinic.id,
           p_name: formData.name,
           p_cpf: formData.cpf,
@@ -281,7 +281,7 @@ export const Patients: React.FC = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Pacientes</h1>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">Pacientes</h1>
           <p className="text-sm text-slate-500 mt-1">Gerencie seus pacientes e prontuários.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -460,25 +460,25 @@ export const Patients: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo *</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1">Nome Completo *</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={e => setFormData({...formData, name: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">E-mail {editingPatient ? '(Fixo)' : '*'}</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1">E-mail {editingPatient ? '(Fixo)' : '*'}</label>
                   <input
                     type="email"
                     required={!editingPatient}
                     disabled={!!editingPatient}
                     value={formData.email}
                     onChange={e => setFormData({...formData, email: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700 disabled:bg-slate-50 disabled:text-slate-500"
                   />
                   {!editingPatient && (
                     <p className="text-xs text-slate-500 mt-1">Será usado para o login.</p>
@@ -495,7 +495,7 @@ export const Patients: React.FC = () => {
                         className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-600 cursor-pointer"
                       />
                       <div>
-                        <span className="block text-sm font-medium text-slate-900">Permitir acesso do paciente ao Aplicativo</span>
+                        <span className="block text-base font-bold text-slate-900">Permitir acesso do paciente ao Aplicativo</span>
                         <span className="block text-xs text-slate-500 mt-0.5">O paciente poderá fazer login para ver o plano alimentar e registrar o diário.</span>
                       </div>
                     </label>
@@ -504,58 +504,58 @@ export const Patients: React.FC = () => {
 
                 {!editingPatient && formData.has_app_access && (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Senha de Acesso *</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">Senha de Acesso *</label>
                     <input
                       type="password"
                       required
                       minLength={6}
                       value={formData.password}
                       onChange={e => setFormData({...formData, password: e.target.value})}
-                      className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Telefone (WhatsApp) *</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1">Telefone (WhatsApp) *</label>
                   <input
                     type="text"
                     required
                     value={formData.phone}
                     onChange={e => setFormData({...formData, phone: formatPhone(e.target.value)})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">CPF</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1">CPF</label>
                   <input
                     type="text"
                     value={formData.cpf}
                     onChange={e => setFormData({...formData, cpf: formatCPF(e.target.value)})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Data de Nascimento *</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1">Data de Nascimento *</label>
                   <input
                     type="text"
                     required
                     placeholder="DD/MM/AAAA"
                     value={formData.birth_date}
                     onChange={e => setFormData({...formData, birth_date: formatDateMask(e.target.value)})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Sexo Biológico *</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1">Sexo Biológico *</label>
                   <select
                     required
                     value={formData.biological_sex}
                     onChange={e => setFormData({...formData, biological_sex: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700 bg-white"
                   >
                     <option value="F">Feminino</option>
                     <option value="M">Masculino</option>
@@ -563,12 +563,12 @@ export const Patients: React.FC = () => {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Objetivo Principal *</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1">Objetivo Principal *</label>
                   <select
                     required
                     value={formData.main_goal}
                     onChange={e => setFormData({...formData, main_goal: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700 bg-white"
                   >
                     <option value="Emagrecimento">Emagrecimento</option>
                     <option value="Hipertrofia">Hipertrofia</option>
@@ -635,46 +635,46 @@ export const Patients: React.FC = () => {
                 
                 <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Alergias e Intolerâncias Alimentares</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">Alergias e Intolerâncias Alimentares</label>
                     <textarea
                       rows={2}
                       value={clinicalFormData.allergies}
                       onChange={e => setClinicalFormData({...clinicalFormData, allergies: e.target.value})}
                       placeholder="Ex: Glúten, Lactose, Oleaginosas. Se não possuir, deixe em branco."
-                      className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Restrições Culturais ou Opções Alimentares</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">Restrições Culturais ou Opções Alimentares</label>
                     <input
                       type="text"
                       value={clinicalFormData.dietary_restrictions}
                       onChange={e => setClinicalFormData({...clinicalFormData, dietary_restrictions: e.target.value})}
                       placeholder="Ex: Vegano, Vegetariano, Kosher"
-                      className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Patologias ou Doenças Crônicas</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">Patologias ou Doenças Crônicas</label>
                     <textarea
                       rows={2}
                       value={clinicalFormData.pathologies}
                       onChange={e => setClinicalFormData({...clinicalFormData, pathologies: e.target.value})}
                       placeholder="Ex: Diabetes Tipo 1/2, Hipertensão, Gastrite"
-                      className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Uso de Medicamentos / Suplementos Atuais</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">Uso de Medicamentos / Suplementos Atuais</label>
                     <textarea
                       rows={2}
                       value={clinicalFormData.medications}
                       onChange={e => setClinicalFormData({...clinicalFormData, medications: e.target.value})}
                       placeholder="Medicamentos e suplementos em uso"
-                      className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                     />
                   </div>
                 </div>
@@ -688,12 +688,12 @@ export const Patients: React.FC = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Nível de Atividade Física *</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">Nível de Atividade Física *</label>
                     <select
                       required
                       value={clinicalFormData.physical_activity_level}
                       onChange={e => setClinicalFormData({...clinicalFormData, physical_activity_level: e.target.value})}
-                      className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700 bg-white"
                     >
                       <option value="" disabled>Selecione...</option>
                       <option value="Sedentário">Sedentário (Nenhuma atividade física)</option>
@@ -704,26 +704,26 @@ export const Patients: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Profissão / Rotina de Trabalho *</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">Profissão / Rotina de Trabalho *</label>
                     <input
                       type="text"
                       required
                       value={clinicalFormData.profession}
                       onChange={e => setClinicalFormData({...clinicalFormData, profession: e.target.value})}
                       placeholder="Ex: Fica muito tempo sentado, em pé"
-                      className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Qualidade do Sono *</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">Qualidade do Sono *</label>
                     <input
                       type="text"
                       required
                       value={clinicalFormData.sleep_quality}
                       onChange={e => setClinicalFormData({...clinicalFormData, sleep_quality: e.target.value})}
                       placeholder="Ex: 8h por noite, sono reparador"
-                      className="block w-full rounded-xl border border-slate-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                     />
                   </div>
                 </div>

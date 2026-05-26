@@ -1,17 +1,25 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, Stethoscope, Settings, LogOut, Apple, Shield, DollarSign, FileText, Activity } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, Settings, LogOut, Apple, Shield, DollarSign, FileText, Activity, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
-  const { signOut, clinic, profile } = useAuth();
+  const { signOut, clinic, profile, userRole } = useAuth();
 
-  const navigation = [
+  interface NavItem {
+    name: string;
+    href: string;
+    icon: React.ComponentType<any>;
+    roles?: ('owner' | 'nutritionist' | 'secretary')[];
+  }
+
+  const navigation: NavItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Acompanhamento', href: '/acompanhamento', icon: Activity },
     { name: 'Agenda', href: '/agenda', icon: Calendar },
-    { name: 'Atas', href: '/atas', icon: FileText },
+    { name: 'Consultas', href: '/consultas', icon: FileText },
+    { name: 'Exames', href: '/exames', icon: ClipboardList, roles: ['owner', 'nutritionist'] },
     { name: 'Financeiro', href: '/financeiro', icon: DollarSign },
     { name: 'Pacientes', href: '/pacientes', icon: Users },
     { name: 'Planos Alimentares', href: '/planos', icon: Apple },
@@ -23,21 +31,7 @@ export const Sidebar: React.FC = () => {
 
   const getSidebarTheme = () => {
     const themeColor = profile?.theme_color || 'white';
-    const themeMode = profile?.theme_mode || 'light';
 
-    if (themeMode === 'dark' || themeColor === 'dark') {
-      return {
-        container: 'bg-slate-900 border-r-0 text-white',
-        border: 'border-b border-slate-800/30',
-        logoText: 'text-white',
-        logoIcon: 'text-slate-400',
-        activeItem: 'bg-slate-800 text-white',
-        inactiveItem: 'text-slate-400 hover:bg-slate-800 hover:text-white',
-        itemIconActive: 'text-white',
-        itemIconInactive: 'text-slate-500 group-hover:text-slate-300'
-      };
-    }
-    
     if (themeColor === 'blue') {
       return {
         container: 'bg-blue-800 border-r-0 text-white',
@@ -53,7 +47,7 @@ export const Sidebar: React.FC = () => {
 
     if (themeColor === 'teal') {
       return {
-        container: 'bg-[#115e59] border-r-0 text-white', // teal-800
+        container: 'bg-[#115e59] border-r-0 text-white', // teal-800 (Turquesa original)
         border: 'border-b border-teal-700/20',
         logoText: 'text-white',
         logoIcon: 'text-teal-200',
@@ -61,6 +55,19 @@ export const Sidebar: React.FC = () => {
         inactiveItem: 'text-teal-100 hover:bg-teal-700/40 hover:text-white',
         itemIconActive: 'text-white',
         itemIconInactive: 'text-teal-300 group-hover:text-white'
+      };
+    }
+
+    if (themeColor === 'dark') {
+      return {
+        container: 'bg-[#0b132b] border-r border-[#1c2541]/40 text-slate-100', // Azul-escuro profundo
+        border: 'border-b border-[#1c2541]/30',
+        logoText: 'text-slate-100 font-extrabold',
+        logoIcon: 'text-primary-400',
+        activeItem: 'bg-[#1c2541] text-primary-400 font-bold border-l-4 border-primary-500 rounded-r-xl rounded-l-none',
+        inactiveItem: 'text-slate-400 hover:bg-[#151d35] hover:text-primary-400 transition-all',
+        itemIconActive: 'text-primary-400',
+        itemIconInactive: 'text-slate-500 group-hover:text-primary-400 transition-all'
       };
     }
 
@@ -112,8 +119,10 @@ export const Sidebar: React.FC = () => {
             )}
 
             {/* If normal clinic user, show clinic-specific items */}
-            {clinic && navigation.map((item) => {
-              const isActive = location.pathname.startsWith(item.href);
+            {clinic && navigation
+              .filter(item => !item.roles || (userRole && item.roles.includes(userRole)))
+              .map((item) => {
+                const isActive = location.pathname.startsWith(item.href);
               return (
                 <li key={item.name}>
                   <Link
