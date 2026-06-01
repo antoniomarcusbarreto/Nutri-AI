@@ -30,7 +30,8 @@ import {
   UploadCloud,
   Trash2,
   Eye,
-  Copy
+  Copy,
+  MessageSquare
 } from 'lucide-react';
 import { format, isSameDay, isToday, parseISO, addDays, subDays, differenceInYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -97,6 +98,127 @@ export const Consultations: React.FC = () => {
   const [analyzingExam, setAnalyzingExam] = useState(false);
   const [selectedExamSignedUrl, setSelectedExamSignedUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+
+  // Observações e Anotações Clínicas
+  const [activeNoteEditIndex, setActiveNoteEditIndex] = useState<number | null>(null);
+  const [tempNoteText, setTempNoteText] = useState<string>('');
+
+  // Helper Functions for Clinical Evolution and Note Processing
+  const parseNumericValue = (valStr: string) => {
+    if (!valStr) return { numeric: null, unit: '' };
+    const cleanStr = valStr.trim();
+    const numMatch = cleanStr.match(/(-?[0-9]+([.,][0-9]+)?)/);
+    if (!numMatch) return { numeric: null, unit: '' };
+    const numeric = parseFloat(numMatch[1].replace(',', '.'));
+    const unit = cleanStr.replace(numMatch[1], '').trim();
+    return { numeric, unit };
+  };
+
+  const getPreviousExamBiomarker = (currentExam: any, marcador: string) => {
+    if (!exams || exams.length <= 1 || !currentExam) return null;
+    
+    const currentExamDate = new Date(currentExam.exam_date || currentExam.created_at);
+    
+    const olderExams = exams
+      .filter((e: any) => e.id !== currentExam.id)
+      .filter((e: any) => {
+        const eDate = new Date(e.exam_date || e.created_at);
+        return eDate < currentExamDate;
+      })
+      .sort((a: any, b: any) => {
+        const aDate = new Date(a.exam_date || a.created_at);
+        const bDate = new Date(b.exam_date || b.created_at);
+        return bDate.getTime() - aDate.getTime();
+      });
+      
+    if (olderExams.length === 0) return null;
+    
+    const prevExam = olderExams[0];
+    if (!prevExam.ai_feedback?.todos_biomarcadores) return null;
+    
+    return prevExam.ai_feedback.todos_biomarcadores.find(
+      (b: any) => b.marcador.toLowerCase().trim() === marcador.toLowerCase().trim()
+    );
+  };
+
+  const getEvolutionIndicator = (currentValStr: string, prevValStr: string) => {
+    const current = parseNumericValue(currentValStr);
+    const prev = parseNumericValue(prevValStr);
+    
+    if (current.numeric === null || prev.numeric === null) {
+      return { text: '—', color: 'text-slate-400', diffStr: '' };
+    }
+    
+    const diff = current.numeric - prev.numeric;
+    const absDiff = Math.abs(diff).toFixed(1);
+    
+    if (diff > 0.05) {
+      return {
+        text: '↗',
+        color: 'text-rose-500 font-bold',
+        diffStr: `+${absDiff} ${current.unit || ''}`
+      };
+    } else if (diff < -0.05) {
+      return {
+        text: '↘',
+        color: 'text-teal-600 font-bold',
+        diffStr: `-${absDiff} ${current.unit || ''}`
+      };
+    } else {
+      return {
+        text: '→',
+        color: 'text-slate-400 font-bold',
+        diffStr: 'Estável'
+      };
+    }
+  };
+
+  const handleSaveBiomarkerNote = async (idx: number) => {
+    if (!selectedExam) return;
+    
+    const updatedBiomarkers = [...selectedExam.ai_feedback.todos_biomarcadores];
+    updatedBiomarkers[idx] = {
+      ...updatedBiomarkers[idx],
+      nota_clinica: tempNoteText.trim()
+    };
+    
+    const updatedAlerts = selectedExam.ai_feedback.alertas ? [...selectedExam.ai_feedback.alertas] : [];
+    const marcadorName = updatedBiomarkers[idx].marcador;
+    
+    const alertIdx = updatedAlerts.findIndex((a: any) => a.marcador === marcadorName);
+    if (alertIdx !== -1) {
+      updatedAlerts[alertIdx] = {
+        ...updatedAlerts[alertIdx],
+        nota_clinica: tempNoteText.trim()
+      };
+    }
+    
+    const updatedFeedback = {
+      ...selectedExam.ai_feedback,
+      todos_biomarcadores: updatedBiomarkers,
+      alertas: updatedAlerts
+    };
+    
+    try {
+      const { error: dbError } = await supabase
+        .from('patient_exams')
+        .update({ ai_feedback: updatedFeedback })
+        .eq('id', selectedExam.id);
+        
+      if (dbError) throw dbError;
+      
+      const updatedExam = { ...selectedExam, ai_feedback: updatedFeedback };
+      setSelectedExam(updatedExam);
+      setExams(prev => prev.map(e => e.id === selectedExam.id ? updatedExam : e));
+      
+      setActiveNoteEditIndex(null);
+      setTempNoteText('');
+      showToast('Observação clínica salva com sucesso!', 'success');
+    } catch (err: any) {
+      console.error('Erro ao salvar nota do biomarcador:', err);
+      showToast('Erro ao salvar observação clínica.', 'error');
+    }
+  };
 
   // Form State for new Consultation
   const [anamneseNotes, setAnamneseNotes] = useState('');
@@ -389,11 +511,24 @@ export const Consultations: React.FC = () => {
       setTimeout(async () => {
         const mockFeedback = {
           alertas: [
-            { marcador: "Vitamina D (25-OH)", valor: "18 ng/mL", referencia: "Desejável > 30 ng/mL", gravidade: "alta" },
-            { marcador: "Glicemia de Jejum", valor: "108 mg/dL", referencia: "70 a 99 mg/dL", gravidade: "media" },
-            { marcador: "Colesterol LDL", valor: "145 mg/dL", referencia: "< 100 mg/dL", gravidade: "media" }
+            { marcador: "Anticorpos Anti-TPO", valor: "120 UI/mL", referencia: "< 9 UI/mL", gravidade: "alta" },
+            { marcador: "TSH (Hormônio Tireoestimulante)", valor: "8.4 mUI/L", referencia: "0.4 a 4.5 mUI/L", gravidade: "alta" },
+            { marcador: "Vitamina D (25-OH)", valor: "18 ng/mL", referencia: "Desejável > 30 ng/mL", gravidade: "alta" }
           ],
-          insights: "O exame do paciente revela uma deficiência crítica de Vitamina D (18 ng/mL), o que impacta diretamente a absorção de cálcio, modulação imunológica e síntese hormonal. Recomenda-se suplementação imediata de colecalciferol. Além disso, observa-se uma leve intolerância à glicose (108 mg/dL) caracterizando um quadro pré-diabético inicial, associado a um LDL elevado (145 mg/dL). Clinicamente, sugere-se uma intervenção dietética com foco na redução drástica de carboidratos simples de alto índice glicêmico e gorduras saturadas, priorizando gorduras monoinsaturadas (azeite de oliva, abacate), aumento expressivo de fibras solúveis (aveia, psyllium) e incentivo à prática regular de treinos de força resistidos para otimização da sensibilidade à insulina."
+          insights: "O laudo do paciente revela marcadores tireoidianos e imunológicos críticos altamente alterados. Destaca-se a elevação expressiva de Anticorpos Anti-TPO (120 UI/mL, sendo a referência < 9 UI/mL) associada a um TSH significativamente elevado (8.4 mUI/L), o que caracteriza clinicamente um quadro de Hipotireoidismo de Hashimoto. Na priorização clínica de segurança, estes alertas lideram a conduta. Além disso, observa-se uma deficiência severa de Vitamina D (18 ng/mL), o que compromete ainda mais a modulação imunológica e o suporte à glândula tireoide. Glicose de Jejum (86.6 mg/dL) e os lipídeos (Colesterol LDL a 95 mg/dL) encontram-se rigorosamente dentro da normalidade e estabilidade metabólica. Recomenda-se acompanhamento médico imediato para avaliação de reposição hormonal, associado a uma conduta nutricional altamente anti-inflamatória, rica em selênio, zinco, e suplementação intensiva de colecalciferol (Vitamina D3) para otimizar os receptores tireoidianos e modular a autoimunidade.",
+          todos_biomarcadores: [
+            { marcador: "Anticorpos Anti-TPO", valor: "120 UI/mL", referencia: "< 9 UI/mL", status: "alterado" },
+            { marcador: "TSH (Hormônio Tireoestimulante)", valor: "8.4 mUI/L", referencia: "0.4 a 4.5 mUI/L", status: "alterado" },
+            { marcador: "Vitamina D (25-OH)", valor: "18 ng/mL", referencia: "Desejável > 30 ng/mL", status: "alterado" },
+            { marcador: "Glicose de Jejum", valor: "86.6 mg/dL", referencia: "70 a 99 mg/dL", status: "normal" },
+            { marcador: "Hemoglobina Glicada (HbA1c)", valor: "5.3%", referencia: "< 5.7%", status: "normal" },
+            { marcador: "Colesterol LDL", valor: "95 mg/dL", referencia: "< 100 mg/dL", status: "normal" },
+            { marcador: "Colesterol Total", valor: "165 mg/dL", referencia: "< 190 mg/dL", status: "normal" },
+            { marcador: "Colesterol HDL", valor: "55 mg/dL", referencia: "> 40 mg/dL", status: "normal" },
+            { marcador: "Triglicerídeos", valor: "110 mg/dL", referencia: "< 150 mg/dL", status: "normal" },
+            { marcador: "Creatinina", valor: "0.8 mg/dL", referencia: "0.5 a 1.1 mg/dL", status: "normal" },
+            { marcador: "Ureia", valor: "28 mg/dL", referencia: "15 a 45 mg/dL", status: "normal" }
+          ]
         };
 
         try {
@@ -437,10 +572,44 @@ export const Consultations: React.FC = () => {
       });
       const base64Data = await base64Promise;
 
-      const systemInstruction = `Você é um assistente especialista em análises clínicas laboratoriais para nutrição. Analise o PDF do exame de sangue enviado. 
-Retorne um objeto JSON estrito com duas chaves:
-1. "alertas": Um array de objetos contendo { "marcador": string, "valor": string, "referencia": string, "gravidade": "alta" ou "media" } para tudo que estiver fora do padrão do laboratório.
-2. "insights": Um texto corrido e amigável com uma interpretação nutricional dos resultados e sugestões de foco para a dieta.`;
+      const systemInstruction = `Você é um analisador de exames laboratoriais de altíssima precisão. Sua tarefa é extrair e identificar apenas os marcadores que estão matematicamente fora dos valores de referência descritos pelo laboratório emissor.
+
+Diretrizes Clínicas de Priorização:
+- Alertas de Gravidade Alta: Qualquer marcador que esteja mais de 2x acima do limite superior ou abaixo do limite inferior (Ex: ANTICORPOS ANTI-TPO elevados, TSH muito acima da referência).
+- Não ignore dados hormonais e imunológicos em favor de marcadores metabólicos padrão (como glicose/colesterol). Se a tireoide ou anticorpos estiverem alterados, eles devem liderar os Alertas Críticos.
+
+Retorne o JSON estrito com o mapeamento real dos dados extraídos do documento, garantindo 100% de fidelidade numérica.
+
+Adote uma estratégia de checagem estrita em duas etapas (Chain-of-Thought) antes de gerar o parecer:
+
+Etapa 1: REGRAS ESTRITAS DE EXTRAÇÃO DE DADOS:
+- Mapeie linha por linha o nome exato do "Exame", o "Resultado" numérico exato e o "Valor de Referência" correspondente à idade e ao sexo do paciente.
+- É terminantemente proibido assumir valores ou aplicar médias estatísticas. Se o exame diz um valor específico (ex: "86,6 mg/dL"), o resultado retornado DEVE ser rigorosamente e exatamente o valor descrito no laudo (ex: "86,6 mg/dL").
+
+Etapa 2: COMPARAÇÃO MATEMÁTICA DE REFERÊNCIA:
+- Antes de classificar um biomarcador como alterado, compare matematicamente se o "Resultado" está estritamente fora dos limites inferior ou superior descritos no campo "Valor(es) de referência" do próprio laudo.
+- Um biomarcador SÓ deve ser classificado como alterado se seu valor numérico estiver estritamente acima do limite superior ou estritamente abaixo do limite inferior do valor de referência. Caso contrário, deve ser classificado como normal.
+
+Retorne um objeto JSON estrito com a seguinte estrutura e chaves exatas:
+{
+  "alertas": [
+    {
+      "marcador": "Nome exato do biomarcador alterado",
+      "valor": "Resultado numérico exato com unidade (ex: 18 ng/mL)",
+      "referencia": "Valor de referência exato correspondente à idade/sexo do paciente",
+      "gravidade": "alta" (se >2x o limite superior ou < o limite inferior do valor de referência, ou alteração imunológica/hormonal crítica) ou "media" (se levemente fora da referência)
+    }
+  ],
+  "insights": "Texto corrido com análise clínica e conduta nutricional funcional detalhada com base nos biomarcadores alterados e na priorização clínica (tireoide, anticorpos e marcadores hormonais/imunológicos devem liderar os alertas e análises sobre marcadores metabólicos padrão se estiverem alterados)",
+  "todos_biomarcadores": [
+    {
+      "marcador": "Nome exato de cada biomarcador lido no laudo",
+      "valor": "Resultado numérico exato com unidade (ex: 86,6 mg/dL)",
+      "referencia": "Valor de referência exato",
+      "status": "alterado" (se fora do limite) ou "normal" (se dentro dos limites inferior/superior)
+    }
+  ]
+}`;
 
       // 3. Request Google AI Studio Gemini API
       const aiResponse = await fetch(
@@ -2373,6 +2542,162 @@ ${metas_pactuadas.length > 0
                                 {selectedExam.ai_feedback.insights}
                               </div>
                             </div>
+                            {/* Full Biomarkers List */}
+                            {selectedExam.ai_feedback.todos_biomarcadores && (
+                              <div className="space-y-3 pt-2">
+                                <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                  <span className="w-1.5 h-3.5 bg-slate-400 rounded-sm" />
+                                  Lista Completa de Biomarcadores ({selectedExam.ai_feedback.todos_biomarcadores.length})
+                                </h5>
+                                
+                                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm animate-in fade-in duration-200">
+                                  <div className="p-3 bg-slate-50/50 grid grid-cols-12 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                    <span className="col-span-4 sm:col-span-5">Biomarcador</span>
+                                    <span className="col-span-3 sm:col-span-2 text-right">Resultado</span>
+                                    <span className="col-span-3 sm:col-span-2 text-center">Evolução</span>
+                                    <span className="hidden sm:block sm:col-span-2 pl-4">Referência</span>
+                                    <span className="col-span-2 sm:col-span-1 text-center">Ações</span>
+                                  </div>
+                                  <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+                                    {selectedExam.ai_feedback.todos_biomarcadores.map((bio: any, idx: number) => {
+                                      const isAltered = bio.status === 'alterado';
+                                      
+                                      // Compare dynamically against historical exams
+                                      const prevBio = getPreviousExamBiomarker(selectedExam, bio.marcador);
+                                      const evo = prevBio ? getEvolutionIndicator(bio.valor, prevBio.valor) : null;
+                                      
+                                      const hasNote = !!bio.nota_clinica;
+                                      const isEditingNote = activeNoteEditIndex === idx;
+
+                                      return (
+                                        <div key={idx} className="flex flex-col hover:bg-slate-50/40 transition-colors">
+                                          {/* Main grid row layout */}
+                                          <div className="p-3.5 grid grid-cols-12 items-center text-xs sm:text-sm font-semibold">
+                                            
+                                            {/* Biomarcador Column */}
+                                            <div className="col-span-4 sm:col-span-5 flex items-center gap-2 min-w-0">
+                                              <div className={`h-2 w-2 rounded-full shrink-0 ${
+                                                isAltered ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                                              }`} />
+                                              <span className="text-slate-750 truncate max-w-[140px] sm:max-w-xs">{bio.marcador}</span>
+                                            </div>
+                                            
+                                            {/* Resultado Column */}
+                                            <div className={`col-span-3 sm:col-span-2 text-right font-bold ${
+                                              isAltered ? 'text-amber-600' : 'text-slate-800'
+                                            }`}>
+                                              {bio.valor}
+                                            </div>
+                                            
+                                            {/* Evolução Column */}
+                                            <div className="col-span-3 sm:col-span-2 text-center flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-xs">
+                                              {evo ? (
+                                                <>
+                                                  <span className={`${evo.color} text-sm`}>{evo.text}</span>
+                                                  {evo.diffStr && (
+                                                    <span className="text-[10px] text-slate-500 font-bold">({evo.diffStr})</span>
+                                                  )}
+                                                </>
+                                              ) : (
+                                                <span className="text-slate-400 font-bold">—</span>
+                                              )}
+                                            </div>
+                                            
+                                            {/* Referência Column */}
+                                            <div className="hidden sm:block sm:col-span-2 pl-4 text-xs text-slate-455 truncate">
+                                              {bio.referencia}
+                                            </div>
+                                            
+                                            {/* Ações Column */}
+                                            <div className="col-span-2 sm:col-span-1 text-center">
+                                              <button
+                                                onClick={() => {
+                                                  if (isEditingNote) {
+                                                    setActiveNoteEditIndex(null);
+                                                    setTempNoteText('');
+                                                  } else {
+                                                    setActiveNoteEditIndex(idx);
+                                                    setTempNoteText(bio.nota_clinica || '');
+                                                  }
+                                                }}
+                                                className={`p-1.5 rounded-lg border transition-all ${
+                                                  hasNote 
+                                                    ? 'bg-teal-50 border-teal-200 text-teal-650 hover:bg-teal-100/55' 
+                                                    : isEditingNote
+                                                      ? 'bg-indigo-50 border-indigo-200 text-indigo-650'
+                                                      : 'bg-white border-slate-200 text-slate-400 hover:text-slate-655 hover:bg-slate-50'
+                                                }`}
+                                                title={hasNote ? "Ver / Editar Observação Clínica" : "Adicionar Observação Clínica"}
+                                              >
+                                                <MessageSquare className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Inline expansible clinical note section */}
+                                          {(isEditingNote || hasNote) && (
+                                            <div className="px-3.5 pb-3.5 pl-8 border-t border-slate-100/60 bg-slate-50/20 text-xs text-left animate-in slide-in-from-top duration-200">
+                                              {isEditingNote ? (
+                                                <div className="space-y-2 mt-2">
+                                                  <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Anotação Clínica do Nutricionista</span>
+                                                    {hasNote && (
+                                                      <span className="text-[9px] bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded font-bold">Nota Salva</span>
+                                                    )}
+                                                  </div>
+                                                  <textarea
+                                                    value={tempNoteText}
+                                                    onChange={(e) => setTempNoteText(e.target.value)}
+                                                    placeholder="Escreva sua percepção ou conduta clínica sobre este biomarcador (ex: ajustar suplementação, focar em micronutrientes)..."
+                                                    rows={2}
+                                                    className="w-full bg-white p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 font-semibold text-slate-700 placeholder-slate-400 transition-all shadow-inner"
+                                                  />
+                                                  <div className="flex justify-end gap-2">
+                                                    <button
+                                                      onClick={() => {
+                                                        setActiveNoteEditIndex(null);
+                                                        setTempNoteText('');
+                                                      }}
+                                                      className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-bold rounded-lg transition-all"
+                                                    >
+                                                      Cancelar
+                                                    </button>
+                                                    <button
+                                                      onClick={() => handleSaveBiomarkerNote(idx)}
+                                                      className="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-500 border border-teal-600 text-white font-bold rounded-lg transition-all shadow-sm"
+                                                    >
+                                                      Salvar Nota
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <div className="mt-2 bg-teal-50/20 border border-teal-100/60 p-2.5 rounded-xl flex justify-between items-start gap-4">
+                                                  <div className="min-w-0">
+                                                    <p className="text-[9px] font-black text-teal-800 uppercase tracking-wider">Observação Clínica Registrada:</p>
+                                                    <p className="font-semibold text-slate-700 leading-relaxed mt-1 whitespace-pre-line italic">
+                                                      "{bio.nota_clinica}"
+                                                    </p>
+                                                  </div>
+                                                  <button
+                                                    onClick={() => {
+                                                      setActiveNoteEditIndex(idx);
+                                                      setTempNoteText(bio.nota_clinica || '');
+                                                  }}
+                                                    className="text-[10px] font-black text-teal-700 hover:text-teal-900 shrink-0 bg-white border border-teal-200 px-2 py-1 rounded-lg transition-all hover:bg-teal-50"
+                                                  >
+                                                    Editar
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             
                           </div>
                         )}

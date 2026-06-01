@@ -167,19 +167,19 @@ export const Patients: React.FC = () => {
 
     try {
       if (editingPatient) {
-        // Edit existing patient in this clinic
-        const { error: updateError } = await supabase
-          .from('patients')
-          .update({
-            name: formData.name,
-            cpf: formData.cpf,
-            phone: formData.phone,
-            status: formData.status,
-            birth_date: isoBirthDate,
-            biological_sex: formData.biological_sex,
-            main_goal: formData.main_goal
-          })
-          .eq('id', editingPatient.id);
+        // Edit existing patient in this clinic using RPC
+        const { error: updateError } = await supabase.rpc('update_patient_account', {
+          p_clinic_id: clinic.id,
+          p_patient_id: editingPatient.id,
+          p_name: formData.name,
+          p_cpf: formData.cpf,
+          p_email: formData.email,
+          p_phone: formData.phone,
+          p_status: formData.status,
+          p_birth_date: isoBirthDate,
+          p_biological_sex: formData.biological_sex,
+          p_main_goal: formData.main_goal
+        });
 
         if (updateError) throw updateError;
       } else {
@@ -471,18 +471,15 @@ export const Patients: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-base font-bold text-slate-700 mb-1">E-mail {editingPatient ? '(Fixo)' : '*'}</label>
+                  <label className="block text-base font-bold text-slate-700 mb-1">E-mail *</label>
                   <input
                     type="email"
-                    required={!editingPatient}
-                    disabled={!!editingPatient}
+                    required
                     value={formData.email}
                     onChange={e => setFormData({...formData, email: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700 disabled:bg-slate-50 disabled:text-slate-500"
+                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
                   />
-                  {!editingPatient && (
-                    <p className="text-xs text-slate-500 mt-1">Será usado para o login.</p>
-                  )}
+                  <p className="text-xs text-slate-500 mt-1">Será usado para o login do paciente.</p>
                 </div>
 
                 {!editingPatient && (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Key, Calendar, Save } from 'lucide-react';
+import { Shield, Key, Calendar, Save, UserPlus, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,12 +19,17 @@ export const AdminDashboard: React.FC = () => {
   const [subStatus, setSubStatus] = useState('trial');
   const [subDate, setSubDate] = useState('');
 
+  // Allocation Modal states
+  const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
+  const [allocateClinicId, setAllocateClinicId] = useState('');
+  const [allocateRole, setAllocateRole] = useState('nutritionist');
+
   const [message, setMessage] = useState({ text: '', type: '' });
 
   const fetchData = async () => {
     setLoading(true);
     const [usersRes, clinicsRes] = await Promise.all([
-      supabase.from('profiles').select('*, clinic_members(role, clinics(name))').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('*, clinic_members(role, clinic_id, clinics(name)), patients(clinic_id, clinics(name))').order('created_at', { ascending: false }),
       supabase.from('clinics').select('*, owner:profiles(full_name)').order('created_at', { ascending: false })
     ]);
     
@@ -77,6 +82,52 @@ export const AdminDashboard: React.FC = () => {
       fetchData();
     } catch (err: any) {
       setMessage({ text: err.message, type: 'error' });
+    }
+  };
+
+  const handleDeleteUser = async (user: any) => {
+    if (user.id === profile?.id) {
+      setMessage({ text: 'Você não pode excluir seu próprio perfil Master.', type: 'error' });
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja excluir permanentemente o usuário ${user.full_name}? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.rpc('delete_user_master', { p_user_id: user.id });
+      if (error) throw error;
+      setMessage({ text: 'Usuário excluído com sucesso!', type: 'success' });
+      fetchData();
+    } catch (err: any) {
+      setMessage({ text: err.message, type: 'error' });
+      setLoading(false);
+    }
+  };
+
+  const handleAllocateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !allocateClinicId) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.rpc('allocate_user_to_clinic', {
+        p_user_id: selectedUser.id,
+        p_clinic_id: allocateClinicId,
+        p_role: allocateRole
+      });
+      
+      if (error) throw error;
+      
+      setMessage({ text: 'Usuário alocado à clínica com sucesso!', type: 'success' });
+      setIsAllocateModalOpen(false);
+      setAllocateClinicId('');
+      setAllocateRole('nutritionist');
+      fetchData();
+    } catch (err: any) {
+      setMessage({ text: err.message, type: 'error' });
+      setLoading(false);
     }
   };
 
@@ -166,11 +217,12 @@ export const AdminDashboard: React.FC = () => {
                         if (role === 'owner') return 'Nutricionista (Titular)';
                         if (role === 'nutritionist') return 'Nutricionista';
                         if (role === 'secretary') return 'Secretária';
+                        if (u.patients && u.patients.length > 0) return 'Paciente';
                         return 'Usuário';
                       })()}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
-                      {u.clinic_members?.[0]?.clinics?.name || 'Sem Clínica'}
+                      {u.clinic_members?.[0]?.clinics?.name || u.patients?.[0]?.clinics?.name || 'Sem Clínica'}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
                       {new Date(u.created_at).toLocaleDateString('pt-BR')}
@@ -183,12 +235,24 @@ export const AdminDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-3">
+                      <div className="flex items-center justify-end gap-3.5">
+                        <button 
+                          onClick={() => {
+                            setSelectedUser(u);
+                            setAllocateClinicId(u.clinic_members?.[0]?.clinic_id || '');
+                            setAllocateRole(u.clinic_members?.[0]?.role || 'nutritionist');
+                            setIsAllocateModalOpen(true);
+                          }}
+                          className="text-indigo-650 hover:text-indigo-900 flex items-center gap-1 font-semibold"
+                          title="Alocar em uma Clínica"
+                        >
+                          <UserPlus className="h-4 w-4" /> Alocar
+                        </button>
                         <button 
                           onClick={() => handleToggleStatus(u)}
-                          className={`text-sm ${u.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+                          className={`text-sm ${u.is_active ? 'text-amber-600 hover:text-amber-900' : 'text-green-600 hover:text-green-900'}`}
                         >
-                          {u.is_active ? 'Bloquear' : 'Desbloquear'}
+                          {u.is_active ? 'Bloquear' : 'Ativar'}
                         </button>
                         <button 
                           onClick={() => { setSelectedUser(u); setIsPasswordModalOpen(true); }}
@@ -196,6 +260,15 @@ export const AdminDashboard: React.FC = () => {
                         >
                           <Key className="h-4 w-4" /> Senha
                         </button>
+                        {u.id !== profile?.id && (
+                          <button 
+                            onClick={() => handleDeleteUser(u)}
+                            className="text-red-650 hover:text-red-900 flex items-center gap-1 font-semibold"
+                            title="Remover Usuário"
+                          >
+                            <Trash2 className="h-4 w-4" /> Excluir
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -333,6 +406,48 @@ export const AdminDashboard: React.FC = () => {
               <div className="flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setIsSubModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50">Cancelar</button>
                 <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 flex items-center gap-2"><Save className="w-4 h-4" /> Salvar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Allocation Modal */}
+      {isAllocateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-slate-200 animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Alocar Usuário à Clínica</h3>
+            <p className="text-xs text-slate-500 mb-4">Usuário: <span className="font-semibold text-slate-700">{selectedUser?.full_name}</span></p>
+            <form onSubmit={handleAllocateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Selecione a Clínica</label>
+                <select
+                  required
+                  value={allocateClinicId}
+                  onChange={e => setAllocateClinicId(e.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-sm focus:ring-primary-500 focus:border-primary-500 focus:outline-none"
+                >
+                  <option value="" disabled>Selecione uma clínica...</option>
+                  {clinics.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.owner?.full_name || 'Sem proprietário'})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Função / Papel na Clínica</label>
+                <select
+                  required
+                  value={allocateRole}
+                  onChange={e => setAllocateRole(e.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-sm focus:ring-primary-500 focus:border-primary-500 focus:outline-none"
+                >
+                  <option value="owner">Proprietário (Titular)</option>
+                  <option value="nutritionist">Nutricionista</option>
+                  <option value="secretary">Secretária(o)</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setIsAllocateModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 cursor-pointer">Cancelar</button>
+                <button type="submit" className="px-5 py-2 text-sm font-bold text-white bg-primary-600 rounded-xl hover:bg-primary-700 flex items-center gap-1.5 cursor-pointer"><Save className="w-4 h-4" /> Alocar Usuário</button>
               </div>
             </form>
           </div>

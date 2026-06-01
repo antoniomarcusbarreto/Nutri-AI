@@ -5,13 +5,13 @@ import { Palette, Check, RefreshCw, Lock, Unlock, Key, Search, UserCheck, X, Inf
 import { useToast } from '../contexts/ToastContext';
 
 export const Settings: React.FC = () => {
-  const { profile, clinic, updateTheme, remainingTrialDays, isReadOnly } = useAuth();
+  const { profile, user, userRole, clinic, updateTheme, updateProfile, updateClinic, remainingTrialDays, isReadOnly } = useAuth();
   const { showToast } = useToast();
   const currentMode = profile?.theme_mode || 'light';
   const currentColor = profile?.theme_color || 'white';
   
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'theme' | 'clinic' | 'team' | 'services' | 'patient_access'>('theme');
+  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'clinic' | 'team' | 'services' | 'patient_access'>('profile');
   const [services, setServices] = useState<{ id?: string, name: string; duration_minutes: number; price: number; modality: string }[]>([]);
   const [newService, setNewService] = useState({ name: '', duration_minutes: 60, price: 150, modality: 'presencial' });
   const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
@@ -41,6 +41,53 @@ export const Settings: React.FC = () => {
   });
   const [teamError, setTeamError] = useState<string | null>(null);
 
+  // Profile states
+  const [profileFormData, setProfileFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    crn: ''
+  });
+
+  useEffect(() => {
+    if (profile && user) {
+      setProfileFormData({
+        name: profile.full_name || '',
+        email: user.email || '',
+        phone: profile.phone || '',
+        crn: profile.crn || ''
+      });
+    }
+  }, [profile, user]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc('update_own_profile', {
+        p_name: profileFormData.name,
+        p_email: profileFormData.email,
+        p_phone: profileFormData.phone,
+        p_crn: profileFormData.crn || null
+      });
+
+      if (error) throw error;
+      
+      showToast('Perfil atualizado com sucesso!', 'success');
+      
+      await updateProfile({
+        full_name: profileFormData.name,
+        phone: profileFormData.phone,
+        crn: profileFormData.crn || null
+      });
+    } catch (err: any) {
+      console.error('Erro ao atualizar perfil:', err);
+      showToast(err.message || 'Erro ao salvar os dados do perfil.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'team' && clinic?.id) {
       loadTeam();
@@ -55,34 +102,23 @@ export const Settings: React.FC = () => {
     if (!clinic?.id) return;
     setLoadingTeam(true);
     try {
-      const { data: members, error: membersError } = await supabase
-        .from('clinic_members')
-        .select('user_id, role')
-        .eq('clinic_id', clinic.id);
+      const { data: members, error: membersError } = await supabase.rpc('get_clinic_staff', {
+        p_clinic_id: clinic.id
+      });
 
       if (membersError) throw membersError;
-      if (members && members.length > 0) {
-        const userIds = members.map(m => m.user_id).filter(Boolean);
-        if (userIds.length > 0) {
-          const { data: profiles, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, full_name, phone, crn, is_active, created_at')
-            .in('id', userIds);
-
-          if (profilesError) throw profilesError;
-          if (profiles) {
-            const merged = profiles.map(p => {
-              const member = members.find(m => m.user_id === p.id);
-              return {
-                ...p,
-                role: member?.role || 'nutritionist'
-              };
-            });
-            setTeamList(merged);
-          }
-        } else {
-          setTeamList([]);
-        }
+      if (members) {
+        const mapped = members.map((m: any) => ({
+          id: m.user_id,
+          full_name: m.full_name,
+          email: m.email,
+          phone: m.phone,
+          crn: m.crn,
+          role: m.role,
+          is_active: m.is_active,
+          created_at: m.created_at
+        }));
+        setTeamList(mapped);
       } else {
         setTeamList([]);
       }
@@ -108,6 +144,7 @@ export const Settings: React.FC = () => {
           p_clinic_id: clinic.id,
           p_user_id: selectedTeamMember.id,
           p_name: name,
+          p_email: email,
           p_phone: phone,
           p_crn: crn || null,
           p_role: role
@@ -427,6 +464,12 @@ export const Settings: React.FC = () => {
       <div className="border-b border-slate-200">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           <button
+            onClick={() => setActiveTab('profile')}
+            className={`${activeTab === 'profile' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Meu Perfil
+          </button>
+          <button
             onClick={() => setActiveTab('theme')}
             className={`${activeTab === 'theme' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
           >
@@ -458,6 +501,71 @@ export const Settings: React.FC = () => {
           </button>
         </nav>
       </div>
+
+      {activeTab === 'profile' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800">Meu Perfil</h2>
+            <p className="text-sm text-slate-500">Atualize seus dados pessoais e informações profissionais de login.</p>
+          </div>
+          <div className="p-6">
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                <div className="sm:col-span-6">
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Nome Completo</label>
+                  <input
+                    type="text"
+                    required
+                    value={profileFormData.name}
+                    onChange={e => setProfileFormData({ ...profileFormData, name: e.target.value })}
+                    className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">E-mail (Login)</label>
+                  <input
+                    type="email"
+                    required
+                    value={profileFormData.email}
+                    onChange={e => setProfileFormData({ ...profileFormData, email: e.target.value })}
+                    className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Telefone</label>
+                  <input
+                    type="text"
+                    value={profileFormData.phone}
+                    onChange={e => setProfileFormData({ ...profileFormData, phone: e.target.value })}
+                    className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none"
+                  />
+                </div>
+                {(userRole === 'owner' || userRole === 'nutritionist') && (
+                  <div className="sm:col-span-6">
+                    <label className="block text-base font-bold text-slate-700 mb-1.5">CRN (Conselho Regional de Nutrição)</label>
+                    <input
+                      type="text"
+                      required
+                      value={profileFormData.crn}
+                      onChange={e => setProfileFormData({ ...profileFormData, crn: e.target.value })}
+                      className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="pt-6 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  Salvar Perfil
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'theme' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -541,9 +649,7 @@ export const Settings: React.FC = () => {
               const formData = new FormData(e.currentTarget);
               const updates = Object.fromEntries(formData);
               try {
-                // @ts-ignore
-                const { error } = await supabase.from('clinics').update(updates).eq('id', clinic?.id);
-                if (error) throw error;
+                await updateClinic(updates);
                 showToast('Dados salvos com sucesso!', 'success');
               } catch (err) {
                 console.error(err);
@@ -553,6 +659,10 @@ export const Settings: React.FC = () => {
               }
             }} className="space-y-4">
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                <div className="sm:col-span-6">
+                  <label className="block text-base font-bold text-slate-700 mb-1.5">Nome da Clínica</label>
+                  <input type="text" name="name" required defaultValue={clinic?.name || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                </div>
                 <div className="sm:col-span-2">
                   <label className="block text-base font-bold text-slate-700 mb-1.5">CEP</label>
                   {/* @ts-ignore */}
@@ -688,7 +798,8 @@ export const Settings: React.FC = () => {
                             </div>
                             <div className="min-w-0">
                               <h4 className="text-sm font-semibold text-slate-900 truncate max-w-[180px] sm:max-w-xs">{member.full_name} {isSelf && '(Você)'}</h4>
-                              <p className="text-xs text-slate-500 truncate max-w-[180px] sm:max-w-xs">{member.phone || 'Sem telefone'}</p>
+                              <p className="text-xs text-slate-500 truncate max-w-[180px] sm:max-w-xs">{member.email}</p>
+                              <p className="text-xs text-slate-400 truncate max-w-[180px] sm:max-w-xs">{member.phone || 'Sem telefone'}</p>
                               {member.crn && (
                                 <p className="text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-100 rounded px-1.5 py-0.5 mt-1 w-fit">
                                   CRN: {member.crn}
@@ -752,7 +863,7 @@ export const Settings: React.FC = () => {
                                   setSelectedTeamMember(member);
                                   setTeamFormData({
                                     name: member.full_name,
-                                    email: '',
+                                    email: member.email || '',
                                     phone: member.phone || '',
                                     crn: member.crn || '',
                                     role: member.role,
@@ -1082,19 +1193,17 @@ export const Settings: React.FC = () => {
                 />
               </div>
 
-              {!selectedTeamMember && (
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">E-mail (Login)</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="email@clinica.com"
-                    value={teamFormData.email}
-                    onChange={e => setTeamFormData({ ...teamFormData, email: e.target.value })}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">E-mail (Login)</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="email@clinica.com"
+                  value={teamFormData.email}
+                  onChange={e => setTeamFormData({ ...teamFormData, email: e.target.value })}
+                  className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                />
+              </div>
 
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1.5">Telefone</label>

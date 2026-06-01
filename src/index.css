@@ -16,6 +16,9 @@
 }
 
 @layer base {
+  html {
+    font-size: 106.25%; /* Aumenta a base padrão de 16px para 17px (proporcional e seguro para toda a plataforma) */
+  }
   body {
     @apply bg-slate-50 text-slate-900 antialiased transition-colors duration-200;
   }

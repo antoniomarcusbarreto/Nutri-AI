@@ -47,6 +47,7 @@ interface AuthContextType {
   isTrialActive: boolean;
   updateTheme: (mode: string, color: string) => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  updateClinic: (updates: Partial<Clinic>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -63,6 +64,7 @@ const AuthContext = createContext<AuthContextType>({
   isTrialActive: false,
   updateTheme: async () => {},
   updateProfile: async () => {},
+  updateClinic: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -155,6 +157,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateClinic = async (updates: Partial<Clinic>) => {
+    if (!clinic) return;
+    try {
+      const { error } = await supabase
+        .from('clinics')
+        .update(updates)
+        .eq('id', clinic.id);
+      
+      if (error) throw error;
+      
+      setClinic({ ...clinic, ...updates });
+    } catch (error) {
+      console.error('Error updating clinic:', error);
+      throw error;
+    }
+  };
+
   const fetchUserData = async (currentUser: User) => {
     try {
       const { data: profileData } = await supabase
@@ -237,7 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, clinic, userRole, isPatient, loading, signOut, remainingTrialDays, isReadOnly, isTrialActive, updateTheme, updateProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, clinic, userRole, isPatient, loading, signOut, remainingTrialDays, isReadOnly, isTrialActive, updateTheme, updateProfile, updateClinic }}>
       {children}
     </AuthContext.Provider>
   );
