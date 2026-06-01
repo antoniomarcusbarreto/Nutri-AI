@@ -27,20 +27,20 @@
 /* 🌙 Dark Mode Harmony - Targeted exclusively under .theme-dark */
 .theme-dark {
   color-scheme: dark;
-  background-color: #0f172a !important;
-  color: #f1f5f9 !important;
+  background-color: #1a1a1a !important;
+  color: #f5f5f5 !important;
 }
 
 .theme-dark main {
-  background-color: #0f172a !important;
+  background-color: #1a1a1a !important;
 }
 
 /* Cards, modais e prontuários em modo escuro */
 .theme-dark .bg-white,
 .theme-dark .bg-card {
-  background-color: #1e293b !important; /* bg-slate-800 slightly lighter dark */
-  color: #f8fafc !important;
-  border-color: #334155 !important;
+  background-color: #242424 !important;
+  color: #f5f5f5 !important;
+  border-color: #333333 !important;
 }
 
 /* Inner elements, nested blocks, lists, inputs */
@@ -50,9 +50,9 @@
 .theme-dark .bg-slate-100,
 .theme-dark .bg-slate-100\/50,
 .theme-dark .bg-slate-150 {
-  background-color: #0f172a !important;
-  color: #f1f5f9 !important;
-  border-color: #334155 !important;
+  background-color: #1a1a1a !important;
+  color: #f5f5f5 !important;
+  border-color: #333333 !important;
 }
 
 /* Inputs & Interactive fields in Main Dark Area */
@@ -62,14 +62,18 @@
 .theme-dark input[type="password"],
 .theme-dark select,
 .theme-dark textarea {
-  background-color: #0f172a !important;
+  background-color: #1a1a1a !important;
   color: #ffffff !important;
-  border-color: #334155 !important;
+  border-color: #333333 !important;
 }
 
 .theme-dark input::placeholder,
 .theme-dark textarea::placeholder {
-  color: #64748b !important;
+  color: #666666 !important;
+}
+
+.theme-dark label {
+  color: #b3b3b3 !important;
 }
 
 /* Table and list item borders */
@@ -78,8 +82,8 @@
 .theme-dark .border-slate-200,
 .theme-dark .divide-slate-100,
 .theme-dark .divide-slate-200 {
-  border-color: #334155 !important;
-  divide-color: #334155 !important;
+  border-color: #333333 !important;
+  divide-color: #333333 !important;
 }
 
 /* High contrast texts inside .theme-dark */
@@ -92,14 +96,14 @@
 .theme-dark .text-slate-700,
 .theme-dark .text-slate-655,
 .theme-dark .text-slate-600 {
-  color: #f1f5f9 !important;
+  color: #f5f5f5 !important;
 }
 
 .theme-dark .text-slate-550,
 .theme-dark .text-slate-500,
 .theme-dark .text-slate-450,
 .theme-dark .text-slate-400 {
-  color: #94a3b8 !important;
+  color: #b3b3b3 !important;
 }
 
 .theme-dark h1,
@@ -111,7 +115,7 @@
   color: #ffffff !important;
 }
 
-/* Destaques e badges de status positivo */
+/* Destaques e badges de status positivo / primários */
 .theme-dark .bg-primary-50 {
   background-color: rgba(20, 184, 166, 0.15) !important;
   color: #2dd4bf !important;
@@ -127,8 +131,48 @@
   color: #2dd4bf !important;
 }
 
+/* Status Badges e Alertas no Modo Escuro (Fundo Opaco e Texto de Alto Contraste) */
+.theme-dark .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.4) !important;
+  color: #34d399 !important;
+  border-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+.theme-dark .bg-rose-50,
+.theme-dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.4) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+.theme-dark .bg-blue-50,
+.theme-dark .bg-indigo-50 {
+  background-color: rgba(30, 58, 138, 0.4) !important;
+  color: #818cf8 !important;
+  border-color: rgba(99, 102, 241, 0.2) !important;
+}
+
+.theme-dark .bg-amber-50,
+.theme-dark .bg-yellow-50 {
+  background-color: rgba(120, 53, 4, 0.4) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.2) !important;
+}
+
+.theme-dark .bg-teal-50 {
+  background-color: rgba(19, 78, 74, 0.4) !important;
+  color: #2dd4bf !important;
+  border-color: rgba(20, 184, 166, 0.2) !important;
+}
+
+.theme-dark .bg-slate-100 {
+  background-color: #242424 !important;
+  color: #b3b3b3 !important;
+  border-color: #333333 !important;
+}
+
 /* Hover adjustments in main area */
 .theme-dark .hover\:bg-slate-50:hover,
 .theme-dark .hover\:bg-slate-100:hover {
-  background-color: #334155 !important;
+  background-color: #2e2e2e !important;
 }

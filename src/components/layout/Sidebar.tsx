@@ -60,12 +60,12 @@ export const Sidebar: React.FC = () => {
 
     if (themeColor === 'dark') {
       return {
-        container: 'bg-[#0b132b] border-r border-[#1c2541]/40 text-slate-100', // Azul-escuro profundo
-        border: 'border-b border-[#1c2541]/30',
+        container: 'bg-[#1a1a1a] border-r border-[#333333] text-slate-100', // Grafite e preto profundo
+        border: 'border-b border-[#333333]/60',
         logoText: 'text-slate-100 font-extrabold',
         logoIcon: 'text-primary-400',
-        activeItem: 'bg-[#1c2541] text-primary-400 font-bold border-l-4 border-primary-500 rounded-r-xl rounded-l-none',
-        inactiveItem: 'text-slate-400 hover:bg-[#151d35] hover:text-primary-400 transition-all',
+        activeItem: 'bg-[#242424] text-primary-400 font-bold border-l-4 border-primary-500 rounded-r-xl rounded-l-none',
+        inactiveItem: 'text-slate-400 hover:bg-[#242424]/60 hover:text-primary-400 transition-all',
         itemIconActive: 'text-primary-400',
         itemIconInactive: 'text-slate-500 group-hover:text-primary-400 transition-all'
       };

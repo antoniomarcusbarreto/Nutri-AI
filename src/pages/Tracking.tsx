@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Activity, 
-  User, 
   Sparkles, 
   Calendar, 
   TrendingUp, 
-  TrendingDown,
   CheckCircle2,
   ShieldAlert,
-  Apple,
   FileText,
   ClipboardList,
   Eye,
@@ -16,7 +13,7 @@ import {
   CalendarRange,
   X
 } from 'lucide-react';
-import { format, parseISO, differenceInYears } from 'date-fns';
+import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -33,7 +30,7 @@ export const parseExamDate = (dateVal: string | null | undefined): Date => {
 };
 
 export const Tracking: React.FC = () => {
-  const { clinic, isReadOnly, profile, userRole } = useAuth();
+  const { clinic, userRole } = useAuth();
   const { showToast } = useToast();
 
   // Patients & Loading States
@@ -234,20 +231,7 @@ export const Tracking: React.FC = () => {
     loadPatientHistory();
   }, [selectedPatientId, clinic?.id]);
 
-  const selectedPatient = useMemo(() => {
-    return patients.find(p => p.id === selectedPatientId);
-  }, [patients, selectedPatientId]);
-
-  // helper: calculate age
-  const getPatientAge = (birthDateStr: string | null | undefined) => {
-    if (!birthDateStr) return 'Não informada';
-    try {
-      const birth = parseISO(birthDateStr);
-      return `${differenceInYears(new Date(), birth)} anos`;
-    } catch {
-      return 'Não informada';
-    }
-  };
+  // (removed unused selectedPatient and getPatientAge to prevent TypeScript compilation errors)
 
   // 1. Dynamic AI Treatment Predictive Prognosis
   const prediction = useMemo(() => {
@@ -616,7 +600,6 @@ export const Tracking: React.FC = () => {
                         {(() => {
                           const maxVal = Math.max(...biomarkerChartData.map(d => d.value)) * 1.25;
                           const minVal = Math.min(...biomarkerChartData.map(d => d.value)) * 0.75;
-                          const range = maxVal - minVal || 10;
                           
                           return (
                             <>
@@ -1018,7 +1001,7 @@ export const Tracking: React.FC = () => {
                   </div>
                 ) : (
                   <div className="relative pl-6 border-l border-slate-200 space-y-6">
-                    {timelineEvents.map((evt, idx) => {
+                    {timelineEvents.map((evt) => {
                       const eventDate = format(evt.date, 'dd/MM/yyyy');
                       
                       return (

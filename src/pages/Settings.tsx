@@ -78,7 +78,7 @@ export const Settings: React.FC = () => {
       await updateProfile({
         full_name: profileFormData.name,
         phone: profileFormData.phone,
-        crn: profileFormData.crn || null
+        crn: profileFormData.crn || undefined
       });
     } catch (err: any) {
       console.error('Erro ao atualizar perfil:', err);
@@ -411,10 +411,10 @@ export const Settings: React.FC = () => {
     {
       id: 'dark',
       name: 'Escuro (Dark Mode Harmony)',
-      description: 'Fundo azul-escuro profundo e refinado com acentos em verde clínico.',
-      bgColor: 'bg-[#0b132b]',
+      description: 'Fundo preto/grafite profundo e refinado com acentos em verde clínico.',
+      bgColor: 'bg-[#1a1a1a]',
       textColor: 'text-white',
-      borderColor: 'border-[#1c2541]',
+      borderColor: 'border-[#333333]',
       action: () => handleSelectTheme('dark', 'dark')
     }
   ];
@@ -589,10 +589,10 @@ export const Settings: React.FC = () => {
                     className={`relative flex flex-col text-left p-5 border rounded-2xl transition-all duration-300 hover:shadow-md ${
                       isSelected 
                         ? isDarkThemeOption
-                          ? 'border-primary-500 bg-[#0b132b] text-white ring-2 ring-primary-500 ring-offset-2'
+                          ? 'border-primary-500 bg-[#1a1a1a] text-white ring-2 ring-primary-500 ring-offset-2'
                           : 'border-primary-500 bg-primary-50/50 ring-2 ring-primary-500 ring-offset-2' 
                         : isDarkThemeOption
-                          ? 'border-slate-800 bg-[#0b132b] text-white hover:border-slate-700'
+                          ? 'border-slate-800 bg-[#1a1a1a] text-white hover:border-slate-700'
                           : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
