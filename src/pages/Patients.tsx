@@ -451,48 +451,48 @@ export const Patients: React.FC = () => {
               </button>
             </div>
             
-            <form onSubmit={handleSave} className="p-6 space-y-5">
+            <form onSubmit={handleSave} className="p-6 space-y-4">
               {error && (
                 <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm border border-red-100">
                   {error}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-base font-bold text-slate-700 mb-1">Nome Completo *</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Nome Completo *</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={e => setFormData({...formData, name: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-base font-bold text-slate-700 mb-1">E-mail *</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">E-mail *</label>
                   <input
                     type="email"
                     required
                     value={formData.email}
                     onChange={e => setFormData({...formData, email: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
                   <p className="text-xs text-slate-500 mt-1">Será usado para o login do paciente.</p>
                 </div>
 
                 {!editingPatient && (
-                  <div className="md:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2">
+                  <div className="md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 mt-1">
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={formData.has_app_access}
                         onChange={e => setFormData({...formData, has_app_access: e.target.checked})}
-                        className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-600 cursor-pointer"
+                        className="h-4.5 w-4.5 rounded border-slate-350 text-indigo-650 focus:ring-indigo-600 cursor-pointer"
                       />
                       <div>
-                        <span className="block text-base font-bold text-slate-900">Permitir acesso do paciente ao Aplicativo</span>
+                        <span className="block text-sm font-semibold text-slate-900">Permitir acesso do paciente ao Aplicativo</span>
                         <span className="block text-xs text-slate-500 mt-0.5">O paciente poderá fazer login para ver o plano alimentar e registrar o diário.</span>
                       </div>
                     </label>
@@ -501,58 +501,58 @@ export const Patients: React.FC = () => {
 
                 {!editingPatient && formData.has_app_access && (
                   <div className="md:col-span-2">
-                    <label className="block text-base font-bold text-slate-700 mb-1">Senha de Acesso *</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Senha de Acesso *</label>
                     <input
                       type="password"
                       required
                       minLength={6}
                       value={formData.password}
                       onChange={e => setFormData({...formData, password: e.target.value})}
-                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-base font-bold text-slate-700 mb-1">Telefone (WhatsApp) *</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Telefone (WhatsApp) *</label>
                   <input
                     type="text"
                     required
                     value={formData.phone}
                     onChange={e => setFormData({...formData, phone: formatPhone(e.target.value)})}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-base font-bold text-slate-700 mb-1">CPF</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">CPF</label>
                   <input
                     type="text"
                     value={formData.cpf}
                     onChange={e => setFormData({...formData, cpf: formatCPF(e.target.value)})}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-base font-bold text-slate-700 mb-1">Data de Nascimento *</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Data de Nascimento *</label>
                   <input
                     type="text"
                     required
                     placeholder="DD/MM/AAAA"
                     value={formData.birth_date}
                     onChange={e => setFormData({...formData, birth_date: formatDateMask(e.target.value)})}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-base font-bold text-slate-700 mb-1">Sexo Biológico *</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Sexo Biológico *</label>
                   <select
                     required
                     value={formData.biological_sex}
                     onChange={e => setFormData({...formData, biological_sex: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700 bg-white"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   >
                     <option value="F">Feminino</option>
                     <option value="M">Masculino</option>
@@ -560,12 +560,12 @@ export const Patients: React.FC = () => {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-base font-bold text-slate-700 mb-1">Objetivo Principal *</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Objetivo Principal *</label>
                   <select
                     required
                     value={formData.main_goal}
                     onChange={e => setFormData({...formData, main_goal: e.target.value})}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700 bg-white"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   >
                     <option value="Emagrecimento">Emagrecimento</option>
                     <option value="Hipertrofia">Hipertrofia</option>
@@ -581,14 +581,14 @@ export const Patients: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-2.5 text-sm font-semibold text-white bg-primary-600 rounded-xl hover:bg-primary-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {saving ? 'Salvando...' : 'Salvar Paciente'}
                 </button>
@@ -619,7 +619,7 @@ export const Patients: React.FC = () => {
               </button>
             </div>
             
-            <form onSubmit={handleSaveClinical} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto text-left">
+            <form onSubmit={handleSaveClinical} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-left">
               {clinicalError && (
                 <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm border border-red-100">
                   {clinicalError}
@@ -627,51 +627,51 @@ export const Patients: React.FC = () => {
               )}
 
               {/* Seção 1: Dados Clínicos */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-primary-600 uppercase tracking-wider">Dados Clínicos e Restrições</h4>
                 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label className="block text-base font-bold text-slate-700 mb-1">Alergias e Intolerâncias Alimentares</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Alergias e Intolerâncias Alimentares</label>
                     <textarea
                       rows={2}
                       value={clinicalFormData.allergies}
                       onChange={e => setClinicalFormData({...clinicalFormData, allergies: e.target.value})}
                       placeholder="Ex: Glúten, Lactose, Oleaginosas. Se não possuir, deixe em branco."
-                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-base font-bold text-slate-700 mb-1">Restrições Culturais ou Opções Alimentares</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Restrições Culturais ou Opções Alimentares</label>
                     <input
                       type="text"
                       value={clinicalFormData.dietary_restrictions}
                       onChange={e => setClinicalFormData({...clinicalFormData, dietary_restrictions: e.target.value})}
                       placeholder="Ex: Vegano, Vegetariano, Kosher"
-                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-base font-bold text-slate-700 mb-1">Patologias ou Doenças Crônicas</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Patologias ou Doenças Crônicas</label>
                     <textarea
                       rows={2}
                       value={clinicalFormData.pathologies}
                       onChange={e => setClinicalFormData({...clinicalFormData, pathologies: e.target.value})}
                       placeholder="Ex: Diabetes Tipo 1/2, Hipertensão, Gastrite"
-                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-base font-bold text-slate-700 mb-1">Uso de Medicamentos / Suplementos Atuais</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Uso de Medicamentos / Suplementos Atuais</label>
                     <textarea
                       rows={2}
                       value={clinicalFormData.medications}
                       onChange={e => setClinicalFormData({...clinicalFormData, medications: e.target.value})}
                       placeholder="Medicamentos e suplementos em uso"
-                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     />
                   </div>
                 </div>
@@ -680,17 +680,17 @@ export const Patients: React.FC = () => {
               <hr className="border-slate-100" />
 
               {/* Seção 2: Hábitos e Estilo de Vida */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-primary-600 uppercase tracking-wider">Hábitos e Estilo de Vida</h4>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="md:col-span-2">
-                    <label className="block text-base font-bold text-slate-700 mb-1">Nível de Atividade Física *</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Nível de Atividade Física *</label>
                     <select
                       required
                       value={clinicalFormData.physical_activity_level}
                       onChange={e => setClinicalFormData({...clinicalFormData, physical_activity_level: e.target.value})}
-                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700 bg-white"
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     >
                       <option value="" disabled>Selecione...</option>
                       <option value="Sedentário">Sedentário (Nenhuma atividade física)</option>
@@ -701,26 +701,26 @@ export const Patients: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-base font-bold text-slate-700 mb-1">Profissão / Rotina de Trabalho *</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Profissão / Rotina de Trabalho *</label>
                     <input
                       type="text"
                       required
                       value={clinicalFormData.profession}
                       onChange={e => setClinicalFormData({...clinicalFormData, profession: e.target.value})}
                       placeholder="Ex: Fica muito tempo sentado, em pé"
-                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-base font-bold text-slate-700 mb-1">Qualidade do Sono *</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Qualidade do Sono *</label>
                     <input
                       type="text"
                       required
                       value={clinicalFormData.sleep_quality}
                       onChange={e => setClinicalFormData({...clinicalFormData, sleep_quality: e.target.value})}
                       placeholder="Ex: 8h por noite, sono reparador"
-                      className="block w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 text-base font-normal text-slate-700"
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     />
                   </div>
                 </div>
@@ -730,14 +730,14 @@ export const Patients: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsClinicalModalOpen(false)}
-                  className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={clinicalSaving}
-                  className="px-6 py-2.5 text-sm font-semibold text-white bg-primary-600 rounded-xl hover:bg-primary-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {clinicalSaving ? 'Salvando...' : 'Salvar Ficha'}
                 </button>

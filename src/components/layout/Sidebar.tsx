@@ -34,14 +34,14 @@ export const Sidebar: React.FC = () => {
 
     if (themeColor === 'blue') {
       return {
-        container: 'bg-blue-800 border-r-0 text-white',
-        border: 'border-b border-blue-700/20',
+        container: 'bg-[#11162a] border-r-0 text-white',
+        border: 'border-b border-white/10',
         logoText: 'text-white',
-        logoIcon: 'text-blue-200',
-        activeItem: 'bg-blue-700/60 text-white',
-        inactiveItem: 'text-blue-100 hover:bg-blue-700/40 hover:text-white',
+        logoIcon: 'text-blue-400',
+        activeItem: 'bg-[#1c2342] text-white',
+        inactiveItem: 'text-slate-300 hover:bg-white/5 hover:text-white transition-all',
         itemIconActive: 'text-white',
-        itemIconInactive: 'text-blue-300 group-hover:text-white'
+        itemIconInactive: 'text-slate-400 group-hover:text-white transition-all'
       };
     }
 

@@ -11,7 +11,9 @@ import {
   Clock, 
   Edit, 
   Printer, 
-  Calendar
+  Calendar,
+  Eye,
+  X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,15 +36,66 @@ const MEAL_NAMES: { [key: string]: string } = {
   breakfast: 'Café da Manhã',
   morning_snack: 'Lanche da Manhã',
   lunch: 'Almoço',
-  afternoon_snack_1: 'Lanche da Tarde 1',
-  afternoon_snack_2: 'Lanche da Tarde 2',
+  afternoon_snack: 'Lanche da Tarde',
+  pre_workout: 'Pré-Treino',
+  post_workout: 'Pós-Treino',
   dinner: 'Jantar',
   supper: 'Ceia'
 };
-
 export const MealPlans: React.FC = () => {
   const { clinic, isReadOnly, profile } = useAuth();
   const { showToast } = useToast();
+
+  const getHeaderTheme = () => {
+    const themeColor = profile?.theme_color || 'white';
+
+    if (themeColor === 'blue') {
+      return {
+        bg: 'bg-[#11162a]',
+        text: 'text-white',
+        icon: 'text-blue-400',
+        border: 'border-slate-800',
+        switcherBg: 'bg-slate-800/80 border-slate-700/30',
+        switcherActive: 'bg-white text-slate-900 shadow-sm',
+        switcherInactive: 'text-slate-400 hover:text-white'
+      };
+    }
+    if (themeColor === 'teal') {
+      return {
+        bg: 'bg-[#115e59]',
+        text: 'text-white',
+        icon: 'text-teal-200',
+        border: 'border-teal-700/30',
+        switcherBg: 'bg-teal-800/50 border-teal-700/20',
+        switcherActive: 'bg-white text-teal-900 shadow-sm',
+        switcherInactive: 'text-teal-200 hover:text-white'
+      };
+    }
+    if (themeColor === 'dark') {
+      return {
+        bg: 'bg-[#1a1a1a]',
+        text: 'text-slate-100',
+        icon: 'text-primary-400',
+        border: 'border-[#333333]',
+        switcherBg: 'bg-[#242424]/80 border-[#333333]/50',
+        switcherActive: 'bg-white text-slate-900 shadow-sm',
+        switcherInactive: 'text-slate-400 hover:text-slate-100'
+      };
+    }
+
+    // Default 'white' / Claro
+    return {
+      bg: 'bg-slate-50',
+      text: 'text-slate-800',
+      icon: 'text-primary-600',
+      border: 'border-slate-200',
+      switcherBg: 'bg-slate-100 border border-slate-200/40',
+      switcherActive: 'bg-white text-slate-850 shadow-xs',
+      switcherInactive: 'text-slate-500 hover:text-slate-800'
+    };
+  };
+
+  const headerTheme = getHeaderTheme();
 
   // Navigation / Tab States
   const [activeTab, setActiveTab] = useState<'editor' | 'history'>('editor');
@@ -69,8 +122,7 @@ export const MealPlans: React.FC = () => {
   const [selectedMeals, setSelectedMeals] = useState<string[]>([
     'breakfast',
     'lunch',
-    'afternoon_snack_1',
-    'afternoon_snack_2',
+    'afternoon_snack',
     'dinner'
   ]);
 
@@ -78,6 +130,42 @@ export const MealPlans: React.FC = () => {
   const [activePlan, setActivePlan] = useState<MealPlanData | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('Plano Alimentar Inteligente');
   const [optionActiveTab, setOptionActiveTab] = useState<{ [key: string]: number }>({});
+
+  // Modal State for Viewing Context
+  const [showConsultationModal, setShowConsultationModal] = useState(false);
+  const [showExamModal, setShowExamModal] = useState(false);
+  const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
+  const [examPdfUrl, setExamPdfUrl] = useState<string | null>(null);
+  const [loadingPdfUrl, setLoadingPdfUrl] = useState(false);
+
+  // Dynamic signed URL fetcher for latest exam PDF
+  useEffect(() => {
+    if (!showExamModal || !latestExam?.file_url) {
+      setExamPdfUrl(null);
+      return;
+    }
+
+    const fetchExamPdf = async () => {
+      setLoadingPdfUrl(true);
+      try {
+        const { data, error } = await supabase.storage
+          .from('exams-bucket')
+          .createSignedUrl(latestExam.file_url, 60 * 60);
+
+        if (error) throw error;
+        if (data?.signedUrl) {
+          setExamPdfUrl(data.signedUrl);
+        }
+      } catch (err) {
+        console.error('Erro ao gerar URL assinada para exame:', err);
+        showToast('Não foi possível carregar o PDF do exame.', 'error');
+      } finally {
+        setLoadingPdfUrl(false);
+      }
+    };
+
+    fetchExamPdf();
+  }, [showExamModal, latestExam]);
 
   // Load Clinic Patients
   useEffect(() => {
@@ -93,6 +181,13 @@ export const MealPlans: React.FC = () => {
 
         if (error) throw error;
         setPatients(data || []);
+        if (data && data.length > 0) {
+          const storedId = localStorage.getItem('nutri-ai:selected-patient-id');
+          const exists = data.some((p: any) => p.id === storedId);
+          const initialId = exists && storedId ? storedId : data[0].id;
+          setSelectedPatientId(initialId);
+          localStorage.setItem('nutri-ai:selected-patient-id', initialId);
+        }
       } catch (err) {
         console.error('Erro ao carregar pacientes:', err);
         showToast('Erro ao carregar lista de pacientes.', 'error');
@@ -111,26 +206,35 @@ export const MealPlans: React.FC = () => {
       setActivePlan(null);
       return;
     }
-
     const loadPatientContext = async () => {
       setLoadingContext(true);
       try {
         // 1. Fetch latest consultation
         const { data: consultationData, error: consultationError } = await supabase
           .from('consultations')
-          .select('id, anamnese_notes, created_at')
+          .select(`
+            id,
+            anamnese_notes,
+            created_at,
+            appointments!inner (
+              status
+            )
+          `)
           .eq('patient_id', selectedPatientId)
+          .neq('appointments.status', 'cancelado')
+          .neq('appointments.status', 'Cancelado')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (consultationError) throw consultationError;
         setLatestConsultation(consultationData);
+        setIncludeConsultation(!!consultationData);
 
-        // 2. Fetch latest exam with ai_feedback
+        // 2. Fetch latest exam with ai_feedback and file_url
         const { data: examData, error: examError } = await supabase
           .from('patient_exams')
-          .select('id, ai_feedback, exam_date, created_at')
+          .select('id, ai_feedback, exam_date, created_at, file_url')
           .eq('patient_id', selectedPatientId)
           .order('exam_date', { ascending: false })
           .limit(1)
@@ -138,6 +242,7 @@ export const MealPlans: React.FC = () => {
 
         if (examError) throw examError;
         setLatestExam(examData);
+        setIncludeExams(!!examData);
 
         // 3. Fetch past meal plans
         const { data: plansData, error: plansError } = await supabase
@@ -295,17 +400,23 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
               { description: 'Posta de salmão ao forno com batata doce', items: ['100g de filé de salmão assado', '100g de batata doce assada com alecrim', 'Salada de alface, tomate cereja e pepino', '1 colher de chá de gergelim preto'], kcal: 620 },
               { description: 'Patinho moído com purê de abóbora e aspargos', items: ['120g de carne moída (patinho) refogada com alho e cebola', '120g de purê de abóbora cabotiá', '6 aspargos grelhados com azeite'], kcal: 540 }
             ];
-          } else if (meal === 'afternoon_snack_1') {
-            mockPlan.meals.afternoon_snack_1 = [
+          } else if (meal === 'afternoon_snack') {
+            mockPlan.meals.afternoon_snack = [
               { description: 'Torrada integral com homus de grão-de-bico', items: ['2 fatias de pão integral de fermentação natural tostadas', '2 colheres de sopa de homus tahine'], kcal: 220 },
               { description: 'Muffin de banana funcional feito na caneca', items: ['1 ovo', '1 colher de farinha de coco', '1/2 banana prata amassada', '1 colher de chá de cacau em pó 70%'], kcal: 190 },
               { description: 'Abacate com cacau e whey protein', items: ['80g de abacate fresco', '15g de whey protein sabor chocolate', '1 colher de sobremesa de cacau nibs'], kcal: 240 }
             ];
-          } else if (meal === 'afternoon_snack_2') {
-            mockPlan.meals.afternoon_snack_2 = [
-              { description: 'Mix de castanhas e sementes com coco', items: ['4 castanhas-do-pará', '5 amêndoas torradas', '10g de lascas de coco seco'], kcal: 180 },
-              { description: 'Fruta com semente de chia', items: ['1 fatia de mamão formosa médio', '1 colher de sopa de sementes de chia hidratadas'], kcal: 120 },
-              { description: 'Iogurte natural proteico com morangos', items: ['1 pote de iogurte grego natural desnatado', '5 morangos frescos higienizados'], kcal: 140 }
+          } else if (meal === 'pre_workout') {
+            mockPlan.meals.pre_workout = [
+              { description: 'Banana com aveia e mel', items: ['1 banana prata', '2 colheres de sopa de farelo de aveia', '1 colher de sobremesa de mel de abelhas'], kcal: 160 },
+              { description: 'Batata doce cozida com peito de frango', items: ['80g de batata doce cozida', '50g de peito de frango desfiado'], kcal: 180 },
+              { description: 'Torrada de arroz com geleia e pasta de amendoim', items: ['2 torradas de arroz integral', '1 colher de sobremesa de pasta de amendoim', '1 colher de chá de geleia sem açúcar'], kcal: 150 }
+            ];
+          } else if (meal === 'post_workout') {
+            mockPlan.meals.post_workout = [
+              { description: 'Shake de Whey Protein com dextrose', items: ['30g de whey protein concentrado', '20g de dextrose/maltodextrina', '250ml de água de coco'], kcal: 210 },
+              { description: 'Omelete de claras com arroz branco', items: ['3 claras de ovo mexidas', '2 colheres de sopa de arroz branco cozido'], kcal: 170 },
+              { description: 'Sanduíche de atum funcional', items: ['2 fatias de pão de forma integral', '60g de atum em conserva ao natural', '1 colher de sopa de creme de ricota light'], kcal: 230 }
             ];
           } else if (meal === 'dinner') {
             mockPlan.meals.dinner = [
@@ -332,7 +443,7 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
 
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -474,7 +585,6 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
   // Delete past meal plan
   const handleDeletePastPlan = async (planId: string) => {
     if (isReadOnly) return;
-    if (!window.confirm('Tem certeza que deseja excluir este plano alimentar permanentemente?')) return;
 
     setSaving(true);
     try {
@@ -491,6 +601,7 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
       showToast('Falha ao excluir o plano no servidor.', 'error');
     } finally {
       setSaving(false);
+      setDeletePlanId(null);
     }
   };
 
@@ -506,9 +617,6 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             Construtor de Planos Alimentares
-            <span className="bg-primary-50 text-primary-700 text-xs font-bold px-2.5 py-1 rounded-full border border-primary-100 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> IA Integrada
-            </span>
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Elabore planos alimentares enriquecidos automaticamente pelo histórico de consultas e análises de exames.
@@ -534,7 +642,15 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
             <label className="block text-xs font-extrabold text-slate-550 uppercase tracking-wider">Paciente</label>
             <select
               value={selectedPatientId}
-              onChange={e => setSelectedPatientId(e.target.value)}
+              onChange={e => {
+                const val = e.target.value;
+                setSelectedPatientId(val);
+                if (val) {
+                  localStorage.setItem('nutri-ai:selected-patient-id', val);
+                } else {
+                  localStorage.removeItem('nutri-ai:selected-patient-id');
+                }
+              }}
               className="block w-full rounded-2xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-4 py-3 border bg-white font-semibold text-slate-700 cursor-pointer"
             >
               <option value="">-- Selecione o Paciente --</option>
@@ -547,76 +663,116 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
           {selectedPatientId && (
             <>
               {/* Contexto Clínico Detectado */}
-              <div className="space-y-3 bg-slate-50/70 border border-slate-100 rounded-2xl p-4.5">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Contexto Detectado</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Contexto Clínico Detectado</span>
                   {loadingContext && (
                     <RefreshCw className="w-3.5 h-3.5 text-primary-600 animate-spin" />
                   )}
                 </div>
 
-                {/* Consultation block */}
-                <div className="border border-slate-150 rounded-xl p-3 bg-white space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 font-bold text-xs text-slate-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={includeConsultation && !!latestConsultation}
-                        disabled={!latestConsultation}
-                        onChange={e => setIncludeConsultation(e.target.checked)}
-                        className="rounded text-primary-600 focus:ring-primary-500 h-4 w-4 border-slate-300"
-                      />
-                      Consultas
-                    </label>
-                    {latestConsultation ? (
-                      <span className="text-[9px] bg-green-50 text-green-700 border border-green-150 font-bold px-1.5 py-0.5 rounded">
-                        Detectada ({new Date(latestConsultation.created_at).toLocaleDateString('pt-BR')})
-                      </span>
-                    ) : (
-                      <span className="text-[9px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.5 rounded">
-                        Sem dados
-                      </span>
-                    )}
-                  </div>
-                  {latestConsultation?.anamnese_notes && (
-                    <p className="text-[10px] text-slate-500 leading-relaxed max-h-16 overflow-y-auto line-clamp-3 bg-slate-50/50 p-1.5 rounded">
-                      {latestConsultation.anamnese_notes}
-                    </p>
-                  )}
-                </div>
+                <div className="grid grid-cols-1 gap-3.5">
+                  {/* Consultation Card */}
+                  <div 
+                    className={`bg-[#f8fafc] border rounded-xl p-4 transition-all duration-200 ${
+                      includeConsultation && !!latestConsultation
+                        ? 'border-indigo-500 ring-1 ring-indigo-500/20'
+                        : 'border-slate-200 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 text-left">
+                        <h4 className="font-semibold text-sm text-slate-900">Última Consulta</h4>
+                        <p className="font-normal text-xs text-slate-500">
+                          {latestConsultation 
+                            ? `Consulta em ${new Date(latestConsultation.created_at).toLocaleDateString('pt-BR')}`
+                            : 'Nenhuma consulta realizada encontrada para este paciente'}
+                        </p>
+                      </div>
 
-                {/* Exams block */}
-                <div className="border border-slate-150 rounded-xl p-3 bg-white space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 font-bold text-xs text-slate-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={includeExams && !!latestExam}
-                        disabled={!latestExam}
-                        onChange={e => setIncludeExams(e.target.checked)}
-                        className="rounded text-primary-600 focus:ring-primary-500 h-4 w-4 border-slate-300"
-                      />
-                      Exames Laboratoriais
-                    </label>
-                    {latestExam ? (
-                      <span className="text-[9px] bg-green-50 text-green-700 border border-green-150 font-bold px-1.5 py-0.5 rounded">
-                        Detectado ({new Date(latestExam.exam_date || latestExam.created_at).toLocaleDateString('pt-BR')})
-                      </span>
-                    ) : (
-                      <span className="text-[9px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.5 rounded">
-                        Sem dados
-                      </span>
-                    )}
-                  </div>
-                  {latestExam?.ai_feedback?.alertas && (
-                    <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto bg-slate-50/50 p-1.5 rounded w-full">
-                      {latestExam.ai_feedback.alertas.map((a: any, idx: number) => (
-                        <span key={idx} className="text-[8px] bg-red-50 text-red-700 border border-red-150 font-bold px-1 py-0.5 rounded truncate max-w-[120px]" title={a.marcador}>
-                          ⚠️ {a.marcador}: {a.valor}
-                        </span>
-                      ))}
+                      {latestConsultation && (
+                        <button
+                          type="button"
+                          onClick={() => setShowConsultationModal(true)}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Visualizar</span>
+                        </button>
+                      )}
                     </div>
-                  )}
+
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                      <span className={`text-[10px] font-semibold ${latestConsultation ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Usar como contexto para IA
+                      </span>
+                      <label className={`relative inline-flex items-center select-none ${latestConsultation ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                        <input
+                          type="checkbox"
+                          disabled={!latestConsultation}
+                          checked={includeConsultation && !!latestConsultation}
+                          onChange={e => setIncludeConsultation(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 rounded-full peer-focus:outline-none transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${
+                          latestConsultation 
+                            ? 'bg-slate-200 peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-indigo-600' 
+                            : 'bg-slate-200/50 opacity-50'
+                        }`}></div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Exam Card */}
+                  <div 
+                    className={`bg-[#f8fafc] border rounded-xl p-4 transition-all duration-200 ${
+                      includeExams && !!latestExam
+                        ? 'border-indigo-500 ring-1 ring-indigo-500/20'
+                        : 'border-slate-200 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 text-left">
+                        <h4 className="font-semibold text-sm text-slate-900">Último Exame</h4>
+                        <p className="font-normal text-xs text-slate-500">
+                          {latestExam 
+                            ? `Exame em ${new Date(latestExam.exam_date || latestExam.created_at).toLocaleDateString('pt-BR')}`
+                            : 'Nenhum laudo encontrado'}
+                        </p>
+                      </div>
+
+                      {latestExam && (
+                        <button
+                          type="button"
+                          onClick={() => setShowExamModal(true)}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Visualizar</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                      <span className={`text-[10px] font-semibold ${latestExam ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Usar como contexto para IA
+                      </span>
+                      <label className={`relative inline-flex items-center select-none ${latestExam ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                        <input
+                          type="checkbox"
+                          disabled={!latestExam}
+                          checked={includeExams && !!latestExam}
+                          onChange={e => setIncludeExams(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 rounded-full peer-focus:outline-none transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${
+                          latestExam 
+                            ? 'bg-slate-200 peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-indigo-600' 
+                            : 'bg-slate-200/50 opacity-50'
+                        }`}></div>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -798,10 +954,10 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
                           </p>
                         </div>
                         
-                        <div className="bg-primary-50 border border-primary-100/70 rounded-2xl px-5 py-2.5 flex items-center gap-3 shrink-0 print:border-slate-200">
+                        <div className="bg-gradient-to-br from-[#0b0f19] to-slate-800 border border-slate-700/30 rounded-2xl px-6 py-3.5 flex items-center gap-3 shrink-0 shadow-md print:border-slate-200 print:bg-none print:bg-transparent print:text-black">
                           <div>
-                            <span className="text-[9px] font-extrabold text-primary-750 uppercase tracking-wider block">Meta Estimada</span>
-                            <span className="text-xl font-black text-primary-900 tracking-tight">{activePlan.kcal} <span className="text-xs font-bold text-primary-750">kcal</span></span>
+                            <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest block print:text-slate-500">Meta Estimada</span>
+                            <span className="text-2xl font-black text-white tracking-tight print:text-black">{activePlan.kcal} <span className="text-xs font-bold text-slate-300 print:text-slate-600">kcal</span></span>
                           </div>
                         </div>
                       </div>
@@ -814,7 +970,12 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
 
                       {/* Meals list */}
                       <div className="space-y-5">
-                        {Object.keys(activePlan.meals).map(mealKey => {
+                        {Object.keys(activePlan.meals)
+                          .sort((a, b) => {
+                            const order = Object.keys(MEAL_NAMES);
+                            return order.indexOf(a) - order.indexOf(b);
+                          })
+                          .map(mealKey => {
                           const options = activePlan.meals[mealKey];
                           const activeOptionIdx = optionActiveTab[mealKey] !== undefined ? optionActiveTab[mealKey] : 0;
                           const currentOption = options[activeOptionIdx] || options[0] || { description: '', items: [], kcal: 0 };
@@ -823,22 +984,22 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
                             <div key={mealKey} className="border border-slate-200/85 rounded-2xl bg-white shadow-sm overflow-hidden flex flex-col print:border-slate-300 print:shadow-none print:break-inside-avoid">
                               
                               {/* Meal Title Bar */}
-                              <div className="bg-slate-50/60 border-b border-slate-100 px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 print:bg-transparent print:border-none">
-                                <h4 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                                  <Clock className="w-4 h-4 text-primary-655" />
-                                  {MEAL_NAMES[mealKey]}
-                                </h4>
+                              <div className={`${headerTheme.bg} border-b ${headerTheme.border} px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 print:bg-transparent print:border-none`}>
+                                <div className={`text-sm font-semibold ${headerTheme.text} flex items-center gap-2`}>
+                                  <Clock className={`w-4 h-4 ${headerTheme.icon}`} />
+                                  <span>{MEAL_NAMES[mealKey]}</span>
+                                </div>
                                 
                                 {/* 3 Options Tab Switchers */}
-                                <div className="flex p-0.5 bg-slate-100 rounded-lg shrink-0 print:hidden">
+                                <div className={`flex p-0.5 ${headerTheme.switcherBg} rounded-lg shrink-0 print:hidden`}>
                                   {options.map((_, optIdx) => (
                                     <button
                                       key={optIdx}
                                       onClick={() => setOptionActiveTab(prev => ({ ...prev, [mealKey]: optIdx }))}
-                                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${
+                                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
                                         activeOptionIdx === optIdx 
-                                          ? 'bg-white text-slate-800 shadow-xs' 
-                                          : 'text-slate-500 hover:text-slate-800'
+                                          ? headerTheme.switcherActive 
+                                          : headerTheme.switcherInactive
                                       }`}
                                     >
                                       Opção {optIdx + 1}
@@ -901,16 +1062,18 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
                                 </div>
 
                                 {/* Calorie input */}
-                                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-4 print:pt-2">
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase print:text-black">Calorias:</span>
-                                    <input
-                                      type="number"
-                                      value={currentOption.kcal || 0}
-                                      onChange={e => handleUpdateOption(mealKey, activeOptionIdx, 'kcal', parseInt(e.target.value) || 0)}
-                                      className="w-16 rounded border-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-800 focus:outline-none print:border-none print:p-0 print:text-xs print:text-slate-850"
-                                    />
-                                    <span className="text-xs text-slate-450 font-bold">kcal</span>
+                                <div className="pt-3.5 border-t border-slate-100 flex items-center justify-between gap-4 print:pt-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-black">Calorias:</span>
+                                    <div className="relative flex items-center">
+                                      <input
+                                        type="number"
+                                        value={currentOption.kcal || 0}
+                                        onChange={e => handleUpdateOption(mealKey, activeOptionIdx, 'kcal', parseInt(e.target.value) || 0)}
+                                        className="min-w-[180px] w-44 rounded-xl border border-slate-200 py-2 pl-4 pr-12 text-lg font-semibold text-indigo-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-all print:border-none print:p-0 print:text-xs print:text-slate-850"
+                                      />
+                                      <span className="absolute right-4 text-xs text-slate-400 font-bold pointer-events-none">kcal</span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -969,10 +1132,10 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
                             >
                               Visualizar no Editor
                             </button>
-                            {!isReadOnly && (
+                             {!isReadOnly && (
                               <button
                                 type="button"
-                                onClick={() => handleDeletePastPlan(plan.id)}
+                                onClick={() => setDeletePlanId(plan.id)}
                                 className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                                 title="Excluir plano alimentar permanentemente"
                               >
@@ -990,7 +1153,148 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
             </div>
           )}
         </div>
-      </div>
+    </div>
+
+      {/* MODAL PARA VISUALIZAR CONSULTA */}
+      {showConsultationModal && latestConsultation && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden animate-in scale-in duration-300">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 shrink-0 bg-slate-50/50">
+              <div className="space-y-0.5">
+                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[10px] font-semibold px-2 py-0.5 flex items-center gap-1 w-fit uppercase tracking-wider">
+                  Histórico de Consulta
+                </span>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Consulta em {new Date(latestConsultation.created_at).toLocaleDateString('pt-BR')}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowConsultationModal(false)} 
+                className="h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 border border-slate-200 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Anotações de Anamnese</h4>
+              <div className="bg-slate-50 border border-slate-200 p-4.5 rounded-2xl">
+                <p className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-line">
+                  {latestConsultation.anamnese_notes || "Nenhuma anotação de anamnese registrada nesta consulta."}
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-slate-100 p-4 shrink-0 bg-slate-50/50 flex justify-end">
+              <button 
+                onClick={() => setShowConsultationModal(false)} 
+                className="px-5 py-2 text-xs font-semibold text-slate-650 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none"
+              >
+                Fechar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA VISUALIZAR EXAME (PDF) */}
+      {showExamModal && latestExam && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden animate-in scale-in duration-300">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 shrink-0 bg-slate-50/50">
+              <div className="space-y-0.5">
+                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[10px] font-semibold px-2 py-0.5 flex items-center gap-1 w-fit uppercase tracking-wider">
+                  Laudo de Exame PDF
+                </span>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Exame em {new Date(latestExam.exam_date || latestExam.created_at).toLocaleDateString('pt-BR')}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowExamModal(false)} 
+                className="h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-850 border border-slate-200 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-hidden p-6 bg-slate-50 flex flex-col">
+              {loadingPdfUrl ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-450">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent mb-3" />
+                  <p className="text-sm font-medium">Gerando link seguro de visualização do PDF...</p>
+                </div>
+              ) : examPdfUrl ? (
+                <iframe 
+                  src={`${examPdfUrl}#toolbar=0`} 
+                  className="w-full h-full rounded-2xl border border-slate-250 shadow-sm"
+                  title="Visualizador de PDF do Exame"
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
+                  <p className="text-sm font-semibold text-rose-600">Erro ao carregar documento PDF.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-slate-100 p-4 shrink-0 bg-slate-50/50 flex justify-end">
+              <button 
+                onClick={() => setShowExamModal(false)} 
+                className="px-5 py-2 text-xs font-semibold text-slate-650 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none"
+              >
+                Fechar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE PLANO */}
+      {deletePlanId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
+          <div className="bg-[#f8fafc] border border-slate-200 rounded-xl shadow-xl max-w-md w-full flex flex-col overflow-hidden animate-in scale-in duration-300">
+            
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              <h3 className="text-lg font-semibold text-slate-900 font-semibold">
+                Excluir Plano Alimentar
+              </h3>
+              <p className="text-sm text-slate-500 leading-relaxed font-normal">
+                Deseja mesmo excluir este plano alimentar? Esta ação não poderá ser desfeita.
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-slate-100 p-4 bg-slate-50/50 flex justify-end gap-3 shrink-0">
+              <button 
+                type="button"
+                onClick={() => setDeletePlanId(null)} 
+                className="bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl py-2 px-4 font-medium text-xs transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleDeletePastPlan(deletePlanId)} 
+                className="bg-rose-600 text-white font-medium rounded-xl py-2 px-4 hover:bg-rose-700 transition-all text-xs cursor-pointer"
+              >
+                Excluir
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };

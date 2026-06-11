@@ -401,18 +401,18 @@ export const Settings: React.FC = () => {
     },
     {
       id: 'blue',
-      name: 'Azul Suave',
-      description: 'Barra lateral e topo em azul escuro moderno e profissional.',
-      bgColor: 'bg-blue-800',
+      name: 'Azul Tecnológico (Deep Navy)',
+      description: 'Barra lateral, topo e botões em azul escuro e elegante de alta tecnologia.',
+      bgColor: 'bg-[#11162a]',
       textColor: 'text-white',
-      borderColor: 'border-blue-700',
+      borderColor: 'border-[#0d1020]',
       action: () => handleSelectTheme('light', 'blue')
     },
     {
       id: 'dark',
       name: 'Escuro (Dark Mode Harmony)',
-      description: 'Fundo preto/grafite profundo e refinado com acentos em verde clínico.',
-      bgColor: 'bg-[#1a1a1a]',
+      description: 'Fundo azul-marinho ultra escuro com acentos em verde clínico.',
+      bgColor: 'bg-[#0b0f19]',
       textColor: 'text-white',
       borderColor: 'border-[#333333]',
       action: () => handleSelectTheme('dark', 'dark')
@@ -503,52 +503,52 @@ export const Settings: React.FC = () => {
       </div>
 
       {activeTab === 'profile' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">Meu Perfil</h2>
             <p className="text-sm text-slate-500">Atualize seus dados pessoais e informações profissionais de login.</p>
           </div>
           <div className="p-6">
             <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+              <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-6">
                 <div className="sm:col-span-6">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Nome Completo</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Nome Completo</label>
                   <input
                     type="text"
                     required
                     value={profileFormData.name}
                     onChange={e => setProfileFormData({ ...profileFormData, name: e.target.value })}
-                    className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none"
+                    className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
                 </div>
                 <div className="sm:col-span-3">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">E-mail (Login)</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">E-mail (Login)</label>
                   <input
                     type="email"
                     required
                     value={profileFormData.email}
                     onChange={e => setProfileFormData({ ...profileFormData, email: e.target.value })}
-                    className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none"
+                    className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
                 </div>
                 <div className="sm:col-span-3">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Telefone</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Telefone</label>
                   <input
                     type="text"
                     value={profileFormData.phone}
                     onChange={e => setProfileFormData({ ...profileFormData, phone: e.target.value })}
-                    className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none"
+                    className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
                 </div>
                 {(userRole === 'owner' || userRole === 'nutritionist') && (
                   <div className="sm:col-span-6">
-                    <label className="block text-base font-bold text-slate-700 mb-1.5">CRN (Conselho Regional de Nutrição)</label>
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">CRN (Conselho Regional de Nutrição)</label>
                     <input
                       type="text"
                       required
                       value={profileFormData.crn}
                       onChange={e => setProfileFormData({ ...profileFormData, crn: e.target.value })}
-                      className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none"
+                      className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                     />
                   </div>
                 )}
@@ -557,7 +557,7 @@ export const Settings: React.FC = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 cursor-pointer shadow-sm"
                 >
                   Salvar Perfil
                 </button>
@@ -568,8 +568,8 @@ export const Settings: React.FC = () => {
       )}
 
       {activeTab === 'theme' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">Visual do Menu e Topo</h2>
             <p className="text-sm text-slate-500">
               Selecione uma opção de estilo para a barra de navegação e cabeçalho. As páginas centrais e de conteúdo continuarão limpas e claras para melhor leitura.
@@ -586,14 +586,18 @@ export const Settings: React.FC = () => {
                     key={option.id}
                     onClick={option.action}
                     disabled={saving}
-                    className={`relative flex flex-col text-left p-5 border rounded-2xl transition-all duration-300 hover:shadow-md ${
+                    className={`relative flex flex-col text-left p-5 border-2 rounded-2xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer ${
                       isSelected 
                         ? isDarkThemeOption
-                          ? 'border-primary-500 bg-[#1a1a1a] text-white ring-2 ring-primary-500 ring-offset-2'
-                          : 'border-primary-500 bg-primary-50/50 ring-2 ring-primary-500 ring-offset-2' 
+                          ? 'border-primary-500 bg-[#1a1a1a] text-white'
+                          : option.id === 'blue'
+                            ? 'border-indigo-600 bg-indigo-50/30'
+                            : option.id === 'teal'
+                              ? 'border-teal-650 bg-teal-50/30'
+                              : 'border-slate-700 bg-slate-50/50'
                         : isDarkThemeOption
                           ? 'border-slate-800 bg-[#1a1a1a] text-white hover:border-slate-700'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
+                          : 'border-slate-200/80 bg-white hover:border-slate-300 shadow-sm'
                     }`}
                   >
                     <div className="flex items-start justify-between w-full">
@@ -637,8 +641,8 @@ export const Settings: React.FC = () => {
       )}
 
       {activeTab === 'clinic' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">Dados da Clínica</h2>
             <p className="text-sm text-slate-500">Atualize as informações de contato e endereço do consultório.</p>
           </div>
@@ -658,59 +662,59 @@ export const Settings: React.FC = () => {
                 setSaving(false);
               }
             }} className="space-y-4">
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+              <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-6">
                 <div className="sm:col-span-6">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Nome da Clínica</label>
-                  <input type="text" name="name" required defaultValue={clinic?.name || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Nome da Clínica</label>
+                  <input type="text" name="name" required defaultValue={clinic?.name || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">CEP</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">CEP</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="cep" defaultValue={clinic?.cep || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="text" name="cep" defaultValue={clinic?.cep || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-4">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Endereço</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Endereço</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="address" defaultValue={clinic?.address || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="text" name="address" defaultValue={clinic?.address || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Número/Complemento</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Número/Complemento</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="complement" defaultValue={clinic?.complement || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="text" name="complement" defaultValue={clinic?.complement || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Bairro</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Bairro</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="neighborhood" defaultValue={clinic?.neighborhood || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="text" name="neighborhood" defaultValue={clinic?.neighborhood || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Cidade</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Cidade</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="city" defaultValue={clinic?.city || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="text" name="city" defaultValue={clinic?.city || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Estado</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Estado</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="state" defaultValue={clinic?.state || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="text" name="state" defaultValue={clinic?.state || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-3">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Telefone da Clínica</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Telefone da Clínica</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="phone" defaultValue={clinic?.phone || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="text" name="phone" defaultValue={clinic?.phone || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-3">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">E-mail da Clínica</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">E-mail da Clínica</label>
                   {/* @ts-ignore */}
-                  <input type="email" name="email" defaultValue={clinic?.email || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="email" name="email" defaultValue={clinic?.email || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-6">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Horário de Funcionamento</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Horário de Funcionamento</label>
                   {/* @ts-ignore */}
-                  <input type="text" name="operating_hours" defaultValue={clinic?.operating_hours || ''} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal focus:outline-none" />
+                  <input type="text" name="operating_hours" defaultValue={clinic?.operating_hours || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
               </div>
               <div className="pt-6 flex justify-end">
-                <button type="submit" disabled={saving} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-sm">Salvar Dados</button>
+                <button type="submit" disabled={saving} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 cursor-pointer shadow-sm">Salvar Dados</button>
               </div>
             </form>
           </div>
@@ -718,8 +722,8 @@ export const Settings: React.FC = () => {
       )}
 
       {activeTab === 'team' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-slate-800">Equipe da Clínica</h2>
               <p className="text-sm text-slate-500">Cadastre e gerencie o acesso de nutricionistas e secretárias.</p>
@@ -901,36 +905,36 @@ export const Settings: React.FC = () => {
       )}
 
       {activeTab === 'services' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">Serviços Prestados</h2>
             <p className="text-sm text-slate-500">Cadastre os tipos de consultas e procedimentos da clínica.</p>
           </div>
           <div className="p-6 space-y-6">
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Nome do Serviço</label>
-                  <input type="text" placeholder="Ex: Primeira Consulta" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal" />
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Nome do Serviço</label>
+                  <input type="text" placeholder="Ex: Primeira Consulta" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Duração (min)</label>
-                  <input type="number" value={newService.duration_minutes} onChange={e => setNewService({...newService, duration_minutes: parseInt(e.target.value) || 0})} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal" />
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Duração (min)</label>
+                  <input type="number" value={newService.duration_minutes} onChange={e => setNewService({...newService, duration_minutes: parseInt(e.target.value) || 0})} className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Preço (R$)</label>
-                  <input type="number" value={newService.price} onChange={e => setNewService({...newService, price: parseFloat(e.target.value) || 0})} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal" />
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Preço (R$)</label>
+                  <input type="number" value={newService.price} onChange={e => setNewService({...newService, price: parseFloat(e.target.value) || 0})} className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-base font-bold text-slate-700 mb-1.5">Modalidade</label>
-                  <select value={newService.modality} onChange={e => setNewService({...newService, modality: e.target.value})} className="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-base px-4 py-3 border bg-white font-normal">
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Modalidade</label>
+                  <select value={newService.modality} onChange={e => setNewService({...newService, modality: e.target.value})} className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm">
                     <option value="presencial">Presencial</option>
                     <option value="online">Online</option>
                     <option value="hibrido">Híbrido</option>
                   </select>
                 </div>
                 <div className="sm:col-span-2 flex items-end">
-                  <button type="button" onClick={addService} disabled={saving} className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 px-6 rounded-xl text-base font-bold transition-all shadow-sm">
+                  <button type="button" onClick={addService} disabled={saving} className="w-full rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-sm">
                     Adicionar Serviço
                   </button>
                 </div>
@@ -965,8 +969,8 @@ export const Settings: React.FC = () => {
       )}
 
       {activeTab === 'patient_access' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-slate-800">Acesso dos Pacientes ao Sistema</h2>
               <p className="text-sm text-slate-500">Gerencie quais pacientes têm acesso ao aplicativo móvel/web, bloqueie acessos temporariamente ou altere suas senhas.</p>
@@ -1107,9 +1111,9 @@ export const Settings: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleChangePasswordSubmit} className="space-y-6">
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
               <div>
-                <label className="block text-base font-bold text-slate-700 mb-1.5">Nova Senha Temporária</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">Nova Senha Temporária</label>
                 <input
                   type="password"
                   required
@@ -1117,7 +1121,7 @@ export const Settings: React.FC = () => {
                   minLength={6}
                   value={newPatientPassword}
                   onChange={e => setNewPatientPassword(e.target.value)}
-                  className="block w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                   autoFocus
                 />
               </div>
@@ -1126,14 +1130,14 @@ export const Settings: React.FC = () => {
                 <button 
                   type="button" 
                   onClick={() => setPasswordModalPatient(null)} 
-                  className="px-5 py-2.5 text-base font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
                   disabled={passwordSaving}
-                  className="px-5 py-2.5 text-base font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   {passwordSaving ? (
                     <>
@@ -1182,46 +1186,46 @@ export const Settings: React.FC = () => {
 
             <form onSubmit={handleSaveTeamMember} className="space-y-4 flex-1 overflow-y-auto pr-1">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Nome Completo</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">Nome Completo</label>
                 <input
                   type="text"
                   required
                   placeholder="Nome do profissional"
                   value={teamFormData.name}
                   onChange={e => setTeamFormData({ ...teamFormData, name: e.target.value })}
-                  className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">E-mail (Login)</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">E-mail (Login)</label>
                 <input
                   type="email"
                   required
                   placeholder="email@clinica.com"
                   value={teamFormData.email}
                   onChange={e => setTeamFormData({ ...teamFormData, email: e.target.value })}
-                  className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Telefone</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">Telefone</label>
                 <input
                   type="text"
                   placeholder="(00) 00000-0000"
                   value={teamFormData.phone}
                   onChange={e => setTeamFormData({ ...teamFormData, phone: e.target.value })}
-                  className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Função / Cargo</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">Função / Cargo</label>
                 <select
                   value={teamFormData.role}
                   onChange={e => setTeamFormData({ ...teamFormData, role: e.target.value })}
-                  className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                 >
                   <option value="nutritionist">Nutricionista</option>
                   <option value="secretary">Secretária(o)</option>
@@ -1230,21 +1234,21 @@ export const Settings: React.FC = () => {
 
               {teamFormData.role === 'nutritionist' && (
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">CRN (Conselho Regional de Nutrição)</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">CRN (Conselho Regional de Nutrição)</label>
                   <input
                     type="text"
                     required={teamFormData.role === 'nutritionist'}
                     placeholder="CRN-X 00000"
                     value={teamFormData.crn}
                     onChange={e => setTeamFormData({ ...teamFormData, crn: e.target.value })}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                   />
                 </div>
               )}
 
               {!selectedTeamMember && (
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Senha de Acesso Inicial</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Senha de Acesso Inicial</label>
                   <input
                     type="password"
                     required
@@ -1252,7 +1256,7 @@ export const Settings: React.FC = () => {
                     minLength={6}
                     value={teamFormData.password}
                     onChange={e => setTeamFormData({ ...teamFormData, password: e.target.value })}
-                    className="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all outline-none bg-white font-normal shadow-sm"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                   />
                 </div>
               )}
@@ -1261,14 +1265,14 @@ export const Settings: React.FC = () => {
                 <button 
                   type="button" 
                   onClick={() => setShowAddEditTeamModal(false)} 
-                  className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
                   disabled={saving}
-                  className="px-5 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   {saving ? (
                     <>

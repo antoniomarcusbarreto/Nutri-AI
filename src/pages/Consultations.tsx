@@ -38,6 +38,7 @@ import { ptBR } from 'date-fns/locale';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { getCanonicalBiomarkerName } from '../utils/biomarkers';
 
 // Safe types for browser SpeechRecognition API
 interface SpeechRecognitionErrorEvent extends Event {
@@ -99,6 +100,12 @@ export const Consultations: React.FC = () => {
   const [selectedExamSignedUrl, setSelectedExamSignedUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
+  // Estados locais para controle de cache e isolamento de exames
+  const [alteracoesCriticas, setAlteracoesCriticas] = useState<any[] | null>(null);
+  const [parecerClinico, setParecerClinico] = useState<string | null>(null);
+  const [biomarcadores, setBiomarcadores] = useState<any[] | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
+
   // Observações e Anotações Clínicas
   const [activeNoteEditIndex, setActiveNoteEditIndex] = useState<number | null>(null);
   const [tempNoteText, setTempNoteText] = useState<string>('');
@@ -137,7 +144,7 @@ export const Consultations: React.FC = () => {
     if (!prevExam.ai_feedback?.todos_biomarcadores) return null;
     
     return prevExam.ai_feedback.todos_biomarcadores.find(
-      (b: any) => b.marcador.toLowerCase().trim() === marcador.toLowerCase().trim()
+      (b: any) => getCanonicalBiomarkerName(b.marcador).toLowerCase() === getCanonicalBiomarkerName(marcador).toLowerCase()
     );
   };
 
@@ -174,15 +181,15 @@ export const Consultations: React.FC = () => {
   };
 
   const handleSaveBiomarkerNote = async (idx: number) => {
-    if (!selectedExam) return;
+    if (!selectedExam || !biomarcadores) return;
     
-    const updatedBiomarkers = [...selectedExam.ai_feedback.todos_biomarcadores];
+    const updatedBiomarkers = [...biomarcadores];
     updatedBiomarkers[idx] = {
       ...updatedBiomarkers[idx],
       nota_clinica: tempNoteText.trim()
     };
     
-    const updatedAlerts = selectedExam.ai_feedback.alertas ? [...selectedExam.ai_feedback.alertas] : [];
+    const updatedAlerts = alteracoesCriticas ? [...alteracoesCriticas] : [];
     const marcadorName = updatedBiomarkers[idx].marcador;
     
     const alertIdx = updatedAlerts.findIndex((a: any) => a.marcador === marcadorName);
@@ -194,9 +201,9 @@ export const Consultations: React.FC = () => {
     }
     
     const updatedFeedback = {
-      ...selectedExam.ai_feedback,
-      todos_biomarcadores: updatedBiomarkers,
-      alertas: updatedAlerts
+      alertas: updatedAlerts,
+      insights: parecerClinico || "",
+      todos_biomarcadores: updatedBiomarkers
     };
     
     try {
@@ -206,6 +213,9 @@ export const Consultations: React.FC = () => {
         .eq('id', selectedExam.id);
         
       if (dbError) throw dbError;
+      
+      setBiomarcadores(updatedBiomarkers);
+      setAlteracoesCriticas(updatedAlerts);
       
       const updatedExam = { ...selectedExam, ai_feedback: updatedFeedback };
       setSelectedExam(updatedExam);
@@ -370,6 +380,10 @@ export const Consultations: React.FC = () => {
   const handleSelectExam = async (exam: any) => {
     setSelectedExam(exam);
     setSelectedExamSignedUrl(null);
+    setAlteracoesCriticas(null);
+    setParecerClinico(null);
+    setBiomarcadores(null);
+    setLoadingDetails(exam ? true : false);
     if (!exam) return;
 
     try {
@@ -506,20 +520,14 @@ export const Consultations: React.FC = () => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     if (!apiKey) {
-      console.warn('VITE_GEMINI_API_KEY não configurada. Ativando análise simulada de alta fidelidade.');
+      console.warn('VITE_GEMINI_API_KEY não configurada. Simulando análise de exames...');
+      showToast('Chave de API do Gemini não configurada. Executando análise simulada...', 'info');
       
       setTimeout(async () => {
         const mockFeedback = {
-          alertas: [
-            { marcador: "Anticorpos Anti-TPO", valor: "120 UI/mL", referencia: "< 9 UI/mL", gravidade: "alta" },
-            { marcador: "TSH (Hormônio Tireoestimulante)", valor: "8.4 mUI/L", referencia: "0.4 a 4.5 mUI/L", gravidade: "alta" },
-            { marcador: "Vitamina D (25-OH)", valor: "18 ng/mL", referencia: "Desejável > 30 ng/mL", gravidade: "alta" }
-          ],
-          insights: "O laudo do paciente revela marcadores tireoidianos e imunológicos críticos altamente alterados. Destaca-se a elevação expressiva de Anticorpos Anti-TPO (120 UI/mL, sendo a referência < 9 UI/mL) associada a um TSH significativamente elevado (8.4 mUI/L), o que caracteriza clinicamente um quadro de Hipotireoidismo de Hashimoto. Na priorização clínica de segurança, estes alertas lideram a conduta. Além disso, observa-se uma deficiência severa de Vitamina D (18 ng/mL), o que compromete ainda mais a modulação imunológica e o suporte à glândula tireoide. Glicose de Jejum (86.6 mg/dL) e os lipídeos (Colesterol LDL a 95 mg/dL) encontram-se rigorosamente dentro da normalidade e estabilidade metabólica. Recomenda-se acompanhamento médico imediato para avaliação de reposição hormonal, associado a uma conduta nutricional altamente anti-inflamatória, rica em selênio, zinco, e suplementação intensiva de colecalciferol (Vitamina D3) para otimizar os receptores tireoidianos e modular a autoimunidade.",
+          insights: "O paciente apresenta um perfil metabólico excelente com a grande maioria dos marcadores em estado de homeostase. Glicose de jejum, hemoglobina glicada e creatinina estão dentro dos limites recomendados. Recomenda-se continuar com a dieta balanceada e monitoramento de rotina.",
+          alertas: [],
           todos_biomarcadores: [
-            { marcador: "Anticorpos Anti-TPO", valor: "120 UI/mL", referencia: "< 9 UI/mL", status: "alterado" },
-            { marcador: "TSH (Hormônio Tireoestimulante)", valor: "8.4 mUI/L", referencia: "0.4 a 4.5 mUI/L", status: "alterado" },
-            { marcador: "Vitamina D (25-OH)", valor: "18 ng/mL", referencia: "Desejável > 30 ng/mL", status: "alterado" },
             { marcador: "Glicose de Jejum", valor: "86.6 mg/dL", referencia: "70 a 99 mg/dL", status: "normal" },
             { marcador: "Hemoglobina Glicada (HbA1c)", valor: "5.3%", referencia: "< 5.7%", status: "normal" },
             { marcador: "Colesterol LDL", valor: "95 mg/dL", referencia: "< 100 mg/dL", status: "normal" },
@@ -539,11 +547,16 @@ export const Consultations: React.FC = () => {
 
           if (dbError) throw dbError;
 
+          // Atualiza os estados locais
+          setAlteracoesCriticas(mockFeedback.alertas || []);
+          setParecerClinico(mockFeedback.insights || "");
+          setBiomarcadores(mockFeedback.todos_biomarcadores || []);
+
           const updatedExam = { ...selectedExam, ai_feedback: mockFeedback };
           setSelectedExam(updatedExam);
           setExams(prev => prev.map(e => e.id === selectedExam.id ? updatedExam : e));
           
-          showToast('Análise de exames simulada concluída!', 'info');
+          showToast('Análise de exames simulada concluída!', 'success');
         } catch (err: any) {
           console.error('Erro na simulação do exame:', err);
           showToast('Erro ao gravar feedback simulado.', 'error');
@@ -608,12 +621,15 @@ Retorne um objeto JSON estrito com a seguinte estrutura e chaves exatas:
       "referencia": "Valor de referência exato",
       "status": "alterado" (se fora do limite) ou "normal" (se dentro dos limites inferior/superior)
     }
-  ]
+  ],
+  "analise_preditiva": "Projeção clínica preditiva sobre a evolução metabólica do paciente com base no tratamento nutricional sugerido (mínimo de 3 linhas de análise preditiva)",
+  "focos_sugeridos": ["Exatamente três focos principais e práticos de suporte nutricional funcional recomendados"],
+  "tempo_estimado": 12
 }`;
 
       // 3. Request Google AI Studio Gemini API
       const aiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -672,6 +688,11 @@ Retorne um objeto JSON estrito com a seguinte estrutura e chaves exatas:
 
       if (dbError) throw dbError;
 
+      // Atualiza os estados locais
+      setAlteracoesCriticas(feedbackJSON.alertas || []);
+      setParecerClinico(feedbackJSON.insights || "");
+      setBiomarcadores(feedbackJSON.todos_biomarcadores || []);
+
       const updatedExam = { ...selectedExam, ai_feedback: feedbackJSON };
       setSelectedExam(updatedExam);
       setExams(prev => prev.map(e => e.id === selectedExam.id ? updatedExam : e));
@@ -686,8 +707,9 @@ Retorne um objeto JSON estrito com a seguinte estrutura e chaves exatas:
   };
 
   const handleCopyAnalysisToConsultation = () => {
-    if (!selectedExam?.ai_feedback) return;
-    const { alertas = [], insights = "" } = selectedExam.ai_feedback;
+    if (!selectedExam || !parecerClinico) return;
+    const alertas = alteracoesCriticas || [];
+    const insights = parecerClinico;
 
     const formattedAlerts = alertas.map((a: any) => 
       `- **${a.marcador}:** ${a.valor} (Ref: ${a.referencia}) [Gravidade: ${a.gravidade.toUpperCase()}]`
@@ -712,6 +734,50 @@ ${insights}`;
       fetchServices();
     }
   }, [clinic?.id]);
+
+  useEffect(() => {
+    if (!selectedExam?.id) {
+      setAlteracoesCriticas(null);
+      setParecerClinico(null);
+      setBiomarcadores(null);
+      setLoadingDetails(false);
+      return;
+    }
+
+    const fetchExamDetails = async () => {
+      setLoadingDetails(true);
+      try {
+        const { data, error } = await supabase
+          .from('patient_exams')
+          .select('ai_feedback')
+          .eq('id', selectedExam.id)
+          .single();
+
+        if (error) throw error;
+
+        const feedback = data?.ai_feedback;
+        if (feedback) {
+          setAlteracoesCriticas(feedback.alertas || []);
+          setParecerClinico(feedback.insights || "");
+          setBiomarcadores(feedback.todos_biomarcadores || []);
+        } else {
+          setAlteracoesCriticas(null);
+          setParecerClinico(null);
+          setBiomarcadores(null);
+        }
+      } catch (err: any) {
+        console.error('Erro ao buscar detalhes dinâmicos do exame:', err);
+        showToast('Erro ao carregar detalhes do exame.', 'error');
+        setAlteracoesCriticas(null);
+        setParecerClinico(null);
+        setBiomarcadores(null);
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+
+    fetchExamDetails();
+  }, [selectedExam?.id]);
 
   useEffect(() => {
     if (selectedAppointment?.patients?.id) {
@@ -1131,7 +1197,7 @@ Com base nessa separação lógica de oradores, processe a transcrição e devol
 - metas_pactuadas (array de strings): Objetivos de curto prazo definidos em comum acordo na sessão.`;
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -1283,9 +1349,6 @@ ${metas_pactuadas.length > 0
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             Consultas & Prontuários
-            <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-100 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> Efetivação de Agenda
-            </span>
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Realize atendimentos diários, registre a composição corporal do paciente e utilize transcrição de áudio com inteligência artificial.
@@ -2376,7 +2439,7 @@ ${metas_pactuadas.length > 0
                 
                 {selectedExam ? (
                   /* SPLIT SCREEN VIEW */
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[720px]">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-220px)]">
                     
                     {/* LEFT PANEL: PDF Viewer */}
                     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col h-full overflow-hidden">
@@ -2440,7 +2503,7 @@ ${metas_pactuadas.length > 0
                           </div>
                         </div>
 
-                        {selectedExam.ai_feedback && (
+                        {parecerClinico && (
                           <button
                             onClick={handleCopyAnalysisToConsultation}
                             className="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 px-3 py-1.5 rounded-xl transition-all shadow-sm hover:shadow"
@@ -2452,7 +2515,12 @@ ${metas_pactuadas.length > 0
                       </div>
 
                       <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/20">
-                        {!selectedExam.ai_feedback ? (
+                        {loadingDetails ? (
+                          <div className="flex flex-col items-center justify-center h-full text-slate-400 py-20 animate-in fade-in duration-200">
+                            <div className="animate-spin rounded-full h-8 w-8 border-2 border-teal-600 border-t-transparent mb-3" />
+                            <p className="text-xs font-bold">Carregando análise do laudo...</p>
+                          </div>
+                        ) : !alteracoesCriticas && !parecerClinico && !biomarcadores ? (
                           /* EMPTY STATE / RUN ANALYSIS */
                           <div className="flex flex-col items-center justify-center h-full text-center p-6 max-w-md mx-auto space-y-4">
                             <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-indigo-50 to-primary-50 text-indigo-600 flex items-center justify-center shadow border border-indigo-100/50 animate-bounce">
@@ -2491,12 +2559,12 @@ ${metas_pactuadas.length > 0
                             <div className="space-y-3">
                               <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                                 <span className="w-1.5 h-3.5 bg-indigo-500 rounded-sm" />
-                                Alterações Detectadas ({selectedExam.ai_feedback.alertas?.length || 0})
+                                Alterações Detectadas ({alteracoesCriticas?.length || 0})
                               </h5>
 
-                              {selectedExam.ai_feedback.alertas && selectedExam.ai_feedback.alertas.length > 0 ? (
+                              {alteracoesCriticas && alteracoesCriticas.length > 0 ? (
                                 <div className="grid grid-cols-1 gap-2.5">
-                                  {selectedExam.ai_feedback.alertas.map((alerta: any, idx: number) => (
+                                  {alteracoesCriticas.map((alerta: any, idx: number) => (
                                     <div
                                       key={idx}
                                       className={`p-3.5 rounded-xl border flex justify-between items-center shadow-sm transition-all hover:translate-x-0.5 duration-200 ${
@@ -2539,15 +2607,15 @@ ${metas_pactuadas.length > 0
                                 Parecer Clínico Nutricional
                               </h5>
                               <div className="text-sm font-medium text-slate-700 leading-relaxed border-l-4 border-emerald-500 bg-emerald-50/10 px-4 py-3.5 rounded-r-xl shadow-inner whitespace-pre-line">
-                                {selectedExam.ai_feedback.insights}
+                                {parecerClinico}
                               </div>
                             </div>
                             {/* Full Biomarkers List */}
-                            {selectedExam.ai_feedback.todos_biomarcadores && (
+                            {biomarcadores && (
                               <div className="space-y-3 pt-2">
                                 <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                                   <span className="w-1.5 h-3.5 bg-slate-400 rounded-sm" />
-                                  Lista Completa de Biomarcadores ({selectedExam.ai_feedback.todos_biomarcadores.length})
+                                  Lista Completa de Biomarcadores ({biomarcadores.length})
                                 </h5>
                                 
                                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm animate-in fade-in duration-200">
@@ -2558,8 +2626,8 @@ ${metas_pactuadas.length > 0
                                     <span className="hidden sm:block sm:col-span-2 pl-4">Referência</span>
                                     <span className="col-span-2 sm:col-span-1 text-center">Ações</span>
                                   </div>
-                                  <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
-                                    {selectedExam.ai_feedback.todos_biomarcadores.map((bio: any, idx: number) => {
+                                  <div className="divide-y divide-slate-100">
+                                    {biomarcadores.map((bio: any, idx: number) => {
                                       const isAltered = bio.status === 'alterado';
                                       
                                       // Compare dynamically against historical exams

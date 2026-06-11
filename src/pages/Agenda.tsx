@@ -427,9 +427,6 @@ export const Agenda: React.FC = () => {
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             Agenda de Consultas
-            <span className="bg-primary-50 text-primary-700 text-xs font-bold px-2.5 py-1 rounded-full border border-primary-100 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> Premium
-            </span>
           </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1">
             <p className="text-sm text-slate-500">Gerencie a escala da clínica, profissionais, serviços e agendamento dos pacientes.</p>
@@ -925,20 +922,20 @@ export const Agenda: React.FC = () => {
               
               {/* Patient intelligent selector */}
               <div className="space-y-1">
-                <label className="block text-sm font-semibold text-slate-700">Paciente</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">Paciente</label>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"
                     placeholder="🔎 Filtrar paciente por nome..."
                     value={patientSearch}
                     onChange={e => setPatientSearch(e.target.value)}
-                    className="block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs px-3 py-2 border"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                   />
                   {patientSearch && (
                     <button 
                       type="button" 
                       onClick={() => setPatientSearch('')}
-                      className="text-xs font-bold text-slate-400 hover:text-slate-600 px-2 border rounded-xl hover:bg-slate-50"
+                      className="text-xs font-bold text-slate-400 hover:text-slate-600 px-2 border rounded-xl hover:bg-slate-50 cursor-pointer"
                     >
                       Limpar
                     </button>
@@ -948,7 +945,7 @@ export const Agenda: React.FC = () => {
                   value={newAppointmentData.patient_id}
                   onChange={e => setNewAppointmentData(prev => ({ ...prev, patient_id: e.target.value }))}
                   required
-                  className="block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2.5 border bg-white font-semibold text-slate-700"
+                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                 >
                   <option value="">-- Selecione o Paciente --</option>
                   {filteredPatientsForSelect.map(p => (
@@ -962,12 +959,12 @@ export const Agenda: React.FC = () => {
 
               {/* Service Select */}
               <div className="space-y-1">
-                <label className="block text-sm font-semibold text-slate-700">Serviço / Procedimento</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">Serviço / Procedimento</label>
                 <select
                   value={newAppointmentData.service_id}
                   onChange={e => setNewAppointmentData(prev => ({ ...prev, service_id: e.target.value }))}
                   required
-                  className="block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2.5 border bg-white font-semibold text-slate-700"
+                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                 >
                   <option value="">-- Selecione o Serviço --</option>
                   {services.map(s => (
@@ -980,12 +977,12 @@ export const Agenda: React.FC = () => {
 
               {/* Nutritionist Select */}
               <div className="space-y-1">
-                <label className="block text-sm font-semibold text-slate-700">Nutricionista Responsável</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">Nutricionista Responsável</label>
                 <select
                   value={newAppointmentData.nutritionist_id}
                   onChange={e => setNewAppointmentData(prev => ({ ...prev, nutritionist_id: e.target.value }))}
                   required
-                  className="block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2.5 border bg-white font-semibold text-slate-700"
+                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                 >
                   <option value="">-- Selecione o Profissional --</option>
                   {professionals.map(p => (
@@ -997,31 +994,31 @@ export const Agenda: React.FC = () => {
               {/* Date & Time Selectors */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="block text-sm font-semibold text-slate-700">Data</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Data</label>
                   <input
                     type="date"
                     value={newAppointmentData.date}
                     onChange={e => setNewAppointmentData(prev => ({ ...prev, date: e.target.value }))}
                     required
                     min={format(new Date(), 'yyyy-MM-dd')}
-                    className="block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border font-semibold text-slate-700"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-sm font-semibold text-slate-700">Hora</label>
+                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Hora</label>
                   <input
                     type="time"
                     value={newAppointmentData.time}
                     onChange={e => setNewAppointmentData(prev => ({ ...prev, time: e.target.value }))}
                     required
-                    className="block w-full rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border font-semibold text-slate-700"
+                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                   />
                 </div>
               </div>
 
               {/* Status Select */}
               <div className="space-y-1">
-                <label className="block text-sm font-semibold text-slate-700">Status Inicial</label>
+                <label className="text-slate-700 font-semibold text-sm mb-1 block">Status Inicial</label>
                 <div className="flex gap-4 mt-1.5">
                   {(['pendente', 'confirmado'] as const).map(s => (
                     <label key={s} className="flex items-center gap-2 cursor-pointer">
@@ -1048,14 +1045,14 @@ export const Agenda: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsNewModalOpen(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200/80 rounded-xl transition-all"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-500 rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   {saving ? (
                     <>

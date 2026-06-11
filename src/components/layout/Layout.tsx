@@ -47,7 +47,7 @@ export const Layout: React.FC = () => {
   const getHeaderTheme = () => {
     if (themeColor === 'dark') return 'bg-[#242424] border-b border-[#333333] text-[#f5f5f5]';
     if (themeColor === 'teal') return 'bg-[#115e59] border-b border-teal-700/20 text-white';
-    if (themeColor === 'blue') return 'bg-blue-800 border-b border-blue-700/20 text-white';
+    if (themeColor === 'blue') return 'bg-[#11162a] border-b border-white/10 text-white';
     return 'bg-white border-b border-slate-100 text-slate-700'; // Default fallback
   };
 
@@ -57,9 +57,9 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div className={`flex h-screen overflow-hidden ${themeColor === 'dark' ? 'bg-[#1a1a1a] theme-dark' : 'bg-[#f8fafc]'} font-sans transition-colors duration-200`}>
+    <div className={`flex h-screen overflow-hidden ${themeColor === 'dark' ? 'bg-[#1a1a1a] theme-dark' : 'bg-[#e2e8f0]'} font-sans transition-colors duration-200`}>
       <Sidebar />
-      <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+      <main className={`flex-1 flex flex-col overflow-y-auto overflow-x-hidden ${themeColor === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#e2e8f0]'} antialiased transition-colors duration-200`}>
         {/* Header Superior Simples */}
         <header className={`${getHeaderTheme()} h-16 shrink-0 flex items-center px-8 shadow-sm transition-colors duration-200`}>
           <div className="flex-1" />

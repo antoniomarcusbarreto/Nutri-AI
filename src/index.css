@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Inter:wght@100..900&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -12,27 +13,406 @@
   --color-primary-800: #115e59;
   --color-primary-900: #134e4a;
   
+  /* Adiciona suporte para classes intermediárias teal customizadas usadas no sistema */
+  --color-teal-150: #b2f5ea;
+  --color-teal-650: #0b8277;
+  
   --font-sans: 'Inter', 'Roboto', sans-serif;
+  --font-internal: 'Inter', 'Plus Jakarta Sans', var(--font-sans);
+}
+
+/* 🟢 Upgrade de Tipografia e Renderização no Painel Interno (Main, Modais, Cards, Tabelas, Alertas/Toasts) */
+main,
+.modal,
+.bg-card,
+table,
+[role="dialog"],
+.fixed.bottom-6.right-6 {
+  --font-sans: var(--font-internal);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 👑 DESIGN SYSTEM UNIFICADO (RECALIBRAÇÃO ERGONÔMICA GLOBAL) */
+
+/* 1. Camada Base do Fundo do Painel Interno */
+main {
+  background-color: #e2e8f0;
+}
+
+/* 2. Limitação do Peso de Fontes em Títulos (Limita ao Semibold 600) */
+main h1, main h2, main h3, main h4, main h5, main h6,
+.modal h1, .modal h2, .modal h3, .modal h4, .modal h5, .modal h6,
+[role="dialog"] h1, [role="dialog"] h2, [role="dialog"] h3, [role="dialog"] h4, [role="dialog"] h5, [role="dialog"] h6 {
+  font-weight: 600 !important;
+  color: #0f172a !important; /* Force slate-900 sólido para títulos */
+}
+
+/* 3. Banimento de Negrito Bruto em Textos Comuns (Mapeia bold/black/semibold para Medium 500 em textos não-heading) */
+main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-bold,
+main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-semibold,
+main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-extrabold,
+main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-black,
+.modal :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-bold,
+.modal :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-semibold,
+.modal :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-extrabold,
+.modal :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-black,
+[role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-bold,
+[role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-semibold,
+[role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-extrabold,
+[role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-black {
+  font-weight: 500 !important;
+}
+
+/* 4. Camada de Superfície (Fim do branco puro agressivo) */
+main .bg-white:not(input):not(select):not(textarea):not(.bg-white-pure),
+.modal .bg-white:not(input):not(select):not(textarea):not(.bg-white-pure),
+[role="dialog"] .bg-white:not(input):not(select):not(textarea):not(.bg-white-pure) {
+  background-color: #f1f5f9 !important; /* slate-100 fosco e relaxante */
+}
+
+/* 5. Camada de Destaque / Elementos Internos (bg-white aninhado recupera pure white para efeito 3D) */
+main .bg-white .bg-white,
+main .bg-card-premium .bg-white,
+.modal .bg-white .bg-white,
+.modal .bg-card-premium .bg-white,
+[role="dialog"] .bg-white .bg-white,
+[role="dialog"] .bg-card-premium .bg-white {
+  background-color: #ffffff !important;
+}
+
+/* 6. Hierarquia Cromática e Design de Cores por Propósito (Claro) */
+/* Títulos de Seções e Cards (Sólido Slate-900) */
+main .text-slate-900,
+.modal .text-slate-900,
+[role="dialog"] .text-slate-900,
+main .text-slate-800,
+.modal .text-slate-800,
+[role="dialog"] .text-slate-800 {
+  color: #0f172a !important;
+}
+
+/* Textos de Suporte/Legendas (Slate-500) */
+main .text-slate-500,
+main .text-slate-400,
+.modal .text-slate-500,
+.modal .text-slate-400,
+[role="dialog"] .text-slate-500,
+[role="dialog"] .text-slate-400 {
+  color: #64748b !important;
+  font-weight: 400 !important; /* legendas/suportes sempre font-normal */
+}
+
+/* Números de Destaque / Métricas / Semanas (Azul Tecnológico vibrante, font-medium) */
+main .text-\[\#5024fc\],
+.modal .text-\[\#5024fc\],
+[role="dialog"] .text-\[\#5024fc\] {
+  color: #5024fc !important;
+  font-weight: 500 !important; /* Destaque pela cor e tamanho, nunca pela grossura */
+}
+
+/* Força números de destaque grandes (ex: text-3xl) a usarem o Azul Tecnológico e peso font-medium */
+main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-3xl,
+main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-4xl,
+.modal :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-3xl,
+[role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-3xl {
+  color: #5024fc !important;
+  font-weight: 500 !important;
+}
+
+/* 🟢 Correção de Contraste para Elementos dentro de Cards com Gradientes */
+main [class*="bg-gradient-"] h1,
+main [class*="bg-gradient-"] h2,
+main [class*="bg-gradient-"] h3,
+main [class*="bg-gradient-"] h4,
+main [class*="bg-gradient-"] h5,
+main [class*="bg-gradient-"] h6,
+main [class*="bg-gradient-"] .text-slate-900,
+main [class*="bg-gradient-"] .text-slate-800,
+main [class*="bg-gradient-"] .text-slate-700 {
+  color: #ffffff !important;
+}
+
+main [class*="bg-gradient-"] .text-slate-500,
+main [class*="bg-gradient-"] .text-slate-400,
+main [class*="bg-gradient-"] .text-indigo-300 {
+  color: #cbd5e1 !important; /* slate-300 */
+}
+
+main [class*="bg-gradient-"] .text-white\/80 {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+main [class*="bg-gradient-"] .text-white\/70 {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+main [class*="bg-gradient-"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-3xl,
+main [class*="bg-gradient-"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-4xl,
+main [class*="bg-gradient-"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-5xl,
+main [class*="bg-gradient-"] .text-\[\#5024fc\] {
+  color: #ffffff !important;
+}
+
+
+/* Status Positivos (Dentro da referência) -> text-emerald-600, bg-emerald-50/50 */
+main .text-emerald-600,
+main .text-emerald-650,
+main .text-emerald-700,
+.modal .text-emerald-600,
+[role="dialog"] .text-emerald-600 {
+  color: #059669 !important;
+}
+main .bg-emerald-50,
+main .bg-emerald-50\/50,
+main .bg-emerald-50\/10,
+main .bg-emerald-50\/20,
+.modal .bg-emerald-50,
+.modal .bg-emerald-50\/50,
+[role="dialog"] .bg-emerald-50,
+[role="dialog"] .bg-emerald-50\/50 {
+  background-color: rgba(236, 253, 245, 0.5) !important;
+  border-color: rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Status Críticos/Alertas -> text-rose-600, bg-rose-50/50 */
+main .text-rose-600,
+main .text-rose-650,
+main .text-rose-700,
+main .text-red-600,
+main .text-red-650,
+.modal .text-rose-600,
+[role="dialog"] .text-rose-600 {
+  color: #e11d48 !important;
+}
+main .bg-rose-50,
+main .bg-rose-50\/50,
+main .bg-rose-50\/30,
+main .bg-rose-50\/10,
+main .bg-red-50,
+.modal .bg-rose-50,
+.modal .bg-rose-50\/50,
+.modal .bg-rose-50\/30,
+[role="dialog"] .bg-rose-50,
+[role="dialog"] .bg-rose-50\/50,
+[role="dialog"] .bg-rose-50\/30 {
+  background-color: rgba(255, 241, 242, 0.5) !important;
+  border-color: rgba(244, 63, 94, 0.15) !important;
+}
+
+/* 7. Padronização de Abas e Botões Segmentados (Dividido, Foco PDF, etc.) */
+/* Os botões devem usar font-medium e text-slate-600. Ativos mudam apenas para text-slate-900 sem engordar a letra */
+main .bg-slate-200\/70 button:not([class*="bg-white"]):not([class*="active"]),
+main .bg-slate-100 button:not([class*="bg-white"]):not([class*="active"]) {
+  color: #475569 !important; /* text-slate-600 */
+  font-weight: 500 !important; /* font-medium */
+}
+main .bg-slate-200\/70 button[class*="bg-white"],
+main .bg-slate-200\/70 button.active,
+main .bg-slate-100 button[class*="bg-white"],
+main .bg-slate-100 button.active {
+  color: #0f172a !important; /* text-slate-900 */
+  font-weight: 500 !important; /* Mantém font-medium - não engorda */
+}
+
+/* 8. Ajuste de Bordas Globais para Sintonia Máxima (Claro) */
+main .border-slate-100,
+main .border-slate-150,
+main .border-slate-200,
+main .divide-slate-100,
+main .divide-slate-200,
+.modal .border-slate-100,
+.modal .border-slate-150,
+.modal .border-slate-200,
+[role="dialog"] .border-slate-100,
+[role="dialog"] .border-slate-150,
+[role="dialog"] .border-slate-200,
+[role="dialog"] .divide-slate-100,
+[role="dialog"] .divide-slate-200 {
+  border-color: rgba(203, 213, 225, 0.5) !important; /* border-slate-300/50 */
+  divide-color: rgba(203, 213, 225, 0.5) !important;
+}
+
+/* 👑 PADRONIZAÇÃO GLOBAL DE FORMULÁRIOS, INPUTS E BOTÕES (GOLDEN STANDARD) */
+main input[type="text"],
+main input[type="number"],
+main input[type="email"],
+main input[type="password"],
+main input[type="date"],
+main input[type="time"],
+main select,
+main textarea,
+.modal input,
+.modal select,
+.modal textarea,
+[role="dialog"] input,
+[role="dialog"] select,
+[role="dialog"] textarea {
+  padding-top: 0.5rem !important; /* py-2 */
+  padding-bottom: 0.5rem !important;
+  padding-left: 0.75rem !important; /* px-3 */
+  padding-right: 0.75rem !important;
+  font-size: 0.875rem !important; /* text-sm */
+  line-height: 1.25rem !important;
+  border-radius: 0.5rem !important; /* rounded-lg */
+  border: 1px solid #e2e8f0 !important; /* border-slate-200 */
+  background-color: #ffffff !important;
+  color: #334155 !important; /* text-slate-700 */
+  outline: none !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; /* shadow-sm */
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+}
+
+main input:focus,
+main select:focus,
+main textarea:focus,
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus,
+[role="dialog"] input:focus,
+[role="dialog"] select:focus,
+[role="dialog"] textarea:focus {
+  border-color: #5024fc !important; /* focus:border-indigo-600 */
+  box-shadow: 0 0 0 1px #5024fc !important; /* focus:ring-1 focus:ring-indigo-600 */
+  outline: none !important;
+}
+
+/* Labels do Sistema */
+main label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])),
+.modal label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])),
+[role="dialog"] label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])) {
+  color: #334155 !important; /* text-slate-700 */
+  font-weight: 500 !important; /* font-medium */
+  font-size: 0.875rem !important; /* text-sm */
+  margin-bottom: 0.25rem !important; /* mb-1 */
+  display: block !important; /* block */
+}
+
+/* Alinhamento dos Rodapés de Ações e Espaçamentos do Grid */
+main form div[class*="justify-end"],
+main form div[class*="flex-end"],
+.modal form div[class*="justify-end"],
+.modal form div[class*="flex-end"],
+[role="dialog"] form div[class*="justify-end"],
+[role="dialog"] form div[class*="flex-end"] {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 0.75rem !important; /* gap-3 */
+  padding-top: 1.5rem !important; /* pt-6 */
+  border-top: 1px solid #f1f5f9 !important; /* border-t border-slate-100 */
+  margin-top: 1.5rem !important;
+}
+
+/* Botões de Formulários (Golden Standard) */
+/* Botão Primário (Salvar/Confirmar/Agendar) */
+main form button[type="submit"],
+.modal form button[type="submit"],
+[role="dialog"] form button[type="submit"],
+main form button.bg-primary-600,
+.modal form button.bg-primary-600,
+[role="dialog"] form button.bg-primary-600 {
+  background-color: #5024fc !important; /* Azul Tecnológico */
+  border-radius: 0.75rem !important; /* rounded-xl */
+  font-weight: 600 !important; /* font-semibold */
+  padding-top: 0.625rem !important; /* py-2.5 */
+  padding-bottom: 0.625rem !important;
+  padding-left: 1.25rem !important; /* px-5 */
+  padding-right: 1.25rem !important;
+  font-size: 0.875rem !important; /* text-sm */
+  color: #ffffff !important;
+  border: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out !important;
+}
+
+main form button[type="submit"]:hover,
+.modal form button[type="submit"]:hover,
+[role="dialog"] form button[type="submit"]:hover,
+main form button.bg-primary-600:hover,
+.modal form button.bg-primary-600:hover,
+[role="dialog"] form button.bg-primary-600:hover {
+  opacity: 0.9 !important;
+  background-color: #431cdb !important;
+}
+
+/* Botão Secundário (Cancelar/Fechar) */
+main form button.bg-slate-100,
+.modal form button.bg-slate-100,
+[role="dialog"] form button.bg-slate-100,
+main form button[type="button"].bg-slate-100,
+.modal form button[type="button"],
+[role="dialog"] form button[type="button"] {
+  background-color: #f1f5f9 !important; /* bg-slate-100 */
+  color: #334155 !important; /* text-slate-700 */
+  border-radius: 0.75rem !important; /* rounded-xl */
+  padding-top: 0.625rem !important; /* py-2.5 */
+  padding-bottom: 0.625rem !important;
+  padding-left: 1.25rem !important; /* px-5 */
+  padding-right: 1.25rem !important;
+  font-size: 0.875rem !important; /* text-sm */
+  font-weight: 500 !important; /* font-medium */
+  border: none !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease-in-out !important;
+}
+
+main form button.bg-slate-100:hover,
+.modal form button.bg-slate-100:hover,
+[role="dialog"] form button.bg-slate-100:hover,
+main form button[type="button"].bg-slate-100:hover,
+.modal form button[type="button"]:hover,
+[role="dialog"] form button[type="button"]:hover {
+  background-color: #e2e8f0 !important; /* hover:bg-slate-200 */
+}
+
+/* 🔵 Dynamic Blue Theme Override */
+html[data-theme="blue"] {
+  --color-primary-50: rgba(17, 22, 42, 0.08) !important;
+  --color-primary-100: rgba(17, 22, 42, 0.15) !important;
+  --color-primary-200: #93c5fd !important;
+  --color-primary-300: #60a5fa !important;
+  --color-primary-400: #3b82f6 !important;
+  --color-primary-500: #1c2342 !important;
+  --color-primary-600: #11162a !important;
+  --color-primary-700: #0d1020 !important;
+  --color-primary-800: #080a14 !important;
+  --color-primary-900: #04050a !important;
+
+  --color-teal-50: rgba(17, 22, 42, 0.08) !important;
+  --color-teal-100: rgba(17, 22, 42, 0.15) !important;
+  --color-teal-150: rgba(17, 22, 42, 0.22) !important;
+  --color-teal-200: #93c5fd !important;
+  --color-teal-350: #60a5fa !important;
+  --color-teal-300: #60a5fa !important;
+  --color-teal-400: #3b82f6 !important;
+  --color-teal-500: #1c2342 !important;
+  --color-teal-600: #11162a !important;
+  --color-teal-650: #0d1020 !important;
+  --color-teal-700: #0d1020 !important;
+  --color-teal-800: #080a14 !important;
+  --color-teal-900: #04050a !important;
 }
 
 @layer base {
   html {
-    font-size: 106.25%; /* Aumenta a base padrão de 16px para 17px (proporcional e seguro para toda a plataforma) */
+    font-size: 93.75%; /* Reduz a base padrão de 16px para 15px para um leiaute mais compacto e elegante */
   }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased transition-colors duration-200;
+    @apply bg-[#e2e8f0] text-slate-900 antialiased transition-colors duration-200;
   }
 }
 
 /* 🌙 Dark Mode Harmony - Targeted exclusively under .theme-dark */
 .theme-dark {
   color-scheme: dark;
-  background-color: #1a1a1a !important;
+  background-color: #0b0f19 !important;
   color: #f5f5f5 !important;
 }
 
 .theme-dark main {
-  background-color: #1a1a1a !important;
+  background-color: #0b0f19 !important;
 }
 
 /* Cards, modais e prontuários em modo escuro */
@@ -40,7 +420,17 @@
 .theme-dark .bg-card {
   background-color: #242424 !important;
   color: #f5f5f5 !important;
-  border-color: #333333 !important;
+  border-color: #383838 !important; /* Borda mais nítida */
+}
+
+/* Desativa sombras no modo escuro para manter o leiaute plano e nítido */
+.theme-dark .shadow-sm,
+.theme-dark .shadow-md,
+.theme-dark .shadow-lg,
+.theme-dark .shadow-xl,
+.theme-dark .shadow-2xl,
+.theme-dark [class*="shadow-"] {
+  box-shadow: none !important;
 }
 
 /* Inner elements, nested blocks, lists, inputs */
@@ -176,3 +566,18 @@
 .theme-dark .hover\:bg-slate-100:hover {
   background-color: #2e2e2e !important;
 }
+
+/* Custom premium card and border styling to prevent glare in light mode */
+.bg-card-premium {
+  background-color: #f1f5f9 !important; /* Soft matte off-white (slate-100) */
+}
+
+/* Dark mode overrides to keep it intact */
+.theme-dark .bg-card-premium {
+  background-color: #242424 !important;
+}
+
+.theme-dark .border-slate-300\/50 {
+  border-color: #333333 !important;
+}
+
