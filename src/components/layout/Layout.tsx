@@ -57,11 +57,11 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div className={`flex h-screen overflow-hidden ${themeColor === 'dark' ? 'bg-[#1a1a1a] theme-dark' : 'bg-[#e2e8f0]'} font-sans transition-colors duration-200`}>
+    <div className={`flex h-screen overflow-hidden print:h-auto print:block print:overflow-visible ${themeColor === 'dark' ? 'bg-[#1a1a1a] theme-dark' : 'bg-[#e2e8f0]'} font-sans transition-colors duration-200 print:!bg-white`}>
       <Sidebar />
-      <main className={`flex-1 flex flex-col overflow-y-auto overflow-x-hidden ${themeColor === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#e2e8f0]'} antialiased transition-colors duration-200`}>
+      <main className={`flex-1 flex flex-col overflow-y-auto overflow-x-hidden print:overflow-visible print:block print:!bg-white ${themeColor === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#e2e8f0]'} antialiased transition-colors duration-200`}>
         {/* Header Superior Simples */}
-        <header className={`${getHeaderTheme()} h-16 shrink-0 flex items-center px-8 shadow-sm transition-colors duration-200`}>
+        <header className={`print:hidden ${getHeaderTheme()} h-16 shrink-0 flex items-center px-8 shadow-sm transition-colors duration-200`}>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
             <span className={`text-sm font-medium ${getTextColor()}`}>
@@ -107,7 +107,7 @@ export const Layout: React.FC = () => {
         </header>
         
         {/* Conteúdo Principal das Rotas */}
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-8 print:p-0 print:w-full print:max-w-none">
           <Outlet />
         </div>
       </main>

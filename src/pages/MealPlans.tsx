@@ -13,7 +13,12 @@ import {
   Printer, 
   Calendar,
   Eye,
-  X
+  X,
+  ShieldAlert,
+  Share2,
+  Copy,
+  Mail,
+  Smartphone
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,7 +48,7 @@ const MEAL_NAMES: { [key: string]: string } = {
   supper: 'Ceia'
 };
 export const MealPlans: React.FC = () => {
-  const { clinic, isReadOnly, profile } = useAuth();
+  const { clinic, isReadOnly, profile, userRole } = useAuth();
   const { showToast } = useToast();
 
   const getHeaderTheme = () => {
@@ -97,6 +102,9 @@ export const MealPlans: React.FC = () => {
 
   const headerTheme = getHeaderTheme();
 
+  // Security Check: allowed only for nutritionists/owners
+  const isAuthorized = userRole === 'owner' || userRole === 'nutritionist';
+
   // Navigation / Tab States
   const [activeTab, setActiveTab] = useState<'editor' | 'history'>('editor');
 
@@ -134,6 +142,7 @@ export const MealPlans: React.FC = () => {
   // Modal State for Viewing Context
   const [showConsultationModal, setShowConsultationModal] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
   const [examPdfUrl, setExamPdfUrl] = useState<string | null>(null);
   const [loadingPdfUrl, setLoadingPdfUrl] = useState(false);
@@ -167,35 +176,64 @@ export const MealPlans: React.FC = () => {
     fetchExamPdf();
   }, [showExamModal, latestExam]);
 
-  // Load Clinic Patients
+  // Load Clinic Patients based on recent appointments
   useEffect(() => {
     const loadPatients = async () => {
-      if (!clinic?.id) return;
+      if (!clinic?.id || !profile?.id) return;
+      if (!isAuthorized) return;
+      
       try {
-        const { data, error } = await supabase
-          .from('patients')
-          .select('id, name, email, phone, birth_date, biological_sex, main_goal')
-          .eq('clinic_id', clinic.id)
-          .eq('status', 'ativo')
-          .order('name');
+        // Fetch appointments for the logged-in nutritionist
+        const { data: apptsData, error } = await supabase
+          .from('appointments')
+          .select(`
+            patient_id,
+            date_time,
+            patients (
+              id, name, email, phone, birth_date, biological_sex, main_goal, status
+            )
+          `)
+          .eq('nutritionist_id', profile.id)
+          .neq('status', 'cancelado')
+          .neq('status', 'Cancelado')
+          .order('date_time', { ascending: false });
 
         if (error) throw error;
-        setPatients(data || []);
-        if (data && data.length > 0) {
+
+        // Extract unique patients from these appointments
+        const patientMap = new Map();
+        if (apptsData) {
+          apptsData.forEach(appt => {
+            const p = appt.patients;
+            const patientObj = Array.isArray(p) ? p[0] : p;
+            
+            // Only add if active and not already added (keeps the most recent due to ordering)
+            if (patientObj && patientObj.status === 'ativo' && !patientMap.has(patientObj.id)) {
+              patientMap.set(patientObj.id, patientObj);
+            }
+          });
+        }
+        
+        const uniquePatients = Array.from(patientMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+        setPatients(uniquePatients);
+
+        if (uniquePatients.length > 0) {
           const storedId = localStorage.getItem('nutri-ai:selected-patient-id');
-          const exists = data.some((p: any) => p.id === storedId);
-          const initialId = exists && storedId ? storedId : data[0].id;
+          const exists = uniquePatients.some((p: any) => p.id === storedId);
+          const initialId = exists && storedId ? storedId : uniquePatients[0].id;
           setSelectedPatientId(initialId);
           localStorage.setItem('nutri-ai:selected-patient-id', initialId);
+        } else {
+          setSelectedPatientId('');
         }
       } catch (err) {
         console.error('Erro ao carregar pacientes:', err);
-        showToast('Erro ao carregar lista de pacientes.', 'error');
+        showToast('Erro ao carregar lista de pacientes do profissional.', 'error');
       }
     };
 
     loadPatients();
-  }, [clinic?.id]);
+  }, [clinic?.id, profile?.id, isAuthorized]);
 
   // Load Patient Context & Past Plans
   useEffect(() => {
@@ -231,11 +269,12 @@ export const MealPlans: React.FC = () => {
         setLatestConsultation(consultationData);
         setIncludeConsultation(!!consultationData);
 
-        // 2. Fetch latest exam with ai_feedback and file_url
+        // 2. Fetch latest exam with ai_feedback and file_url (processed successfully)
         const { data: examData, error: examError } = await supabase
           .from('patient_exams')
           .select('id, ai_feedback, exam_date, created_at, file_url')
           .eq('patient_id', selectedPatientId)
+          .not('ai_feedback', 'is', null)
           .order('exam_date', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -260,6 +299,24 @@ export const MealPlans: React.FC = () => {
           initialTabs[m] = 0;
         });
         setOptionActiveTab(initialTabs);
+
+        // Restore draft if exists
+        const draftKey = `nutriai_draft_plano_${selectedPatientId}`;
+        const draftStr = localStorage.getItem(draftKey);
+        if (draftStr) {
+          try {
+            const draft = JSON.parse(draftStr);
+            setActivePlan(draft.activePlan || null);
+            setEditingTitle(draft.editingTitle || 'Plano Alimentar Inteligente');
+          } catch (e) {
+            console.error('Erro ao recuperar rascunho de plano:', e);
+            setActivePlan(null);
+            setEditingTitle('Plano Alimentar Inteligente');
+          }
+        } else {
+          setActivePlan(null);
+          setEditingTitle('Plano Alimentar Inteligente');
+        }
       } catch (err) {
         console.error('Erro ao buscar histórico do paciente:', err);
         showToast('Erro ao buscar histórico clínico.', 'error');
@@ -270,6 +327,21 @@ export const MealPlans: React.FC = () => {
 
     loadPatientContext();
   }, [selectedPatientId, clinic?.id]);
+
+  // Auto-Save Draft logic for Meal Plans
+  useEffect(() => {
+    if (!selectedPatientId) return;
+    const draftKey = `nutriai_draft_plano_${selectedPatientId}`;
+    if (!activePlan) {
+      localStorage.removeItem(draftKey);
+    } else {
+      const draftObj = {
+        activePlan,
+        editingTitle
+      };
+      localStorage.setItem(draftKey, JSON.stringify(draftObj));
+    }
+  }, [activePlan, editingTitle, selectedPatientId]);
 
   const selectedPatient = useMemo(() => {
     return patients.find(p => p.id === selectedPatientId);
@@ -434,6 +506,9 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
         });
 
         setActivePlan(mockPlan);
+        if (suggestKcalWithAI) {
+          setKcalTarget(mockPlan.kcal.toString());
+        }
         setEditingTitle(`Plano Alimentar Inteligente de ${selectedPatient?.name.split(' ')[0]}`);
         setGenerating(false);
         showToast('Plano alimentar simulado gerado com sucesso com base no contexto clínico!', 'success');
@@ -473,6 +548,9 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
 
       const parsedJSON: MealPlanData = JSON.parse(rawText.trim());
       setActivePlan(parsedJSON);
+      if (suggestKcalWithAI && parsedJSON.kcal) {
+        setKcalTarget(parsedJSON.kcal.toString());
+      }
       setEditingTitle(`Plano Alimentar Inteligente de ${selectedPatient?.name.split(' ')[0]}`);
       showToast('Plano alimentar gerado pela IA com sucesso!', 'success');
     } catch (err: any) {
@@ -565,6 +643,10 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
       if (error) throw error;
       showToast('Plano alimentar salvo com sucesso no prontuário do paciente!', 'success');
       
+      // Clean draft from localStorage on success
+      localStorage.removeItem(`nutriai_draft_plano_${selectedPatientId}`);
+      setActivePlan(null);
+      
       // Reload past plans
       const { data: plansData } = await supabase
         .from('meal_plans')
@@ -605,12 +687,51 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
     }
   };
 
+  const handleShareClick = () => {
+    if (!activePlan?.id) {
+      showToast('Por favor, salve a dieta antes de compartilhar.', 'error');
+      return;
+    }
+    setShowShareModal(true);
+  };
+
+  const shareText = `Olá, ${selectedPatient?.name?.split(' ')[0]}! Seu novo plano alimentar está pronto. Acesse através do link seguro: ${window.location.origin}/plano/${activePlan?.id}\n(Sua senha de acesso é a sua data de nascimento).`;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/plano/${activePlan?.id}`);
+    showToast('Link copiado para a área de transferência!', 'success');
+  };
+
+  const handleWhatsAppShare = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+  };
+
+  const handleEmailShare = () => {
+    window.open(`mailto:${selectedPatient?.email || ''}?subject=${encodeURIComponent('Seu Plano Alimentar - Nutri-AI')}&body=${encodeURIComponent(shareText)}`, '_self');
+  };
+
   const handlePrintPlan = () => {
     window.print();
   };
 
+  if (!isAuthorized) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px] p-6 animate-in fade-in duration-300">
+        <div className="bg-white border border-slate-200 p-8 rounded-xl shadow-sm text-center max-w-lg flex flex-col items-center">
+          <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100 mb-4 animate-bounce">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-semibold text-slate-900">Acesso Restrito a Nutricionistas</h2>
+          <p className="text-sm text-slate-500 mt-3 leading-relaxed">
+            Desculpe, o módulo de <strong>Construção de Planos Alimentares</strong> é de uso estritamente restrito a nutricionistas autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col font-sans pb-12">
+    <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col font-sans pb-12 print:!h-auto print:!block">
       
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0 print:hidden">
@@ -624,8 +745,8 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
         </div>
       </div>
 
-      {/* SECTOR SELECTOR */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 items-start print:block">
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 relative print:block print:w-full">
         
         {/* LEFT COLUMN: PARAMETERS CARD */}
         <div className="bg-white border border-slate-200 rounded-3xl p-6.5 shadow-sm space-y-6 print:hidden">
@@ -862,7 +983,7 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
         </div>
 
         {/* RIGHT COLUMN: MAIN PLAN VIEWER & HISTORY */}
-        <div className="lg:col-span-2 flex flex-col flex-1 h-full min-h-[500px]">
+        <div className="lg:col-span-2 flex flex-col flex-1 h-full min-h-[500px] print:!h-auto print:!block">
           
           {/* Patient Selector Placeholder */}
           {!selectedPatientId ? (
@@ -874,7 +995,7 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
               </p>
             </div>
           ) : (
-            <div className="flex flex-col flex-1 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden print:border-none print:shadow-none print:bg-transparent">
+            <div className="flex flex-col flex-1 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden print:!border-none print:!shadow-none print:!rounded-none print:!overflow-visible">
               
               {/* Tabs Navigation */}
               <div className="flex border-b border-slate-100 bg-slate-50/50 px-6 py-4.5 justify-between items-center shrink-0 print:hidden">
@@ -901,259 +1022,278 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
                   </button>
                 </div>
 
-                {activePlan && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handlePrintPlan}
-                      className="p-2 border border-slate-200 text-slate-655 hover:bg-slate-100 rounded-xl transition-all shadow-sm shrink-0"
-                      title="Imprimir Dieta / Salvar PDF"
-                    >
-                      <Printer className="w-4.5 h-4.5" />
-                    </button>
-                    {!isReadOnly && (
-                      <button
-                        onClick={handleSaveMealPlan}
-                        disabled={saving}
-                        className="bg-primary-600 hover:bg-primary-500 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm hover:shadow flex items-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                        Salvar Dieta
-                      </button>
+                      {activePlan && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleShareClick}
+                            className="p-2 border border-slate-200 text-slate-655 hover:bg-slate-100 rounded-xl transition-all shadow-sm shrink-0"
+                            title="Compartilhar Link Seguro"
+                          >
+                            <Share2 className="w-4.5 h-4.5" />
+                          </button>
+                          <button
+                            onClick={handlePrintPlan}
+                            className="p-2 border border-slate-200 text-slate-655 hover:bg-slate-100 rounded-xl transition-all shadow-sm shrink-0"
+                            title="Imprimir Dieta / Salvar PDF"
+                          >
+                            <Printer className="w-4.5 h-4.5" />
+                          </button>
+                          {!isReadOnly && (
+                            <button
+                              onClick={handleSaveMealPlan}
+                              disabled={saving}
+                              className="bg-primary-600 hover:bg-primary-500 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm hover:shadow flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                              Salvar Dieta
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* EDITOR TAB CONTENT */}
+                    {activeTab === 'editor' && (
+                      <div className="flex-1 p-6 overflow-y-auto space-y-6 print:p-0 print:!overflow-visible print:!h-auto">
+                        
+                        {!activePlan ? (
+                          <div className="text-center py-20 flex flex-col items-center justify-center flex-1 min-h-[350px]">
+                            <Apple className="h-16 w-16 text-slate-355 stroke-[1.2] mb-3 animate-bounce" />
+                            <h3 className="text-base font-bold text-slate-850">Montar Dieta para {selectedPatient?.name}</h3>
+                            <p className="text-xs text-slate-400 max-w-xs mt-1 font-semibold">
+                              Escolha uma opção no painel lateral para iniciar o cardápio: Gerar com Inteligência Artificial ou construir manualmente.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-6 print:table print:w-full print:!bg-white">
+                            <div className="hidden print:table-header-group">
+                              <div className="h-[20mm] bg-white"></div>
+                            </div>
+                            <div className="hidden print:table-footer-group">
+                              <div className="h-[20mm] bg-white"></div>
+                            </div>
+                            <div className="print:table-row-group">
+                              <div className="print:table-row">
+                                <div className="print:table-cell space-y-6 print:px-[20mm] print:!bg-white print:align-top">
+                            
+                            {/* Active plan header details */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4.5 gap-4 print:!hidden">
+                              <div>
+                                <input
+                                  type="text"
+                                  value={editingTitle}
+                                  onChange={e => setEditingTitle(e.target.value)}
+                                  className="text-lg font-black text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-primary-500 focus:outline-none focus:ring-0 w-full py-0.5 print:border-none print:text-2xl print:text-black"
+                                  placeholder="Título da Dieta"
+                                />
+                                <p className="text-xs font-semibold text-slate-400 mt-1 print:hidden">
+                                  Preencha ou ajuste os detalhes e as 3 opções de cardápios alternativos abaixo.
+                                </p>
+                              </div>
+                              
+                              <div className="bg-gradient-to-br from-[#0b0f19] to-slate-800 border border-slate-700/30 rounded-2xl px-6 py-3.5 flex items-center gap-3 shrink-0 shadow-md">
+                                <div>
+                                  <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest block">Meta Estimada</span>
+                                  <span className="text-2xl font-black text-white tracking-tight">{activePlan.kcal} <span className="text-xs font-bold text-slate-300">kcal</span></span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Printable header */}
+                            <div className="hidden print:block border-b border-slate-300 pb-4 mb-4">
+                              <h1 className="text-xl font-bold text-black">{selectedPatient?.name}</h1>
+                              <p className="text-base text-slate-800 font-semibold mt-1">Plano Alimentar</p>
+                            </div>
+
+                            {/* Meals list */}
+                            <div className="space-y-5">
+                              {Object.keys(activePlan.meals)
+                                .sort((a, b) => {
+                                  const order = Object.keys(MEAL_NAMES);
+                                  return order.indexOf(a) - order.indexOf(b);
+                                })
+                                .map(mealKey => {
+                                const options = activePlan.meals[mealKey];
+                                const activeOptionIdx = optionActiveTab[mealKey] !== undefined ? optionActiveTab[mealKey] : 0;
+                                const currentOption = options[activeOptionIdx] || options[0] || { description: '', items: [], kcal: 0 };
+
+                                return (
+                                  <div key={mealKey} className="border border-slate-200/85 rounded-2xl bg-white shadow-sm overflow-hidden flex flex-col print:border-slate-300 print:shadow-none print:!overflow-visible">
+                                    
+                                    {/* Meal Title Bar */}
+                                    <div className={`${headerTheme.bg} border-b ${headerTheme.border} px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0`}>
+                                      <div className={`text-sm font-semibold ${headerTheme.text} flex items-center gap-2`}>
+                                        <Clock className={`w-4 h-4 ${headerTheme.icon}`} />
+                                        <span>{MEAL_NAMES[mealKey]}</span>
+                                      </div>
+                                      
+                                      {/* 3 Options Tab Switchers */}
+                                      <div className={`flex p-0.5 ${headerTheme.switcherBg} rounded-lg shrink-0 print:hidden`}>
+                                        {options.map((_, optIdx) => (
+                                          <button
+                                            key={optIdx}
+                                            onClick={() => setOptionActiveTab(prev => ({ ...prev, [mealKey]: optIdx }))}
+                                            className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                                              activeOptionIdx === optIdx 
+                                                ? headerTheme.switcherActive 
+                                                : headerTheme.switcherInactive
+                                            }`}
+                                          >
+                                            Opção {optIdx + 1}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Selected Option Content Area */}
+                                    <div className="p-5 space-y-4">
+                                      
+                                      {/* Meal description input */}
+                                      <div className="space-y-1">
+                                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider print:hidden">
+                                          Descrição da Opção {activeOptionIdx + 1}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={currentOption.description}
+                                          onChange={e => handleUpdateOption(mealKey, activeOptionIdx, 'description', e.target.value)}
+                                          placeholder="Ex: Tapioca com ovos caipiras..."
+                                          className="block w-full rounded-xl border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-primary-500 focus:outline-none print:!border-none print:!bg-transparent print:!shadow-none print:text-sm print:font-bold print:text-black print:px-0"
+                                        />
+                                      </div>
+
+                                      {/* Items list editor */}
+                                      <div className="space-y-2">
+                                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider print:hidden">
+                                          Alimentos / Componentes
+                                        </label>
+                                        <div className="space-y-2.5">
+                                          {currentOption.items.map((item, itemIdx) => (
+                                            <div key={itemIdx} className="flex items-center gap-2 print:block">
+                                              <span className="h-1.5 w-1.5 rounded-full bg-primary-500 shrink-0 print:inline-block print:mr-2" />
+                                              <input
+                                                type="text"
+                                                value={item}
+                                                onChange={e => handleUpdateItem(mealKey, activeOptionIdx, itemIdx, e.target.value)}
+                                                className="block flex-1 rounded-xl border-slate-150 px-3 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-primary-500 focus:outline-none print:!border-none print:!bg-transparent print:!shadow-none print:inline-block print:text-xs print:p-0 print:text-slate-850"
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={() => handleRemoveItem(mealKey, activeOptionIdx, itemIdx)}
+                                                className="text-slate-350 hover:text-red-500 p-1 rounded transition-colors print:hidden"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          ))}
+                                          
+                                          <button
+                                            type="button"
+                                            onClick={() => handleAddItem(mealKey, activeOptionIdx)}
+                                            className="inline-flex items-center gap-1 text-[10px] font-bold text-primary-655 hover:text-primary-500 pt-1.5 transition-colors print:hidden"
+                                          >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            Adicionar Alimento
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {/* Calorie input */}
+                                      <div className="pt-3.5 border-t border-slate-100 flex items-center justify-between gap-4 print:pt-2">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-black">Calorias:</span>
+                                          <div className="relative flex items-center">
+                                            <input
+                                              type="number"
+                                              value={currentOption.kcal || 0}
+                                              onChange={e => handleUpdateOption(mealKey, activeOptionIdx, 'kcal', parseInt(e.target.value) || 0)}
+                                              className="min-w-[180px] w-44 rounded-xl border border-slate-200 py-2 pl-4 pr-12 text-lg font-semibold text-indigo-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-all print:!border-none print:!bg-transparent print:p-0 print:text-xs print:text-slate-850"
+                                            />
+                                            <span className="absolute right-4 text-xs text-slate-400 font-bold pointer-events-none">kcal</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
+
+                    {/* PAST PLANS TAB CONTENT */}
+                    {activeTab === 'history' && (
+                      <div className="flex-1 p-6 overflow-y-auto space-y-4 print:hidden">
+                        {pastPlans.length === 0 ? (
+                          <div className="text-center py-16 flex flex-col items-center justify-center">
+                            <Clock className="h-12 w-12 text-slate-300 stroke-[1.2] mb-3" />
+                            <h3 className="text-sm font-semibold text-slate-800">Nenhum plano anterior</h3>
+                            <p className="text-xs text-slate-400 max-w-xs mt-1">
+                              Não existem planos alimentares históricos salvos no prontuário de {selectedPatient?.name}.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {pastPlans.map(plan => (
+                              <div key={plan.id} className="border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-sm transition-all duration-200 flex items-center justify-between bg-white group gap-4">
+                                <div className="flex items-center gap-3.5">
+                                  <div className="h-10 w-10 rounded-full bg-primary-50 border border-primary-100 flex items-center justify-center shrink-0">
+                                    <FileText className="w-5 h-5 text-primary-600" />
+                                  </div>
+                                  <div>
+                                    <h4 className="text-sm font-extrabold text-slate-850">
+                                      Plano Alimentar ({plan.kcal} kcal)
+                                    </h4>
+                                    <p className="text-[11px] font-semibold text-slate-450 mt-1 flex items-center gap-1.5">
+                                      <Calendar className="w-3.5 h-3.5" />
+                                      Criado em: {new Date(plan.created_at).toLocaleDateString('pt-BR')} às {new Date(plan.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActivePlan({
+                                        kcal: plan.kcal,
+                                        meals: plan.meals
+                                      });
+                                      setEditingTitle(`Plano de ${selectedPatient?.name.split(' ')[0]} - Histórico`);
+                                      setActiveTab('editor'); // Go back to editor to show it
+                                      showToast('Plano histórico restaurado no editor!', 'success');
+                                    }}
+                                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                  >
+                                    Visualizar no Editor
+                                  </button>
+                                   {!isReadOnly && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeletePlanId(plan.id)}
+                                      className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                                      title="Excluir plano alimentar permanentemente"
+                                    >
+                                      <Trash2 className="w-4.5 h-4.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                   </div>
                 )}
               </div>
-
-              {/* EDITOR TAB CONTENT */}
-              {activeTab === 'editor' && (
-                <div className="flex-1 p-6 overflow-y-auto space-y-6 print:p-0">
-                  
-                  {!activePlan ? (
-                    <div className="text-center py-20 flex flex-col items-center justify-center flex-1 min-h-[350px]">
-                      <Apple className="h-16 w-16 text-slate-355 stroke-[1.2] mb-3 animate-bounce" />
-                      <h3 className="text-base font-bold text-slate-850">Montar Dieta para {selectedPatient?.name}</h3>
-                      <p className="text-xs text-slate-400 max-w-xs mt-1 font-semibold">
-                        Escolha uma opção no painel lateral para iniciar o cardápio: Gerar com Inteligência Artificial ou construir manualmente.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      
-                      {/* Active plan header details */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4.5 gap-4">
-                        <div>
-                          <input
-                            type="text"
-                            value={editingTitle}
-                            onChange={e => setEditingTitle(e.target.value)}
-                            className="text-lg font-black text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-primary-500 focus:outline-none focus:ring-0 w-full py-0.5 print:border-none print:text-2xl print:text-black"
-                            placeholder="Título da Dieta"
-                          />
-                          <p className="text-xs font-semibold text-slate-400 mt-1 print:hidden">
-                            Preencha ou ajuste os detalhes e as 3 opções de cardápios alternativos abaixo.
-                          </p>
-                        </div>
-                        
-                        <div className="bg-gradient-to-br from-[#0b0f19] to-slate-800 border border-slate-700/30 rounded-2xl px-6 py-3.5 flex items-center gap-3 shrink-0 shadow-md print:border-slate-200 print:bg-none print:bg-transparent print:text-black">
-                          <div>
-                            <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest block print:text-slate-500">Meta Estimada</span>
-                            <span className="text-2xl font-black text-white tracking-tight print:text-black">{activePlan.kcal} <span className="text-xs font-bold text-slate-300 print:text-slate-600">kcal</span></span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Printable header */}
-                      <div className="hidden print:block border-b border-slate-300 pb-4 mb-4">
-                        <h1 className="text-xl font-bold text-black">{selectedPatient?.name}</h1>
-                        <p className="text-xs text-slate-600">Plano Alimentar Customizado • Gerado por Nutri-AI</p>
-                      </div>
-
-                      {/* Meals list */}
-                      <div className="space-y-5">
-                        {Object.keys(activePlan.meals)
-                          .sort((a, b) => {
-                            const order = Object.keys(MEAL_NAMES);
-                            return order.indexOf(a) - order.indexOf(b);
-                          })
-                          .map(mealKey => {
-                          const options = activePlan.meals[mealKey];
-                          const activeOptionIdx = optionActiveTab[mealKey] !== undefined ? optionActiveTab[mealKey] : 0;
-                          const currentOption = options[activeOptionIdx] || options[0] || { description: '', items: [], kcal: 0 };
-
-                          return (
-                            <div key={mealKey} className="border border-slate-200/85 rounded-2xl bg-white shadow-sm overflow-hidden flex flex-col print:border-slate-300 print:shadow-none print:break-inside-avoid">
-                              
-                              {/* Meal Title Bar */}
-                              <div className={`${headerTheme.bg} border-b ${headerTheme.border} px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 print:bg-transparent print:border-none`}>
-                                <div className={`text-sm font-semibold ${headerTheme.text} flex items-center gap-2`}>
-                                  <Clock className={`w-4 h-4 ${headerTheme.icon}`} />
-                                  <span>{MEAL_NAMES[mealKey]}</span>
-                                </div>
-                                
-                                {/* 3 Options Tab Switchers */}
-                                <div className={`flex p-0.5 ${headerTheme.switcherBg} rounded-lg shrink-0 print:hidden`}>
-                                  {options.map((_, optIdx) => (
-                                    <button
-                                      key={optIdx}
-                                      onClick={() => setOptionActiveTab(prev => ({ ...prev, [mealKey]: optIdx }))}
-                                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                        activeOptionIdx === optIdx 
-                                          ? headerTheme.switcherActive 
-                                          : headerTheme.switcherInactive
-                                      }`}
-                                    >
-                                      Opção {optIdx + 1}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Selected Option Content Area */}
-                              <div className="p-5 space-y-4">
-                                
-                                {/* Meal description input */}
-                                <div className="space-y-1">
-                                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider print:hidden">
-                                    Descrição da Opção {activeOptionIdx + 1}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={currentOption.description}
-                                    onChange={e => handleUpdateOption(mealKey, activeOptionIdx, 'description', e.target.value)}
-                                    placeholder="Ex: Tapioca com ovos caipiras..."
-                                    className="block w-full rounded-xl border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-primary-500 focus:outline-none print:border-none print:text-sm print:font-bold print:text-black print:px-0"
-                                  />
-                                </div>
-
-                                {/* Items list editor */}
-                                <div className="space-y-2">
-                                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider print:hidden">
-                                    Alimentos / Componentes
-                                  </label>
-                                  <div className="space-y-2.5">
-                                    {currentOption.items.map((item, itemIdx) => (
-                                      <div key={itemIdx} className="flex items-center gap-2 print:block">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-primary-500 shrink-0 print:inline-block print:mr-2" />
-                                        <input
-                                          type="text"
-                                          value={item}
-                                          onChange={e => handleUpdateItem(mealKey, activeOptionIdx, itemIdx, e.target.value)}
-                                          className="block flex-1 rounded-xl border-slate-150 px-3 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-primary-500 focus:outline-none print:border-none print:inline-block print:text-xs print:p-0 print:text-slate-850"
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() => handleRemoveItem(mealKey, activeOptionIdx, itemIdx)}
-                                          className="text-slate-350 hover:text-red-500 p-1 rounded transition-colors print:hidden"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    ))}
-                                    
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAddItem(mealKey, activeOptionIdx)}
-                                      className="inline-flex items-center gap-1 text-[10px] font-bold text-primary-655 hover:text-primary-500 pt-1.5 transition-colors print:hidden"
-                                    >
-                                      <Plus className="w-3.5 h-3.5" />
-                                      Adicionar Alimento
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Calorie input */}
-                                <div className="pt-3.5 border-t border-slate-100 flex items-center justify-between gap-4 print:pt-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-black">Calorias:</span>
-                                    <div className="relative flex items-center">
-                                      <input
-                                        type="number"
-                                        value={currentOption.kcal || 0}
-                                        onChange={e => handleUpdateOption(mealKey, activeOptionIdx, 'kcal', parseInt(e.target.value) || 0)}
-                                        className="min-w-[180px] w-44 rounded-xl border border-slate-200 py-2 pl-4 pr-12 text-lg font-semibold text-indigo-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-all print:border-none print:p-0 print:text-xs print:text-slate-850"
-                                      />
-                                      <span className="absolute right-4 text-xs text-slate-400 font-bold pointer-events-none">kcal</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* PAST PLANS TAB CONTENT */}
-              {activeTab === 'history' && (
-                <div className="flex-1 p-6 overflow-y-auto space-y-4 print:hidden">
-                  {pastPlans.length === 0 ? (
-                    <div className="text-center py-16 flex flex-col items-center justify-center">
-                      <Clock className="h-12 w-12 text-slate-300 stroke-[1.2] mb-3" />
-                      <h3 className="text-sm font-semibold text-slate-800">Nenhum plano anterior</h3>
-                      <p className="text-xs text-slate-400 max-w-xs mt-1">
-                        Não existem planos alimentares históricos salvos no prontuário de {selectedPatient?.name}.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {pastPlans.map(plan => (
-                        <div key={plan.id} className="border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-sm transition-all duration-200 flex items-center justify-between bg-white group gap-4">
-                          <div className="flex items-center gap-3.5">
-                            <div className="h-10 w-10 rounded-full bg-primary-50 border border-primary-100 flex items-center justify-center shrink-0">
-                              <FileText className="w-5 h-5 text-primary-600" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-extrabold text-slate-850">
-                                Plano Alimentar ({plan.kcal} kcal)
-                              </h4>
-                              <p className="text-[11px] font-semibold text-slate-450 mt-1 flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5" />
-                                Criado em: {new Date(plan.created_at).toLocaleDateString('pt-BR')} às {new Date(plan.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActivePlan({
-                                  kcal: plan.kcal,
-                                  meals: plan.meals
-                                });
-                                setEditingTitle(`Plano de ${selectedPatient?.name.split(' ')[0]} - Histórico`);
-                                setActiveTab('editor'); // Go back to editor to show it
-                                showToast('Plano histórico restaurado no editor!', 'success');
-                              }}
-                              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                            >
-                              Visualizar no Editor
-                            </button>
-                             {!isReadOnly && (
-                              <button
-                                type="button"
-                                onClick={() => setDeletePlanId(plan.id)}
-                                className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                                title="Excluir plano alimentar permanentemente"
-                              >
-                                <Trash2 className="w-4.5 h-4.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-            </div>
-          )}
         </div>
-    </div>
 
       {/* MODAL PARA VISUALIZAR CONSULTA */}
       {showConsultationModal && latestConsultation && (
@@ -1292,6 +1432,59 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE COMPARTILHAMENTO */}
+      {showShareModal && activePlan && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden animate-in scale-in duration-300">
+            <div className="p-6 text-center border-b border-slate-100">
+              <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Share2 className="w-7 h-7" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">Compartilhar Plano</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                O plano será protegido pela data de nascimento de {selectedPatient?.name.split(' ')[0]}.
+              </p>
+            </div>
+            <div className="p-6 space-y-3 bg-slate-50/50">
+              <button onClick={handleWhatsAppShare} className="w-full flex items-center gap-3 p-4 bg-white border border-slate-200 hover:border-green-500 hover:ring-1 hover:ring-green-500 rounded-xl transition-all shadow-sm group text-left">
+                <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Enviar por WhatsApp</p>
+                  <p className="text-xs text-slate-500">Abre mensagem com link seguro</p>
+                </div>
+              </button>
+
+              <button onClick={handleEmailShare} className="w-full flex items-center gap-3 p-4 bg-white border border-slate-200 hover:border-blue-500 hover:ring-1 hover:ring-blue-500 rounded-xl transition-all shadow-sm group text-left">
+                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Enviar por E-mail</p>
+                  <p className="text-xs text-slate-500">Usa o seu app de e-mail padrão</p>
+                </div>
+              </button>
+
+              <button onClick={handleCopyLink} className="w-full flex items-center gap-3 p-4 bg-white border border-slate-200 hover:border-slate-400 hover:ring-1 hover:ring-slate-400 rounded-xl transition-all shadow-sm group text-left">
+                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:scale-110 transition-transform">
+                  <Copy className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Copiar Link</p>
+                  <p className="text-xs text-slate-500">{window.location.origin}/plano/{activePlan.id}</p>
+                </div>
+              </button>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end bg-white">
+              <button onClick={() => setShowShareModal(false)} className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

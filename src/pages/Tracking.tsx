@@ -11,16 +11,31 @@ import {
   Eye,
   Info,
   CalendarRange,
-  X
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area
+} from 'recharts';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { getCanonicalBiomarkerName } from '../utils/biomarkers';
 
 // Helper to parse dates in local timezone (avoiding UTC offset conversion bugs)
-export const parseExamDate = (dateVal: string | null | undefined): Date => {
+const parseExamDate = (dateVal: string | null | undefined): Date => {
   if (!dateVal) return new Date();
   if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
     const [year, month, day] = dateVal.split('-').map(Number);
@@ -46,15 +61,135 @@ export const Tracking: React.FC = () => {
   const [mealPlans, setMealPlans] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
 
-  // Chart Interactive Filters
-  const [selectedBiomarker, setSelectedBiomarker] = useState<string>('');
-  const [activeAntropometriaLine, setActiveAntropometriaLine] = useState<'all' | 'weight' | 'bodyFat' | 'muscleMass'>('all');
-
   // Modal states for details
   const [selectedExamForModal, setSelectedExamForModal] = useState<any>(null);
   const [selectedAptForModal, setSelectedAptForModal] = useState<any>(null);
+  const [selectedConsultationForModal, setSelectedConsultationForModal] = useState<any | null>(null);
+  const [selectedMealPlanForModal, setSelectedMealPlanForModal] = useState<any | null>(null);
   const [modalPdfUrl, setModalPdfUrl] = useState<string | null>(null);
   const [loadingPdfUrl, setLoadingPdfUrl] = useState<boolean>(false);
+
+  // Visible chart line filters
+  const [visibleBiomarkers, setVisibleBiomarkers] = useState<Record<string, boolean>>({});
+  const [visibleAnthropometry, setVisibleAnthropometry] = useState<Record<string, boolean>>({
+    weight: true,
+    bodyFat: true,
+    muscleMass: true
+  });
+
+  const [selectedBiomarkerDate, setSelectedBiomarkerDate] = useState<string | null>(null);
+  const [selectedAnthropometryDate, setSelectedAnthropometryDate] = useState<string | null>(null);
+
+  // Helper to find original biomarker value from exams data to display with unit in custom tooltip
+  const getOriginalBiomarkerValue = (biomarkerName: string, dateStr: string) => {
+    const exam = exams.find(e => {
+      const date = parseExamDate(e.exam_date || e.created_at);
+      const formattedDate = format(date, 'MMM/yy', { locale: ptBR });
+      return formattedDate === dateStr;
+    });
+    if (!exam) return null;
+    const bio = exam.ai_feedback?.todos_biomarcadores?.find(
+      (b: any) => getCanonicalBiomarkerName(b.marcador).toLowerCase() === biomarkerName.toLowerCase()
+    );
+    return bio ? bio.valor : null;
+  };
+
+  // Formatter for Biomarkers Tooltip
+  const biomarkerFormatter = (value: any, name: any, entry: any) => {
+    const dateStr = entry?.payload?.dateStr;
+    const originalVal = dateStr ? getOriginalBiomarkerValue(name, dateStr) : null;
+    return [originalVal || value, name];
+  };
+
+  // Formatter for Anthropometry Tooltip
+  const anthropometryFormatter = (value: any, name: any) => {
+    if (name === 'Peso (kg)') return [`${value} kg`, 'Peso'];
+    if (name === 'Gordura (%)') return [`${value}%`, 'Gordura'];
+    if (name === 'Massa Muscular (%)') return [`${value}%`, 'Massa Muscular'];
+    return [value, name];
+  };
+
+  // Formatter for Legend text to ensure high contrast
+  const renderLegendText = (value: any) => {
+    return <span className="text-slate-650 font-semibold text-xs">{value}</span>;
+  };
+
+  // Custom Tooltip for Biomarkers Chart
+  const CustomBiomarkerTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-md text-left min-w-[200px]">
+          <p className="text-xs font-semibold text-slate-500 mb-2">{label}</p>
+          <div className="space-y-1.5">
+            {payload.map((item: any, index: number) => {
+              const originalVal = getOriginalBiomarkerValue(item.name, label);
+              const displayVal = originalVal || `${item.value}`;
+              return (
+                <div key={index} className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="text-slate-600 font-medium">{item.name}:</span>
+                  <span className="text-slate-900 font-bold ml-auto">{displayVal}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Custom Tooltip for Anthropometry Chart
+  const CustomAnthropometryTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-md text-left min-w-[200px]">
+          <p className="text-xs font-semibold text-slate-500 mb-2">{label}</p>
+          <div className="space-y-1.5">
+            {payload.map((item: any, index: number) => {
+              let unit = '';
+              if (item.dataKey === 'weight') unit = ' kg';
+              else if (item.dataKey === 'bodyFat' || item.dataKey === 'muscleMass') unit = '%';
+              
+              return (
+                <div key={index} className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="text-slate-650 font-medium">{item.name}:</span>
+                  <span className="text-slate-900 font-bold ml-auto">{item.value}{unit}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Legend click handlers to toggle line visibility dynamically
+  const handleBiomarkerLegendClick = (o: any) => {
+    const { dataKey } = o;
+    if (dataKey) {
+      const name = String(dataKey);
+      const isVisible = visibleBiomarkers[name] !== false;
+      setVisibleBiomarkers(prev => ({
+        ...prev,
+        [name]: !isVisible
+      }));
+    }
+  };
+
+  const handleAnthropometryLegendClick = (o: any) => {
+    const { dataKey } = o;
+    if (dataKey) {
+      const key = String(dataKey);
+      const isVisible = visibleAnthropometry[key] !== false;
+      setVisibleAnthropometry(prev => ({
+        ...prev,
+        [key]: !isVisible
+      }));
+    }
+  };
 
   // Dynamic storage signed URL fetcher when modal opens
   useEffect(() => {
@@ -134,7 +269,7 @@ export const Tracking: React.FC = () => {
     const loadPatientHistory = async () => {
       setLoadingContext(true);
       try {
-        // 1. Fetch consultations with associated appointment status
+        // 1. Fetch consultations with associated appointment status and services
         const { data: consultationsData, error: consultationsError } = await supabase
           .from('consultations')
           .select(`
@@ -143,7 +278,10 @@ export const Tracking: React.FC = () => {
             anthropometry_json,
             created_at,
             appointments (
-              status
+              status,
+              services (
+                name
+              )
             )
           `)
           .eq('patient_id', selectedPatientId)
@@ -204,26 +342,6 @@ export const Tracking: React.FC = () => {
 
         if (appointmentsError) throw appointmentsError;
         setAppointments(appointmentsData || []);
-
-        // Initialize biomarker selector based on loaded exams
-        if (examsData && examsData.length > 0) {
-          const list: string[] = [];
-          examsData.forEach(e => {
-            e.ai_feedback?.todos_biomarcadores?.forEach((b: any) => {
-              const name = getCanonicalBiomarkerName(b.marcador);
-              if (!list.some(item => item.toLowerCase() === name.toLowerCase())) {
-                list.push(name);
-              }
-            });
-          });
-          if (list.length > 0) {
-            setSelectedBiomarker(list[0].toLowerCase().trim());
-          } else {
-            setSelectedBiomarker('tsh (hormônio tireoestimulante)');
-          }
-        } else {
-          setSelectedBiomarker('tsh (hormônio tireoestimulante)');
-        }
 
       } catch (err) {
         console.error('Erro ao buscar histórico clínico:', err);
@@ -370,59 +488,88 @@ export const Tracking: React.FC = () => {
     return list;
   }, [exams]);
 
-  // 3. SVG Chart A: Biomarkers dynamic line path builder
-  const biomarkerChartData = useMemo(() => {
-    if (!selectedPatientId || !selectedBiomarker) return [];
+  // Helper to extract clean numerical values from biomarker strings (e.g. "86.6 mg/dL" -> 86.6)
+  const parseBiomarkerValue = (valStr: string): number | null => {
+    if (!valStr) return null;
+    const cleaned = valStr.replace(',', '.');
+    const match = cleaned.match(/[-+]?[0-9]*\.?[0-9]+/);
+    if (match) {
+      const num = parseFloat(match[0]);
+      return isNaN(num) ? null : num;
+    }
+    return null;
+  };
 
-    const data: { date: string, value: number, unit: string, originalStr: string }[] = [];
-    [...exams]
-      .reverse()
-      .forEach(e => {
-        const bio = e.ai_feedback?.todos_biomarcadores?.find(
-          (b: any) => getCanonicalBiomarkerName(b.marcador).toLowerCase() === selectedBiomarker.toLowerCase()
-        );
-        if (bio) {
-          const cleanStr = bio.valor.trim();
-          const numMatch = cleanStr.match(/(-?[0-9]+([.,][0-9]+)?)/);
-          if (numMatch) {
-            const val = parseFloat(numMatch[1].replace(',', '.'));
-            const unit = cleanStr.replace(numMatch[1], '').trim();
-            const dateStr = format(parseExamDate(e.exam_date || e.created_at), 'dd/MM');
-            data.push({
-              date: dateStr,
-              value: val,
-              unit,
-              originalStr: bio.valor
-            });
-          }
+  // Identify all biomarkers analyzed by the AI for this patient (sorted by frequency)
+  const allBiomarkers = useMemo(() => {
+    const counts: Record<string, number> = {};
+    exams.forEach(e => {
+      e.ai_feedback?.todos_biomarcadores?.forEach((b: any) => {
+        const name = getCanonicalBiomarkerName(b.marcador);
+        counts[name] = (counts[name] || 0) + 1;
+      });
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0]);
+  }, [exams]);
+
+  // Consolidate exams chronologically (oldest first) and extract biomarker values
+  const biomarkerRechartsData = useMemo(() => {
+    const sortedExams = [...exams].sort((a, b) => {
+      const dateA = parseExamDate(a.exam_date || a.created_at);
+      const dateB = parseExamDate(b.exam_date || b.created_at);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    return sortedExams.map(e => {
+      const date = parseExamDate(e.exam_date || e.created_at);
+      const formattedDate = format(date, 'MMM/yy', { locale: ptBR });
+
+      const row: Record<string, any> = {
+        dateStr: formattedDate,
+        originalDate: date,
+      };
+
+      e.ai_feedback?.todos_biomarcadores?.forEach((b: any) => {
+        const name = getCanonicalBiomarkerName(b.marcador);
+        const val = parseBiomarkerValue(b.valor);
+        if (val !== null) {
+          row[name] = val;
         }
       });
 
-    return data;
-  }, [selectedPatientId, selectedBiomarker, exams]);
+      return row;
+    });
+  }, [exams]);
 
-  // 4. SVG Chart B: Anthropometry dynamic multiline path builder
-  const anthropometryChartData = useMemo(() => {
-    if (!selectedPatientId) return [];
+  // Consolidate physical body evaluations chronologically (oldest first)
+  const anthropometryRechartsData = useMemo(() => {
+    const sortedConsultations = [...consultations].sort((a, b) => {
+      const dateA = new Date(a.created_at);
+      const dateB = new Date(b.created_at);
+      return dateA.getTime() - dateB.getTime();
+    });
 
-    const data: { date: string, weight: number, bodyFat: number, muscleMass: number }[] = [];
-    [...consultations]
-      .reverse()
-      .forEach(c => {
-        const ant = c.anthropometry_json;
-        if (ant && (ant.weight || ant.body_fat || ant.muscle_mass)) {
-          const dateStr = format(new Date(c.created_at), 'dd/MM/yyyy');
-          data.push({
-            date: dateStr,
-            weight: ant.weight || 0,
-            bodyFat: ant.body_fat || 0,
-            muscleMass: ant.muscle_mass || 0
-          });
-        }
-      });
+    return sortedConsultations
+      .map(c => {
+        const date = new Date(c.created_at);
+        const formattedDate = format(date, 'MMM/yy', { locale: ptBR });
+        
+        const weight = parseFloat(c.anthropometry_json?.weight);
+        const bodyFat = parseFloat(c.anthropometry_json?.body_fat);
+        const muscleMass = parseFloat(c.anthropometry_json?.muscle_mass);
 
-    return data;
-  }, [selectedPatientId, consultations]);
+        return {
+          dateStr: formattedDate,
+          originalDate: date,
+          weight: isNaN(weight) ? null : weight,
+          bodyFat: isNaN(bodyFat) ? null : bodyFat,
+          muscleMass: isNaN(muscleMass) ? null : muscleMass,
+        };
+      })
+      .filter(d => d.weight !== null || d.bodyFat !== null || d.muscleMass !== null);
+  }, [consultations]);
 
   // 5. Patient Journey Timeline Events compiler (reverse chronological)
   const timelineEvents = useMemo(() => {
@@ -477,6 +624,72 @@ export const Tracking: React.FC = () => {
 
     return events.sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [selectedPatientId, consultations, exams, mealPlans]);
+
+  // Helper to render value labels on active (clicked) dots for Biomarkers
+  const renderBiomarkerLabel = (props: any) => {
+    const { x, y, value, payload } = props;
+    if (payload && payload.dateStr === selectedBiomarkerDate && value !== undefined && value !== null) {
+      return (
+        <g>
+          {/* Subtle background pill */}
+          <rect 
+            x={x - 22} 
+            y={y - 25} 
+            width={44} 
+            height={16} 
+            rx={4} 
+            fill="#1e293b" 
+            stroke="#475569" 
+            strokeWidth={1}
+          />
+          <text 
+            x={x} 
+            y={y - 14} 
+            fill="#ffffff" 
+            fontSize={9} 
+            fontWeight="600" 
+            textAnchor="middle"
+          >
+            {value}
+          </text>
+        </g>
+      );
+    }
+    return null;
+  };
+
+  // Helper to render value labels on active (clicked) dots for Anthropometry
+  const renderAnthropometryLabel = (props: any) => {
+    const { x, y, value, payload } = props;
+    if (payload && payload.dateStr === selectedAnthropometryDate && value !== undefined && value !== null) {
+      return (
+        <g>
+          {/* Subtle background pill */}
+          <rect 
+            x={x - 22} 
+            y={y - 25} 
+            width={44} 
+            height={16} 
+            rx={4} 
+            fill="#1e293b" 
+            stroke="#475569" 
+            strokeWidth={1}
+          />
+          <text 
+            x={x} 
+            y={y - 14} 
+            fill="#ffffff" 
+            fontSize={9} 
+            fontWeight="600" 
+            textAnchor="middle"
+          >
+            {value}
+          </text>
+        </g>
+      );
+    }
+    return null;
+  };
 
   // Standard visual styles
   if (!isAuthorized) {
@@ -568,402 +781,311 @@ export const Tracking: React.FC = () => {
       ) : (
         /* MAIN INTERACTIVE CLINICAL DASHBOARD */
         <div className="space-y-6">
-
           {/* 1. DYNAMIC IA PREDICTIVE TREATMENT PROGNOSIS CARD */}
           {prediction && (
             <div className="bg-gradient-to-br from-slate-900 via-[#1e1b4b] to-[#312e81] rounded-2xl p-6.5 text-white shadow-sm relative overflow-hidden animate-in fade-in duration-300">
               
-              <div className="flex flex-col lg:flex-row justify-between items-start gap-6 relative z-10">
+              <div className="space-y-6 relative z-10 w-full">
                 
-                {/* Left block: description, focuses */}
-                <div className="flex-1 space-y-4 text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-normal text-indigo-300">Tempo estimado baseado na última consulta/exames</span>
-                  </div>
-
-                  <h3 className="text-xl font-semibold text-white tracking-tight leading-none">
-                    Projeção Preditiva de Evolução Metabólica
-                  </h3>
+                {/* Top row: description, progress */}
+                <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
                   
-                  <p className="text-sm text-slate-300 font-normal leading-relaxed max-w-3xl">
-                    {prediction.description}
-                  </p>
-
-                  <div className="pt-2">
-                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-2">Focos Sugeridos de Suporte Nutritivo:</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {prediction.focusPoints.map((point, idx) => (
-                        <div key={idx} className="bg-white/5 border border-white/10 p-2.5 rounded-xl flex items-start gap-2 shadow-sm">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                          <span className="text-xs font-normal text-white leading-normal">{point}</span>
-                        </div>
-                      ))}
+                  {/* Left block: description */}
+                  <div className="flex-1 space-y-4 text-left">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-normal text-indigo-300">Tempo estimado baseado na última consulta/exames</span>
                     </div>
-                  </div>
-                </div>
 
-                {/* Right block: Progress Indicator Dial */}
-                <div className="w-full lg:w-80 shrink-0 bg-gradient-to-r from-indigo-600 to-violet-600 p-5 rounded-2xl flex flex-col justify-center space-y-4 shadow-md border-0 text-white">
-                  <div className="flex justify-between items-center text-xs font-medium">
-                    <span className="text-white/95 uppercase tracking-wider">
-                      {prediction.isTreatmentActive ? "Tratamento Ativo" : "Aguardando Início"}
-                    </span>
+                    <h3 className="text-xl font-semibold text-white tracking-tight leading-none">
+                      Projeção Preditiva de Evolução Metabólica
+                    </h3>
+                    
+                    <p className="text-sm text-slate-300 font-normal leading-relaxed max-w-3xl">
+                      {prediction.description}
+                    </p>
                   </div>
-                  
-                  <div>
-                    <div className="flex justify-between items-baseline mb-2">
-                      <span className="text-3xl font-medium text-white">
-                        {prediction.isTreatmentActive ? prediction.progressWeeks : "--"}{" "}
-                        <span className="text-base font-medium text-white/80">/ {prediction.baseWeeks} sem</span>
+
+                  {/* Right block: Progress Indicator Dial */}
+                  <div className="w-full lg:w-80 shrink-0 bg-gradient-to-r from-indigo-600 to-violet-600 p-5 rounded-2xl flex flex-col justify-center space-y-4 shadow-md border-0 text-white">
+                    <div className="flex justify-between items-center text-xs font-medium">
+                      <span className="text-white/95 uppercase tracking-wider">
+                        {prediction.isTreatmentActive ? "Tratamento Ativo" : "Aguardando Início"}
                       </span>
                     </div>
-
-                    {/* Progress Bar */}
-                    <div className="h-3 w-full bg-white/20 rounded-full overflow-hidden shadow-inner border-0">
-                      <div 
-                        className="h-full bg-emerald-400 rounded-full transition-all duration-1000 shadow"
-                        style={{ width: `${prediction.isTreatmentActive ? prediction.percent : 0}%` }}
-                      />
+                    
+                    <div>
+                      <div className="flex justify-between items-baseline mb-2">
+                        <span className="text-3xl font-medium text-white">
+                          {prediction.isTreatmentActive ? prediction.progressWeeks : "--"}{" "}
+                          <span className="text-base font-medium text-white/80">/ {prediction.baseWeeks} sem</span>
+                        </span>
+                      </div>
+                      
+                      {/* Progress Bar */}
+                      <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-white h-full transition-all duration-500" 
+                          style={{ width: `${prediction.percent}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-
-                  <p className="text-[10px] font-normal text-white/70 leading-normal text-left">
-                    {prediction.isTreatmentActive 
-                      ? "*A evolução é simulada com base no cruzamento matemático de biomarcadores séricos alterados com o cumprimento dietético estimado."
-                      : "*O cronograma de tratamento iniciará automaticamente assim que o primeiro plano alimentar for cadastrado para o paciente."}
-                  </p>
                 </div>
 
               </div>
             </div>
           )}
 
-          {/* 2. ANALYTICAL CHARTS SECTION */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Gráficos de Acompanhamento - Um abaixo do outro */}
+          <div className="flex flex-col gap-6">
 
-            {/* CHART A: EVOLUÇÃO DE BIOMARCADORES */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6.5 shadow-sm flex flex-col h-[480px]">
-              
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900 flex items-center gap-1.5">
-                    <TrendingUp className="w-5 h-5 text-teal-650" />
-                    Curva Evolutiva de Biomarcadores
-                  </h3>
-                  <p className="text-[10px] font-normal text-slate-500 uppercase tracking-wider mt-0.5">Histórico extraído dos laudos de PDF</p>
-                </div>
-                
-                {/* Biomarker Selector Dropdown */}
-                <select
-                  value={selectedBiomarker}
-                  onChange={e => setSelectedBiomarker(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 cursor-pointer shadow-sm min-w-[150px] max-w-[200px] hover:border-slate-350 transition-all"
-                >
-                  {availableBiomarkers.map((b, idx) => (
-                    <option key={idx} value={b.toLowerCase().trim()}>{b}</option>
-                  ))}
-                </select>
-              </div>
+          {/* Global Style to override Recharts Black Focus Outline */}
+          <style>{`
+            .recharts-wrapper:focus, .recharts-wrapper:focus-visible { outline: none !important; border: none !important; }
+            .recharts-surface:focus { outline: none !important; }
+          `}</style>
 
-              {/* SVG Chart A Rendering */}
-              <div className="flex-1 min-h-0 pt-6 relative flex items-center justify-center">
-                {biomarkerChartData.length === 0 ? (
-                  <div className="text-center py-20 text-slate-400">
-                    <Info className="w-8 h-8 text-slate-300 mx-auto mb-1 stroke-[1.2]" />
-                    <p className="text-xs font-semibold">Nenhum exame estruturado para este biomarcador</p>
+          {/* Card 1: Biomarkers Evolution */}
+          <div className="bg-white p-6 rounded-xl border-2 border-slate-300 shadow-md">
+              <div className="flex flex-col gap-4 text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="text-left">
+                    <h4 className="text-base font-semibold text-slate-900">Evolução de Biomarcadores (Exames)</h4>
+                    <p className="text-xs text-slate-500 mt-1">Histórico dos biomarcadores analisados pela IA ao longo do tempo</p>
                   </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col justify-between">
-                    {/* SVG canvas container */}
-                    <div className="flex-1 w-full relative min-h-0">
-                      <svg viewBox="0 0 500 240" className="w-full h-full overflow-visible">
-                        {/* Grid lines */}
-                        <line x1="40" y1="40" x2="460" y2="40" stroke="#f1f5f9" strokeWidth="1.5" />
-                        <line x1="40" y1="100" x2="460" y2="100" stroke="#f1f5f9" strokeWidth="1.5" />
-                        <line x1="40" y1="160" x2="460" y2="160" stroke="#f1f5f9" strokeWidth="1.5" />
-                        <line x1="40" y1="200" x2="460" y2="200" stroke="#cbd5e1" strokeWidth="2" /> {/* Bottom axis */}
-
-                        {/* Y-axis labels */}
-                        {(() => {
-                          const maxVal = Math.max(...biomarkerChartData.map(d => d.value)) * 1.25;
-                          const minVal = Math.min(...biomarkerChartData.map(d => d.value)) * 0.75;
-                          
-                          return (
-                            <>
-                              <text x="32" y="45" textAnchor="end" className="text-[10px] font-medium fill-slate-500">{(maxVal).toFixed(1)}</text>
-                              <text x="32" y="105" textAnchor="end" className="text-[10px] font-medium fill-slate-500">{((maxVal + minVal)/2).toFixed(1)}</text>
-                              <text x="32" y="165" textAnchor="end" className="text-[10px] font-medium fill-slate-500">{(minVal).toFixed(1)}</text>
-                            </>
-                          );
-                        })()}
-
-                        {/* Data Line Path Builder */}
-                        {(() => {
-                          const maxVal = Math.max(...biomarkerChartData.map(d => d.value)) * 1.25;
-                          const minVal = Math.min(...biomarkerChartData.map(d => d.value)) * 0.75;
-                          const range = maxVal - minVal || 10;
-
-                          const points = biomarkerChartData.map((d, idx) => {
-                            const x = biomarkerChartData.length === 1
-                              ? 250
-                              : 40 + (idx * (420 / Math.max(1, biomarkerChartData.length - 1)));
-                            const y = 200 - (((d.value - minVal) / range) * 160);
-                            return { x, y, data: d };
+                  
+                  {allBiomarkers.length > 0 && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          const nextState: Record<string, boolean> = {};
+                          allBiomarkers.forEach(name => {
+                            nextState[name] = true;
                           });
-
-                          const pathStr = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-
-                          return (
-                            <>
-                              {/* Glowing path underlay */}
-                              {biomarkerChartData.length > 1 && (
-                                <path d={pathStr} fill="none" stroke="rgba(20, 184, 166, 0.15)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-                              )}
-                              {/* Main path */}
-                              {biomarkerChartData.length > 1 && (
-                                <path d={pathStr} fill="none" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                              )}
-                              
-                              {/* Points and Tooltips */}
-                              {points.map((p, idx) => (
-                                <g key={idx} className="group/point cursor-pointer">
-                                  <circle cx={p.x} cy={p.y} r="6" fill="#ffffff" stroke="#14b8a6" strokeWidth="3" />
-                                  <circle cx={p.x} cy={p.y} r="10" fill="transparent" className="hover:fill-teal-500/10 transition-colors" />
-                                  
-                                  {/* Tooltip on hover */}
-                                  <g className="opacity-0 group-hover/point:opacity-100 transition-opacity duration-200">
-                                    <rect x={p.x - 45} y={p.y - 38} width="90" height="28" rx="8" fill="#0f172a" />
-                                    <text x={p.x} y={p.y - 20} textAnchor="middle" className="text-[10px] font-medium fill-white font-sans">{p.data.originalStr}</text>
-                                  </g>
-                                  
-                                  {/* Date Labels below X-axis */}
-                                  <text x={p.x} y="218" textAnchor="middle" className="text-[10px] font-medium fill-slate-500">{p.data.date}</text>
-                                </g>
-                              ))}
-                            </>
-                          );
-                        })()}
-                      </svg>
+                          setVisibleBiomarkers(nextState);
+                        }}
+                        className="px-2 py-1 rounded bg-slate-50 border border-slate-200 hover:bg-slate-100 text-[9px] font-semibold text-slate-700 transition-all cursor-pointer focus:outline-none"
+                      >
+                        Selecionar Todos
+                      </button>
+                      <button
+                        onClick={() => {
+                          const nextState: Record<string, boolean> = {};
+                          allBiomarkers.forEach(name => {
+                            nextState[name] = false;
+                          });
+                          setVisibleBiomarkers(nextState);
+                        }}
+                        className="px-2 py-1 rounded bg-slate-50 border border-slate-200 hover:bg-slate-100 text-[9px] font-semibold text-slate-500 transition-all cursor-pointer focus:outline-none"
+                      >
+                        Limpar Filtro
+                      </button>
                     </div>
-                    {/* Unit legend */}
-                    <div className="flex flex-col gap-2 mt-2 shrink-0">
-                      <div className="flex items-center gap-1.5 bg-emerald-50/50 border border-emerald-100/50 p-2.5 rounded-xl">
-                        <Info className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span className="text-[10px] font-medium text-slate-500">
-                          Os limites de referência do laudo estão integrados matematicamente aos pontos. Unidade padrão: <span className="font-medium text-emerald-600">{biomarkerChartData[0]?.unit || 'unidades'}</span>.
-                        </span>
-                      </div>
-                      
-                      {biomarkerChartData.length === 1 && (
-                        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/50 p-2.5 rounded-xl">
-                          <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                          <span className="text-[10px] font-medium text-slate-500">
-                            Histórico de evolução será exibido assim que novos exames forem adicionados.
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                  )}
+                </div>
+
+                {allBiomarkers.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 bg-slate-50 border border-slate-100 p-3 rounded-xl max-h-[120px] overflow-y-auto">
+                    {allBiomarkers.map((name, idx) => {
+                      const isVisible = visibleBiomarkers[name] !== false;
+                      const colors = [
+                        '#f43f5e', '#38bdf8', '#34d399', '#fbbf24', '#a78bfa',
+                        '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#a855f7',
+                        '#2dd4bf', '#fb7185'
+                      ];
+                      const color = colors[idx % colors.length];
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => setVisibleBiomarkers(prev => ({ ...prev, [name]: !isVisible }))}
+                          className="px-2.5 py-1 rounded-full text-[10px] font-medium transition-all flex items-center gap-1.5 border cursor-pointer focus:outline-none focus-visible:outline-none"
+                          style={{ 
+                            backgroundColor: isVisible ? `${color}15` : 'transparent',
+                            borderColor: isVisible ? color : '#e2e8f0',
+                            color: isVisible ? '#1e293b' : '#94a3b8',
+                            textDecoration: isVisible ? 'none' : 'line-through'
+                          }}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                          {name}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
+
+              {biomarkerRechartsData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[300px] bg-slate-50 border border-slate-100 rounded-xl p-6 text-center">
+                  <Activity className="h-8 w-8 text-slate-400 stroke-[1.5] mb-2" />
+                  <p className="text-xs font-medium text-slate-500">Nenhum exame cadastrado com biomarcadores estruturados para este paciente.</p>
+                </div>
+              ) : (
+                <div 
+                  className="w-full h-[300px] border border-slate-300 rounded-xl p-2 sm:p-4 bg-slate-50/50"
+                  style={{ outline: 'none' }}
+                >
+                  <ResponsiveContainer width="100%" height="100%" style={{ outline: 'none' }}>
+                    <LineChart 
+                      data={biomarkerRechartsData} 
+                      margin={{ top: 15, right: 10, left: -20, bottom: 0 }}
+                      className="cursor-pointer"
+                      style={{ outline: 'none', border: 'none' }}
+                      onMouseDown={(e) => e?.preventDefault()}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="dateStr" stroke="#94a3b8" tick={{ fill: '#475569', fontSize: 10 }} />
+                      <YAxis stroke="#94a3b8" tick={{ fill: '#475569', fontSize: 10 }} />
+                      <Tooltip 
+                        cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '3 3' }}
+                        content={<CustomBiomarkerTooltip />}
+                        shared={false}
+                      />
+                      {/* Redundant Recharts Legend Removed to match Anthropometry chart */}
+                      {allBiomarkers.map((name, idx) => {
+                        const isVisible = visibleBiomarkers[name] !== false;
+                        const colors = [
+                          '#f43f5e', '#38bdf8', '#34d399', '#fbbf24', '#a78bfa',
+                          '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#a855f7',
+                          '#2dd4bf', '#fb7185'
+                        ];
+                        const color = colors[idx % colors.length];
+                        return (
+                          <Line
+                            key={name}
+                            type="monotone"
+                            dataKey={name}
+                            stroke={color}
+                            strokeWidth={2.5}
+                            dot={{ r: 6, strokeWidth: 2, cursor: 'pointer' }}
+                            activeDot={{ r: 8, cursor: 'pointer' }}
+                            connectNulls
+                            name={name}
+                            hide={!isVisible}
+                          />
+                        );
+                      })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               </div>
             </div>
 
-            {/* CHART B: EVOLUÇÃO ANTROPOMÉTRICA */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6.5 shadow-sm flex flex-col h-[480px]">
-              
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-3 shrink-0">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900 flex items-center gap-1.5">
-                    <Activity className="w-5 h-5 text-indigo-650" />
-                    Histórico Evolutivo de Antropometria
-                  </h3>
-                  <p className="text-[10px] font-normal text-slate-500 uppercase tracking-wider mt-0.5">Peso, percentual de gordura e massa muscular</p>
-                </div>
-
-                {/* Legends Segmented Filter */}
-                <div className="flex bg-slate-200/70 p-1 border border-slate-300/35 rounded-xl shadow-inner shrink-0">
-                  <button
-                    onClick={() => setActiveAntropometriaLine('all')}
-                    className={`px-2.5 py-1 text-[10px] font-medium rounded-lg transition-all ${
-                      activeAntropometriaLine === 'all' ? 'bg-white text-slate-900 shadow' : 'text-slate-650 hover:text-slate-900'
-                    }`}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    onClick={() => setActiveAntropometriaLine('weight')}
-                    className={`px-2.5 py-1 text-[10px] font-medium rounded-lg transition-all ${
-                      activeAntropometriaLine === 'weight' ? 'bg-white text-rose-600 shadow' : 'text-slate-650 hover:text-slate-900'
-                    }`}
-                  >
-                    Peso
-                  </button>
-                  <button
-                    onClick={() => setActiveAntropometriaLine('bodyFat')}
-                    className={`px-2.5 py-1 text-[10px] font-medium rounded-lg transition-all ${
-                      activeAntropometriaLine === 'bodyFat' ? 'bg-white text-amber-600 shadow' : 'text-slate-650 hover:text-slate-900'
-                    }`}
-                  >
-                    Gordura
-                  </button>
-                  <button
-                    onClick={() => setActiveAntropometriaLine('muscleMass')}
-                    className={`px-2.5 py-1 text-[10px] font-medium rounded-lg transition-all ${
-                      activeAntropometriaLine === 'muscleMass' ? 'bg-white text-emerald-600 shadow' : 'text-slate-650 hover:text-slate-900'
-                    }`}
-                  >
-                    Músculo
-                  </button>
-                </div>
+            {/* Card 2: Anthropometric Correlation */}
+            <div className="bg-white p-6 rounded-xl border-2 border-slate-300 shadow-md">
+              <div className="flex flex-col gap-4 text-left">
+              <div className="text-left">
+                <h4 className="text-base font-semibold text-slate-900">Correlação Antropométrica (Composição Corporal)</h4>
+                <p className="text-xs text-slate-500 mt-1">Evolução do peso vs gordura e músculo com base nas consultas realizadas</p>
               </div>
 
-              {/* SVG Chart B Multiline Rendering */}
-              <div className="flex-1 min-h-0 pt-6 relative flex items-center justify-center">
-                {anthropometryChartData.length === 0 ? (
-                  <div className="text-center py-20 text-slate-400">
-                    <Info className="w-8 h-8 text-slate-300 mx-auto mb-1 stroke-[1.2]" />
-                    <p className="text-xs font-semibold">Nenhuma antropometria cadastrada nas consultas anteriores</p>
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col justify-between">
-                    <div className="flex-1 w-full relative min-h-0">
-                      <svg viewBox="0 0 500 240" className="w-full h-full overflow-visible">
-                        {/* Grid lines */}
-                        <line x1="40" y1="40" x2="460" y2="40" stroke="#f1f5f9" strokeWidth="1.5" />
-                        <line x1="40" y1="100" x2="460" y2="100" stroke="#f1f5f9" strokeWidth="1.5" />
-                        <line x1="40" y1="160" x2="460" y2="160" stroke="#f1f5f9" strokeWidth="1.5" />
-                        <line x1="40" y1="200" x2="460" y2="200" stroke="#cbd5e1" strokeWidth="2" /> {/* Bottom axis */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'weight', label: 'Peso (kg)', color: '#f43f5e' },
+                  { key: 'bodyFat', label: 'Gordura (%)', color: '#f59e0b' },
+                  { key: 'muscleMass', label: 'Massa Muscular (%)', color: '#10b981' }
+                ].map(field => {
+                  const isVisible = visibleAnthropometry[field.key] !== false;
+                  return (
+                    <button
+                      key={field.key}
+                      onClick={() => setVisibleAnthropometry(prev => ({ ...prev, [field.key]: !isVisible }))}
+                      className="px-2.5 py-1 rounded-full text-[10px] font-medium transition-all flex items-center gap-1.5 border cursor-pointer"
+                      style={{ 
+                        backgroundColor: isVisible ? `${field.color}15` : 'transparent',
+                        borderColor: isVisible ? field.color : '#e2e8f0',
+                        color: isVisible ? '#1e293b' : '#94a3b8',
+                        textDecoration: isVisible ? 'none' : 'line-through'
+                      }}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: field.color }} />
+                      {field.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-                        {/* Y Axis standard scale */}
-                        <text x="32" y="45" textAnchor="end" className="text-[10px] font-medium fill-slate-500">100</text>
-                        <text x="32" y="105" textAnchor="end" className="text-[10px] font-medium fill-slate-500">50</text>
-                        <text x="32" y="165" textAnchor="end" className="text-[10px] font-medium fill-slate-500">10</text>
-
-                        {/* Line Path Builders */}
-                        {(() => {
-                          const points = anthropometryChartData.map((d, idx) => {
-                            const x = anthropometryChartData.length === 1
-                              ? 250
-                              : 40 + (idx * (420 / Math.max(1, anthropometryChartData.length - 1)));
-                            
-                            // Map values to 40 - 200 SVG range relative to estimated limits:
-                            // Weight max=120, min=40
-                            const yWeight = 200 - (((d.weight - 40) / 80) * 160);
-                            // Bodyfat max=40, min=5
-                            const yFat = 200 - (((d.bodyFat - 5) / 35) * 160);
-                            // Muscle max=60, min=15
-                            const yMuscle = 200 - (((d.muscleMass - 15) / 45) * 160);
-
-                            return { x, yWeight, yFat, yMuscle, data: d };
-                          });
-
-                          const pathWeightStr = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.yWeight}`).join(' ');
-                          const pathFatStr = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.yFat}`).join(' ');
-                          const pathMuscleStr = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.yMuscle}`).join(' ');
-
-                          return (
-                            <>
-                              {/* Draw Weight line (Rose) */}
-                              {(activeAntropometriaLine === 'all' || activeAntropometriaLine === 'weight') && (
-                                <>
-                                  {anthropometryChartData.length > 1 && (
-                                    <>
-                                      <path d={pathWeightStr} fill="none" stroke="rgba(244, 63, 94, 0.1)" strokeWidth="6" strokeLinecap="round" />
-                                      <path d={pathWeightStr} fill="none" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </>
-                                  )}
-                                  {points.map((p, idx) => (
-                                    <g key={`w_${idx}`} className="group/wpoint cursor-pointer">
-                                      <circle cx={p.x} cy={p.yWeight} r="4" fill="#ffffff" stroke="#f43f5e" strokeWidth="2" />
-                                      <g className="opacity-0 group-hover/wpoint:opacity-100 transition-opacity">
-                                        <rect x={p.x - 35} y={p.yWeight - 32} width="70" height="22" rx="6" fill="#f43f5e" />
-                                        <text x={p.x} y={p.yWeight - 18} textAnchor="middle" className="text-[9px] font-semibold fill-white font-sans">{p.data.weight} kg</text>
-                                      </g>
-                                    </g>
-                                  ))}
-                                </>
-                              )}
-
-                              {/* Draw Body Fat line (Amber) */}
-                              {(activeAntropometriaLine === 'all' || activeAntropometriaLine === 'bodyFat') && (
-                                <>
-                                  {anthropometryChartData.length > 1 && (
-                                    <>
-                                      <path d={pathFatStr} fill="none" stroke="rgba(245, 158, 11, 0.1)" strokeWidth="6" strokeLinecap="round" />
-                                      <path d={pathFatStr} fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4,4" />
-                                    </>
-                                  )}
-                                  {points.map((p, idx) => (
-                                    <g key={`f_${idx}`} className="group/fpoint cursor-pointer">
-                                      <circle cx={p.x} cy={p.yFat} r="4" fill="#ffffff" stroke="#f59e0b" strokeWidth="2" />
-                                      <g className="opacity-0 group-hover/fpoint:opacity-100 transition-opacity">
-                                        <rect x={p.x - 30} y={p.yFat - 32} width="60" height="22" rx="6" fill="#f59e0b" />
-                                        <text x={p.x} y={p.yFat - 18} textAnchor="middle" className="text-[9px] font-semibold fill-white font-sans">{p.data.bodyFat}%</text>
-                                      </g>
-                                    </g>
-                                  ))}
-                                </>
-                              )}
-
-                              {/* Draw Muscle Mass line (Emerald) */}
-                              {(activeAntropometriaLine === 'all' || activeAntropometriaLine === 'muscleMass') && (
-                                <>
-                                  {anthropometryChartData.length > 1 && (
-                                    <>
-                                      <path d={pathMuscleStr} fill="none" stroke="rgba(16, 185, 129, 0.1)" strokeWidth="6" strokeLinecap="round" />
-                                      <path d={pathMuscleStr} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </>
-                                  )}
-                                  {points.map((p, idx) => (
-                                    <g key={`m_${idx}`} className="group/mpoint cursor-pointer">
-                                      <circle cx={p.x} cy={p.yMuscle} r="4" fill="#ffffff" stroke="#10b981" strokeWidth="2" />
-                                      <g className="opacity-0 group-hover/mpoint:opacity-100 transition-opacity">
-                                        <rect x={p.x - 35} y={p.yMuscle - 32} width="70" height="22" rx="6" fill="#10b981" />
-                                        <text x={p.x} y={p.yMuscle - 18} textAnchor="middle" className="text-[9px] font-semibold fill-white font-sans">{p.data.muscleMass} kg</text>
-                                      </g>
-                                    </g>
-                                  ))}
-                                </>
-                              )}
-
-                              {/* X Axis dates */}
-                              {points.map((p, idx) => (
-                                <text key={`x_${idx}`} x={p.x} y="218" textAnchor="middle" className="text-[10px] font-medium fill-slate-500">{p.data.date}</text>
-                              ))}
-                            </>
-                          );
-                        })()}
-                      </svg>
-                    </div>
-
-                    {/* Chart Legends */}
-                    <div className="flex flex-col gap-2 shrink-0 border-t border-slate-100 pt-3">
-                      <div className="flex justify-center gap-6">
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                          <span className="h-3 w-3 rounded-full bg-rose-500 border border-rose-450" />
-                          <span>Peso (kg)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                          <span className="h-3 w-3 rounded-full bg-amber-500 border border-amber-450" />
-                          <span>Gordura (%)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                          <span className="h-3 w-3 rounded-full bg-emerald-500 border border-emerald-450" />
-                          <span>Massa Muscular (kg)</span>
-                        </div>
-                      </div>
-
-                      {anthropometryChartData.length === 1 && (
-                        <div className="flex items-center justify-center gap-1.5 bg-amber-50/40 border border-amber-100/50 p-2 rounded-xl mt-1.5">
-                          <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span className="text-[10px] font-medium text-slate-500">
-                            Os dados de evolução aparecerão aqui assim que mais de uma avaliação física for registrada.
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+              {anthropometryRechartsData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[300px] bg-slate-50 border border-slate-100 rounded-xl p-6 text-center">
+                  <Activity className="h-8 w-8 text-slate-400 stroke-[1.5] mb-2" />
+                  <p className="text-xs font-medium text-slate-500">Nenhuma avaliação física (peso, gordura, músculo) registrada nas consultas deste paciente.</p>
+                </div>
+              ) : (
+                <div className="w-full h-[300px] border border-slate-200 rounded-xl p-2 sm:p-4 bg-slate-50/30 focus:outline-none">
+                  <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
+                    <AreaChart 
+                      data={anthropometryRechartsData} 
+                      margin={{ top: 15, right: 10, left: -20, bottom: 0 }}
+                      className="cursor-pointer"
+                      style={{ outline: 'none', border: 'none' }}
+                      onMouseDown={(e) => e?.preventDefault()}
+                    >
+                      <defs>
+                        <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorFat" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.15}/>
+                          <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorMuscle" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.15}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="dateStr" stroke="#94a3b8" tick={{ fill: '#475569', fontSize: 10 }} />
+                      <YAxis yAxisId="left" stroke="#f43f5e" tick={{ fill: '#e11d48', fontSize: 10 }} label={{ value: 'Peso (kg)', angle: -90, position: 'insideLeft', fill: '#e11d48', fontSize: 10 }} />
+                      <YAxis yAxisId="right" orientation="right" stroke="#10b981" tick={{ fill: '#059669', fontSize: 10 }} label={{ value: 'Percentual (%)', angle: 90, position: 'insideRight', fill: '#059669', fontSize: 10 }} />
+                      <Tooltip 
+                        trigger="click" 
+                        shared={true} 
+                        cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '3 3' }}
+                        content={<CustomAnthropometryTooltip />}
+                      />
+                      {/* Redundant Recharts Legend Removed */}
+                      <Area 
+                        yAxisId="left" 
+                        type="monotone" 
+                        dataKey="weight" 
+                        name="Peso (kg)" 
+                        stroke="#f43f5e" 
+                        strokeWidth={2.5} 
+                        fillOpacity={1} 
+                        fill="url(#colorWeight)" 
+                        connectNulls 
+                        hide={!visibleAnthropometry.weight} 
+                      />
+                      <Area 
+                        yAxisId="right" 
+                        type="monotone" 
+                        dataKey="bodyFat" 
+                        name="Gordura (%)" 
+                        stroke="#f59e0b" 
+                        strokeWidth={2} 
+                        strokeDasharray="4 4" 
+                        fillOpacity={1} 
+                        fill="url(#colorFat)" 
+                        connectNulls 
+                        hide={!visibleAnthropometry.bodyFat} 
+                      />
+                      <Area 
+                        yAxisId="right" 
+                        type="monotone" 
+                        dataKey="muscleMass" 
+                        name="Massa Muscular (%)" 
+                        stroke="#10b981" 
+                        strokeWidth={2} 
+                        fillOpacity={1} 
+                        fill="url(#colorMuscle)" 
+                        connectNulls 
+                        hide={!visibleAnthropometry.muscleMass} 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               </div>
             </div>
 

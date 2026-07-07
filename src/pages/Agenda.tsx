@@ -70,6 +70,17 @@ export const Agenda: React.FC = () => {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Reschedule states
+  const [reschedules, setReschedules] = useState<any[]>([]);
+  const [loadingReschedules, setLoadingReschedules] = useState(false);
+  const [isRescheduleMode, setIsRescheduleMode] = useState(false);
+  const [rescheduleData, setRescheduleData] = useState({
+    date: '',
+    time: '',
+    reason: ''
+  });
+  const [rescheduling, setRescheduling] = useState(false);
+
   // Toast & inline errors state
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -195,6 +206,49 @@ export const Agenda: React.FC = () => {
       loadDropdownData();
     }
   }, [clinic?.id]);
+
+  const fetchReschedules = async (appointmentId: string) => {
+    setLoadingReschedules(true);
+    try {
+      const { data, error } = await supabase
+        .from('appointment_reschedules')
+        .select(`
+          id,
+          reason,
+          old_date_time,
+          new_date_time,
+          created_at,
+          rescheduled_by,
+          profiles ( full_name )
+        `)
+        .eq('appointment_id', appointmentId)
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        setReschedules(data);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar histórico de reagendamentos:', err);
+    } finally {
+      setLoadingReschedules(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedAppointment?.id) {
+      fetchReschedules(selectedAppointment.id);
+      setIsRescheduleMode(false);
+      
+      const apptDate = new Date(selectedAppointment.date_time);
+      setRescheduleData({
+        date: format(apptDate, 'yyyy-MM-dd'),
+        time: format(apptDate, 'HH:mm'),
+        reason: ''
+      });
+    } else {
+      setReschedules([]);
+      setIsRescheduleMode(false);
+    }
+  }, [selectedAppointment?.id]);
 
   // Calendar dates generation
   const calendarDays = useMemo(() => {
@@ -383,6 +437,69 @@ export const Agenda: React.FC = () => {
       showToast('Falha ao atualizar o status no servidor.', 'error');
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  // Reschedule Appointment
+  const handleRescheduleAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly || !selectedAppointment || !profile?.id) return;
+
+    const { date, time, reason } = rescheduleData;
+    if (!date || !time || !reason.trim()) {
+      showToast('Por favor, preencha todos os campos obrigatórios.', 'error');
+      return;
+    }
+
+    const newDateTime = new Date(`${date}T${time}:00`);
+    if (newDateTime < new Date()) {
+      showToast('Não é possível reagendar consultas para data e hora retroativas.', 'error');
+      return;
+    }
+
+    setRescheduling(true);
+    try {
+      const oldDateTimeStr = selectedAppointment.date_time;
+
+      // 1. Update the appointment's date_time in appointments
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({ date_time: newDateTime.toISOString() })
+        .eq('id', selectedAppointment.id);
+
+      if (updateError) throw updateError;
+
+      // 2. Insert into appointment_reschedules
+      const { error: insertError } = await supabase
+        .from('appointment_reschedules')
+        .insert([{
+          appointment_id: selectedAppointment.id,
+          rescheduled_by: profile.id,
+          reason: reason.trim(),
+          old_date_time: oldDateTimeStr,
+          new_date_time: newDateTime.toISOString()
+        }]);
+
+      if (insertError) throw insertError;
+
+      showToast('Consulta reagendada com sucesso!', 'success');
+      
+      // Update local appointments state with the new date_time
+      setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, date_time: newDateTime.toISOString() } : a));
+      
+      // Update selectedAppointment so details modal reflects new date/time
+      setSelectedAppointment((prev: any) => prev ? { ...prev, date_time: newDateTime.toISOString() } : null);
+      
+      // Reset reschedule mode
+      setIsRescheduleMode(false);
+      
+      // Refresh the reschedules list
+      fetchReschedules(selectedAppointment.id);
+    } catch (err) {
+      console.error('Erro ao reagendar consulta:', err);
+      showToast('Ocorreu um erro ao salvar o reagendamento no servidor.', 'error');
+    } finally {
+      setRescheduling(false);
     }
   };
 
@@ -1096,7 +1213,7 @@ export const Agenda: React.FC = () => {
             </div>
 
             {/* Content body */}
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
               
               {isAttention(selectedAppointment) && (
                 <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4 flex gap-3 animate-in fade-in duration-300">
@@ -1119,13 +1236,13 @@ export const Agenda: React.FC = () => {
                 }`} />
                 
                 <div className="pl-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Horário Marcado
+                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-slate-500" /> Horário Marcado
                   </p>
                   <p className="text-2xl font-black text-slate-800 mt-1">
                     {format(new Date(selectedAppointment.date_time), 'HH:mm')}
                   </p>
-                  <p className="text-xs font-semibold text-slate-500 mt-1">
+                  <p className="text-xs font-semibold text-slate-750 mt-1">
                     {format(new Date(selectedAppointment.date_time), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </p>
                 </div>
@@ -1151,60 +1268,182 @@ export const Agenda: React.FC = () => {
                 </button>
               </div>
 
+              {/* Reschedule Option */}
+              {!isReadOnly && (
+                isRescheduleMode ? (
+                  <form onSubmit={handleRescheduleAppointment} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4 animate-in fade-in duration-300">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                        <CalendarIcon className="w-4 h-4 text-primary-600" />
+                        Reagendar Consulta
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsRescheduleMode(false)}
+                        className="text-xs text-slate-400 hover:text-slate-650 font-semibold"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-slate-600 font-semibold text-[11px] block">Nova Data</label>
+                        <input
+                          type="date"
+                          value={rescheduleData.date}
+                          onChange={e => setRescheduleData(prev => ({ ...prev, date: e.target.value }))}
+                          required
+                          min={format(new Date(), 'yyyy-MM-dd')}
+                          className="block w-full rounded-lg border border-slate-200 py-1.5 px-2 text-xs focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-slate-600 font-semibold text-[11px] block">Nova Hora</label>
+                        <input
+                          type="time"
+                          value={rescheduleData.time}
+                          onChange={e => setRescheduleData(prev => ({ ...prev, time: e.target.value }))}
+                          required
+                          className="block w-full rounded-lg border border-slate-200 py-1.5 px-2 text-xs focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-slate-600 font-semibold text-[11px] block">Motivo do Reagendamento</label>
+                      <textarea
+                        value={rescheduleData.reason}
+                        onChange={e => setRescheduleData(prev => ({ ...prev, reason: e.target.value }))}
+                        required
+                        rows={2}
+                        placeholder="Descreva o motivo pelo qual a consulta está sendo movida..."
+                        className="block w-full rounded-lg border border-slate-200 py-1.5 px-2.5 text-xs focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={rescheduling}
+                      className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm disabled:opacity-55 cursor-pointer"
+                    >
+                      {rescheduling ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+                          Salvando...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Confirmar Reagendamento
+                        </>
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsRescheduleMode(true)}
+                    className="w-full bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                  >
+                    <CalendarIcon className="w-4 h-4 text-slate-500" />
+                    Reagendar Consulta (Mover Horário)
+                  </button>
+                )
+              )}
+
               {/* Patient Info */}
               <div className="space-y-2">
-                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Paciente</h4>
-                <div className="border border-slate-150 rounded-2xl p-4 space-y-2.5">
+                <h4 className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Paciente</h4>
+                <div className="border border-slate-200 rounded-2xl p-4 space-y-2.5">
                   <div>
-                    <p className="text-sm font-extrabold text-slate-800">{selectedAppointment.patients?.name || 'Paciente Excluído'}</p>
+                    <p className="text-sm font-extrabold text-slate-850">{selectedAppointment.patients?.name || 'Paciente Excluído'}</p>
                   </div>
                   {selectedAppointment.patients?.email && (
-                    <div className="text-xs text-slate-500 flex items-center gap-2">
-                      <span className="font-bold text-slate-400 w-12 shrink-0">E-mail:</span>
+                    <div className="text-xs text-slate-750 flex items-center gap-2">
+                      <span className="font-bold text-slate-600 w-12 shrink-0">E-mail:</span>
                       <span className="truncate">{selectedAppointment.patients.email}</span>
                     </div>
                   )}
                   {selectedAppointment.patients?.phone && (
-                    <div className="text-xs text-slate-500 flex items-center gap-2">
-                      <span className="font-bold text-slate-400 w-12 shrink-0">Tel:</span>
+                    <div className="text-xs text-slate-750 flex items-center gap-2">
+                      <span className="font-bold text-slate-600 w-12 shrink-0">Tel:</span>
                       <span>{selectedAppointment.patients.phone}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Service & Nutri */}
-              <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Serviço</h4>
-                  <div className="bg-slate-50/55 p-3 rounded-xl border border-slate-100">
+                  <h4 className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">Serviço</h4>
+                  <div className="bg-slate-50/55 p-3 rounded-xl border border-slate-200">
                     <p className="text-xs font-bold text-slate-850 truncate">{selectedAppointment.services?.name || 'Excluído'}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
+                    <p className="text-[10px] text-slate-700 mt-0.5">
                       R$ {selectedAppointment.services?.price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                     </p>
                   </div>
                 </div>
                 
                 <div className="space-y-1.5">
-                  <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Profissional</h4>
-                  <div className="bg-slate-50/55 p-3 rounded-xl border border-slate-100">
+                  <h4 className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">Profissional</h4>
+                  <div className="bg-slate-50/55 p-3 rounded-xl border border-slate-200">
                     <p className="text-xs font-bold text-slate-850 truncate">
                       {professionals.find(p => p.id === selectedAppointment.nutritionist_id)?.full_name || 'Não definido'}
                     </p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Nutricionista</p>
+                    <p className="text-[10px] text-slate-700 mt-0.5">Nutricionista</p>
                   </div>
                 </div>
               </div>
 
-              {/* Action: Toggle Status */}
-              <div className="space-y-2 border-t border-slate-100 pt-5">
-                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Alterar Status</h4>
+              {/* Reschedule History (Auditoria) */}
+              <div className="space-y-2.5 border-t border-slate-150 pt-5">
+                <h4 className="text-xs font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  Histórico de Reagendamento
+                </h4>
+                
+                {loadingReschedules ? (
+                  <div className="flex items-center justify-center py-4 text-slate-600 text-xs gap-1.5">
+                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-primary-500 border-t-transparent" />
+                    Carregando histórico...
+                  </div>
+                ) : reschedules.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">Sem reagendamentos registrados para esta consulta.</p>
+                ) : (
+                  <div className="space-y-3 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                    {reschedules.map((r) => (
+                      <div key={r.id} className="bg-slate-50/70 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 relative">
+                        <div className="flex items-center justify-between text-[10px] text-slate-600">
+                          <span className="font-bold text-slate-700 truncate max-w-[150px]">
+                            {r.profiles?.full_name || 'Usuário'}
+                          </span>
+                          <span>
+                            {format(new Date(r.created_at), 'dd/MM/yyyy HH:mm')}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-800 bg-white border border-slate-200 p-2 rounded-lg italic font-medium leading-relaxed">
+                          "{r.reason}"
+                        </p>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-700 bg-slate-100/80 px-2 py-1 rounded w-fit font-semibold">
+                          <span>De: {format(new Date(r.old_date_time), 'dd/MM/yy HH:mm')}</span>
+                          <ChevronRightIcon className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="text-primary-700 font-extrabold">Para: {format(new Date(r.new_date_time), 'dd/MM/yy HH:mm')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+               {/* Action: Toggle Status */}
+              <div className="space-y-2 border-t border-slate-150 pt-5">
+                <h4 className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Alterar Status</h4>
                 
                 {(selectedAppointment.status === 'confirmado' || selectedAppointment.status === 'cancelado') ? (
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-start gap-2.5">
-                    <Info className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
-                    <p className="text-xs font-semibold text-slate-500 leading-relaxed">
-                      Consultas com status <strong className="capitalize text-slate-700">{selectedAppointment.status}</strong> não podem ser alteradas, somente excluídas permanentemente.
+                    <Info className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                    <p className="text-xs font-semibold text-slate-700 leading-relaxed">
+                      Consultas com status <strong className="capitalize text-slate-850">{selectedAppointment.status}</strong> não podem ser alteradas, somente excluídas permanentemente.
                     </p>
                   </div>
                 ) : (

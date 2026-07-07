@@ -714,7 +714,7 @@ ${insights}`;
                   placeholder="Buscar paciente..."
                   value={patientSearchTerm}
                   onChange={e => setPatientSearchTerm(e.target.value)}
-                  className="w-full bg-slate-50 pl-11 pr-4 py-2 border border-slate-200 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 rounded-lg text-sm font-semibold text-slate-700 shadow-sm transition-all"
+                  className="w-full bg-slate-50 pl-12 pr-4 py-2 border border-slate-200 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 rounded-lg text-sm font-semibold text-slate-700 shadow-sm transition-all"
                 />
               </div>
             </div>

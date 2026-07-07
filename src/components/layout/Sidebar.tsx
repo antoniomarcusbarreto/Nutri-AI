@@ -22,7 +22,7 @@ export const Sidebar: React.FC = () => {
     { name: 'Exames', href: '/exames', icon: ClipboardList, roles: ['owner', 'nutritionist'] },
     { name: 'Financeiro', href: '/financeiro', icon: DollarSign },
     { name: 'Pacientes', href: '/pacientes', icon: Users },
-    { name: 'Planos Alimentares', href: '/planos', icon: Apple },
+    { name: 'Planos Alimentares', href: '/planos', icon: Apple, roles: ['owner', 'nutritionist'] },
   ];
 
   const classNames = (...classes: string[]) => {
@@ -87,7 +87,7 @@ export const Sidebar: React.FC = () => {
   const theme = getSidebarTheme();
 
   return (
-    <div className={`flex h-full w-64 flex-col ${theme.container} transition-colors duration-200`}>
+    <div className={`flex h-full w-64 flex-col ${theme.container} transition-colors duration-200 print:!hidden`}>
       <div className={`flex h-16 shrink-0 items-center px-6 ${theme.border}`}>
         <Apple className={`h-8 w-8 ${theme.logoIcon}`} />
         <span className={`ml-3 text-xl font-semibold ${theme.logoText} tracking-tight`}>NutriAI</span>

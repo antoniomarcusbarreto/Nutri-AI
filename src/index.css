@@ -12,13 +12,10 @@
   --color-primary-700: #0f766e;
   --color-primary-800: #115e59;
   --color-primary-900: #134e4a;
-  
-  /* Adiciona suporte para classes intermediárias teal customizadas usadas no sistema */
   --color-teal-150: #b2f5ea;
   --color-teal-650: #0b8277;
-  
-  --font-sans: 'Inter', 'Roboto', sans-serif;
-  --font-internal: 'Inter', 'Plus Jakarta Sans', var(--font-sans);
+  --font-sans: "Inter", "Roboto", sans-serif;
+  --font-internal: "Inter", "Plus Jakarta Sans", var(--font-sans);
 }
 
 /* 🟢 Upgrade de Tipografia e Renderização no Painel Interno (Main, Modais, Cards, Tabelas, Alertas/Toasts) */
@@ -263,6 +260,13 @@ main textarea,
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; /* shadow-sm */
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
 }
+
+main input.pl-12,
+.modal input.pl-12,
+[role="dialog"] input.pl-12 {
+  padding-left: 3rem !important;
+}
+
 
 main input:focus,
 main select:focus,
@@ -581,3 +585,18 @@ html[data-theme="blue"] {
   border-color: #333333 !important;
 }
 
+.recharts-wrapper, .recharts-surface, .recharts-responsive-container, [tabindex] { outline: none !important; border: none !important; }
+
+@media print {
+  @page {
+    margin: 0 !important;
+  }
+  html, body, #root, #root > div, main {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: white !important;
+    height: auto !important;
+    overflow: visible !important;
+    min-height: auto !important;
+  }
+}

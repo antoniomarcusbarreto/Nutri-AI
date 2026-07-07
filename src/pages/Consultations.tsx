@@ -81,6 +81,7 @@ export const Consultations: React.FC = () => {
   // Data loading state
   const [appointments, setAppointments] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [professionals, setProfessionals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [optimizingAI, setOptimizingAI] = useState(false);
@@ -326,9 +327,42 @@ export const Consultations: React.FC = () => {
     }
   };
 
-  // Fetch patient history when selectedAppointment changes
-  const fetchPatientHistory = async (patientId: string) => {
-    if (!clinic?.id || !patientId) return;
+  // Fetch professionals for listing and validation
+  const fetchProfessionals = async () => {
+    if (!clinic?.id) return;
+    try {
+      const { data: members, error: membersError } = await supabase
+        .from('clinic_members')
+        .select('user_id, role')
+        .eq('clinic_id', clinic.id);
+        
+      if (!membersError && members) {
+        const userIds = members.map(m => m.user_id).filter(Boolean);
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, is_active')
+            .in('id', userIds);
+            
+          if (profiles) {
+            const mappedProfessionals = profiles.map(p => {
+              const member = members.find(m => m.user_id === p.id);
+              return {
+                ...p,
+                role: member?.role || 'nutritionist'
+              };
+            }).filter(p => p.is_active !== false);
+            setProfessionals(mappedProfessionals);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao carregar profissionais:', err);
+    }
+  };
+
+  const fetchPatientHistory = async (selectedPacienteId: string) => {
+    if (!clinic?.id || !selectedPacienteId) return;
     setLoadingHistory(true);
     try {
       const { data, error } = await supabase
@@ -339,12 +373,15 @@ export const Consultations: React.FC = () => {
           anthropometry_json,
           created_at,
           appointment_id,
-          appointments (
+          appointments!inner (
+            status,
             date_time,
             services ( name )
           )
         `)
-        .eq('patient_id', patientId)
+        .eq('patient_id', selectedPacienteId)
+        .neq('appointments.status', 'Cancelado')
+        .neq('appointments.status', 'cancelado')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -732,6 +769,7 @@ ${insights}`;
     if (clinic?.id) {
       fetchAppointments();
       fetchServices();
+      fetchProfessionals();
     }
   }, [clinic?.id]);
 
@@ -786,15 +824,66 @@ ${insights}`;
       setSelectedExamSignedUrl(null);
       fetchPatientExams(selectedAppointment.patients.id);
       
-      // Reset Form fields
-      setAnamneseNotes('');
-      setWeight('');
-      setHeight('');
-      setBodyFat('');
-      setMuscleMass('');
+      // Load draft from localStorage or reset if not found
+      const patientId = selectedAppointment.patient_id || selectedAppointment.patients.id;
+      const draftKey = `nutriai_draft_consulta_${patientId}`;
+      const draftStr = localStorage.getItem(draftKey);
+      if (selectedAppointment.status === 'concluido') {
+        const loadSavedConsultation = async () => {
+          try {
+            const { data, error } = await supabase
+              .from('consultations')
+              .select('*')
+              .eq('appointment_id', selectedAppointment.id)
+              .maybeSingle();
+            
+            if (error) throw error;
+            if (data) {
+              setAnamneseNotes(data.anamnese_notes || '');
+              const ant = data.anthropometry_json || {};
+              setWeight(ant.weight !== null ? String(ant.weight) : '');
+              setHeight(ant.height !== null ? String(ant.height) : '');
+              setBodyFat(ant.body_fat !== null ? String(ant.body_fat) : '');
+              setMuscleMass(ant.muscle_mass !== null ? String(ant.muscle_mass) : '');
+            } else {
+              setAnamneseNotes('');
+              setWeight('');
+              setHeight('');
+              setBodyFat('');
+              setMuscleMass('');
+            }
+          } catch (err) {
+            console.error('Erro ao buscar consulta concluída:', err);
+          }
+        };
+        loadSavedConsultation();
+      } else if (draftStr) {
+        try {
+          const draft = JSON.parse(draftStr);
+          setAnamneseNotes(draft.anamneseNotes || '');
+          setWeight(draft.weight || '');
+          setHeight(draft.height || '');
+          setBodyFat(draft.bodyFat || '');
+          setMuscleMass(draft.muscleMass || '');
+        } catch (e) {
+          console.error('Erro ao recuperar rascunho:', e);
+          setAnamneseNotes('');
+          setWeight('');
+          setHeight('');
+          setBodyFat('');
+          setMuscleMass('');
+        }
+      } else {
+        setAnamneseNotes('');
+        setWeight('');
+        setHeight('');
+        setBodyFat('');
+        setMuscleMass('');
+      }
+
       setActiveTab('profile');
       setIsEditingClinical(false);
-
+      
       // Populate Clinical Form State from selected patient
       const p = selectedAppointment.patients;
       setClinicalForm({
@@ -808,6 +897,27 @@ ${insights}`;
       });
     }
   }, [selectedAppointment]);
+
+  // Auto-Save Draft logic (Salvar ao digitar)
+  useEffect(() => {
+    const patientId = selectedAppointment?.patient_id || selectedAppointment?.patients?.id;
+    if (!patientId) return;
+
+    const draftKey = `nutriai_draft_consulta_${patientId}`;
+    
+    if (!anamneseNotes && !weight && !height && !bodyFat && !muscleMass) {
+      localStorage.removeItem(draftKey);
+    } else {
+      const draftObj = {
+        anamneseNotes,
+        weight,
+        height,
+        bodyFat,
+        muscleMass
+      };
+      localStorage.setItem(draftKey, JSON.stringify(draftObj));
+    }
+  }, [anamneseNotes, weight, height, bodyFat, muscleMass, selectedAppointment]);
 
   // Audio recording mic waves simulation and volume monitoring
   const startVolumeAnalysis = async () => {
@@ -1044,6 +1154,12 @@ ${insights}`;
 
       showToast('Atendimento finalizado e prontuário registrado com sucesso!', 'success');
       
+      // Clean draft from localStorage on success
+      const patientId = selectedAppointment.patient_id || selectedAppointment.patients?.id;
+      if (patientId) {
+        localStorage.removeItem(`nutriai_draft_consulta_${patientId}`);
+      }
+
       // Refresh local appointment states
       await fetchAppointments();
       
@@ -1442,13 +1558,13 @@ ${metas_pactuadas.length > 0
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Busca de Paciente</label>
                 <div className="relative">
-                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Buscar por nome..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full bg-slate-50 pl-10 pr-4 py-2.5 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-xl text-xs font-normal text-slate-700 shadow-sm transition-all"
+                    className="w-full bg-slate-50 pl-12 pr-4 py-2.5 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-xl text-xs font-normal text-slate-700 shadow-sm transition-all"
                   />
                 </div>
               </div>
@@ -1519,12 +1635,22 @@ ${metas_pactuadas.length > 0
                   {filteredAppointments.map(apt => {
                     const timeStr = format(new Date(apt.date_time), 'HH:mm');
                     const initials = apt.patients?.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+                    const prof = professionals.find(p => p.id === apt.nutritionist_id);
+                    const isResponsible = profile?.id === apt.nutritionist_id;
 
                     return (
                       <div
                         key={apt.id}
-                        onClick={() => setSelectedAppointment(apt)}
-                        className="group bg-white border border-slate-200/80 hover:border-primary-400 hover:shadow-md rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer flex flex-col justify-between h-56 relative overflow-hidden"
+                        onClick={() => {
+                          if (apt.status !== 'concluido' && !isResponsible) {
+                            showToast('Apenas o profissional responsável por esta consulta pode iniciá-la.', 'error');
+                            return;
+                          }
+                          setSelectedAppointment(apt);
+                        }}
+                        className={`group bg-white border border-slate-200/80 hover:border-primary-400 hover:shadow-md rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer flex flex-col justify-between h-60 relative overflow-hidden ${
+                          apt.status !== 'concluido' && !isResponsible ? 'opacity-85' : ''
+                        }`}
                       >
                         {/* Left indicator accent color */}
                         <div className={`absolute top-0 bottom-0 left-0 w-1.5 rounded-l-2xl transition-colors ${
@@ -1555,6 +1681,9 @@ ${metas_pactuadas.length > 0
                             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 truncate">
                               {apt.services?.name || 'Consulta Geral'}
                             </p>
+                            <p className="text-[10px] text-slate-500 font-semibold mt-1 truncate">
+                              <span className="font-bold text-slate-400">Nutri:</span> {prof?.full_name || 'Profissional'}
+                            </p>
                           </div>
                         </div>
 
@@ -1564,9 +1693,19 @@ ${metas_pactuadas.length > 0
                             Objetivo: <span className="text-slate-600 truncate max-w-[120px] inline-block align-bottom">{apt.patients?.main_goal || 'Não informado'}</span>
                           </span>
                           
-                          <span className="text-[11px] font-extrabold text-primary-600 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                            Iniciar <ArrowRight className="w-3.5 h-3.5" />
-                          </span>
+                          {apt.status === 'concluido' ? (
+                            <span className="text-[11px] font-extrabold text-emerald-600 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                              Visualizar <ArrowRight className="w-3.5 h-3.5" />
+                            </span>
+                          ) : isResponsible ? (
+                            <span className="text-[11px] font-extrabold text-primary-600 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                              Iniciar <ArrowRight className="w-3.5 h-3.5" />
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-0.5 cursor-not-allowed" title="Apenas o profissional responsável pode iniciar esta consulta">
+                              Restrito
+                            </span>
+                          )}
                         </div>
 
                       </div>
@@ -2100,10 +2239,7 @@ ${metas_pactuadas.length > 0
                 ) : pastConsultations.length === 0 ? (
                   <div className="bg-white border border-slate-200 rounded-2xl p-10 shadow-sm text-center flex flex-col items-center justify-center">
                     <History className="h-12 w-12 text-slate-300 mx-auto mb-3 stroke-[1.2]" />
-                    <h4 className="text-sm font-bold text-slate-800">Sem registros clínicos anteriores</h4>
-                    <p className="text-xs text-slate-500 mt-2 max-w-sm">
-                      Este paciente ainda não possui prontuários registrados nesta clínica. A primeira consulta clínica será o ponto inicial para acompanhamentos.
-                    </p>
+                    <h4 className="text-sm font-bold text-slate-800">Nenhum atendimento clínico registrado para este paciente.</h4>
                     <button
                       onClick={() => setActiveTab('form')}
                       className="mt-4 bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow transition-colors"
@@ -2212,6 +2348,7 @@ ${metas_pactuadas.length > 0
                         placeholder="ex: 75.5"
                         value={weight}
                         onChange={e => setWeight(e.target.value)}
+                        disabled={selectedAppointment.status === 'concluido'}
                         className="block w-full rounded-xl border border-slate-200 focus:border-primary-500 focus:ring-primary-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
                       />
                     </div>
@@ -2224,6 +2361,7 @@ ${metas_pactuadas.length > 0
                         placeholder="ex: 1.78"
                         value={height}
                         onChange={e => setHeight(e.target.value)}
+                        disabled={selectedAppointment.status === 'concluido'}
                         className="block w-full rounded-xl border border-slate-200 focus:border-primary-500 focus:ring-primary-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
                       />
                     </div>
@@ -2236,6 +2374,7 @@ ${metas_pactuadas.length > 0
                         placeholder="ex: 18.4"
                         value={bodyFat}
                         onChange={e => setBodyFat(e.target.value)}
+                        disabled={selectedAppointment.status === 'concluido'}
                         className="block w-full rounded-xl border border-slate-200 focus:border-primary-500 focus:ring-primary-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
                       />
                     </div>
@@ -2248,6 +2387,7 @@ ${metas_pactuadas.length > 0
                         placeholder="ex: 35.2"
                         value={muscleMass}
                         onChange={e => setMuscleMass(e.target.value)}
+                        disabled={selectedAppointment.status === 'concluido'}
                         className="block w-full rounded-xl border border-slate-200 focus:border-primary-500 focus:ring-primary-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
                       />
                     </div>
@@ -2270,89 +2410,91 @@ ${metas_pactuadas.length > 0
                     </div>
                   </div>
 
-                  <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-sm flex flex-col sm:flex-row items-center gap-5 justify-between relative overflow-hidden">
-                    {isRecording && (
-                      <div className="absolute inset-0 bg-red-950/20 opacity-40 animate-pulse z-0 pointer-events-none" />
-                    )}
-                    
-                    <div className="flex items-center gap-4 z-10 text-center sm:text-left flex-col sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={toggleRecording}
-                        className={`h-16 w-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ${
-                          isRecording 
-                            ? 'bg-red-600 hover:bg-red-500 ring-4 ring-red-500/30 ring-offset-4 ring-offset-slate-900 scale-105 animate-pulse' 
-                            : 'bg-gradient-to-tr from-primary-600 to-indigo-500 hover:from-primary-500 hover:to-indigo-400'
-                        }`}
-                        title={isRecording ? 'Pausar gravação' : 'Iniciar gravação'}
-                      >
-                        {isRecording ? (
-                          <MicOff className="h-6 w-6 text-white stroke-[2]" />
-                        ) : (
-                          <Mic className="h-6 w-6 text-white stroke-[2]" />
-                        )}
-                      </button>
+                  {selectedAppointment.status !== 'concluido' && (
+                    <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-sm flex flex-col sm:flex-row items-center gap-5 justify-between relative overflow-hidden">
+                      {isRecording && (
+                        <div className="absolute inset-0 bg-red-950/20 opacity-40 animate-pulse z-0 pointer-events-none" />
+                      )}
                       
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 justify-center sm:justify-start">
-                          <Volume2 className={`w-4 h-4 ${isRecording ? 'text-red-400 animate-bounce' : 'text-slate-400'}`} />
-                          {isRecording ? 'Ouvindo o atendimento...' : 'Registrar com Áudio'}
-                        </h4>
-                        <p className="text-[11px] text-slate-300 mt-1 max-w-sm leading-relaxed">
-                          {isRecording 
-                            ? 'Fale normalmente. As palavras ditadas são adicionadas instantaneamente abaixo.' 
-                            : 'Escreva livremente ou utilize nosso gravador de voz para ditar a anamnese do paciente.'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto z-10">
-                      <div className="flex items-center bg-slate-800/80 px-2 py-1.5 rounded-xl border border-slate-700/60 justify-between gap-3">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider pl-1">Inserir:</span>
-                        <div className="flex p-0.5 bg-slate-900 rounded-lg">
-                          <button
-                            type="button"
-                            onClick={() => setRecordingMode('append')}
-                            className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all ${
-                              recordingMode === 'append' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            Anexar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRecordingMode('replace')}
-                            className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all ${
-                              recordingMode === 'replace' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            Substituir
-                          </button>
+                      <div className="flex items-center gap-4 z-10 text-center sm:text-left flex-col sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={toggleRecording}
+                          className={`h-16 w-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ${
+                            isRecording 
+                              ? 'bg-red-600 hover:bg-red-500 ring-4 ring-red-500/30 ring-offset-4 ring-offset-slate-900 scale-105 animate-pulse' 
+                              : 'bg-gradient-to-tr from-primary-600 to-indigo-500 hover:from-primary-500 hover:to-indigo-400'
+                          }`}
+                          title={isRecording ? 'Pausar gravação' : 'Iniciar gravação'}
+                        >
+                          {isRecording ? (
+                            <MicOff className="h-6 w-6 text-white stroke-[2]" />
+                          ) : (
+                            <Mic className="h-6 w-6 text-white stroke-[2]" />
+                          )}
+                        </button>
+                        
+                        <div>
+                          <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 justify-center sm:justify-start">
+                            <Volume2 className={`w-4 h-4 ${isRecording ? 'text-red-400 animate-bounce' : 'text-slate-400'}`} />
+                            {isRecording ? 'Ouvindo o atendimento...' : 'Registrar com Áudio'}
+                          </h4>
+                          <p className="text-[11px] text-slate-300 mt-1 max-w-sm leading-relaxed">
+                            {isRecording 
+                              ? 'Fale normalmente. As palavras ditadas são adicionadas instantaneamente abaixo.' 
+                              : 'Escreva livremente ou utilize nosso gravador de voz para ditar a anamnese do paciente.'}
+                          </p>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={handleOptimizeAI}
-                        disabled={optimizingAI}
-                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-[10px] px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow disabled:opacity-60"
-                      >
-                        {optimizingAI ? (
-                          <>
-                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-primary-400 border-t-transparent" />
-                            Processando...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-3.5 h-3.5 text-primary-400" />
-                            Estruturar Anotações (IA)
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                      <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto z-10">
+                        <div className="flex items-center bg-slate-800/80 px-2 py-1.5 rounded-xl border border-slate-700/60 justify-between gap-3">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider pl-1">Inserir:</span>
+                          <div className="flex p-0.5 bg-slate-900 rounded-lg">
+                            <button
+                              type="button"
+                              onClick={() => setRecordingMode('append')}
+                              className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all ${
+                                recordingMode === 'append' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              Anexar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRecordingMode('replace')}
+                              className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all ${
+                                recordingMode === 'replace' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              Substituir
+                            </button>
+                          </div>
+                        </div>
 
-                  {isRecording && (
+                        <button
+                          type="button"
+                          onClick={handleOptimizeAI}
+                          disabled={optimizingAI}
+                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-[10px] px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow disabled:opacity-60"
+                        >
+                          {optimizingAI ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-primary-400 border-t-transparent" />
+                              Processando...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5 text-primary-400" />
+                              Estruturar Anotações (IA)
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isRecording && selectedAppointment.status !== 'concluido' && (
                     <div className="bg-slate-900/5 px-4 py-2 border border-slate-100 rounded-xl flex items-center justify-between gap-3 animate-in fade-in duration-300">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                         <Activity className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Nível de Voz
@@ -2383,7 +2525,8 @@ ${metas_pactuadas.length > 0
                       required
                       value={anamneseNotes}
                       onChange={e => setAnamneseNotes(e.target.value)}
-                      placeholder="Digite aqui ou ative a gravação de áudio no painel acima..."
+                      placeholder={selectedAppointment.status === 'concluido' ? 'Nenhuma nota registrada nesta consulta.' : 'Digite aqui ou ative a gravação de áudio no painel acima...'}
+                      disabled={selectedAppointment.status === 'concluido'}
                       className="block w-full rounded-xl border border-slate-300 px-5 py-4 text-base focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 font-normal leading-relaxed shadow-sm bg-slate-50/10 focus:bg-white transition-colors"
                     />
                   </div>
@@ -2394,40 +2537,46 @@ ${metas_pactuadas.length > 0
                   <div className="flex items-start gap-2.5 text-left">
                     <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                     <p className="text-[10px] text-slate-400 max-w-sm leading-relaxed">
-                      Ao finalizar, as anotações e medições físicas serão inseridas no prontuário definitivo deste paciente e o status deste agendamento passará para <strong>Concluído</strong>.
+                      {selectedAppointment.status === 'concluido' ? (
+                        <span>Este atendimento já foi finalizado e os dados do prontuário estão salvos de forma definitiva.</span>
+                      ) : (
+                        <span>Ao finalizar, as anotações e medições físicas serão inseridas no prontuário definitivo deste paciente e o status deste agendamento passará para <strong>Concluído</strong>.</span>
+                      )}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAnamneseNotes('');
-                        setWeight('');
-                        setHeight('');
-                        setBodyFat('');
-                        setMuscleMass('');
-                      }}
-                      className="px-4 py-2.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm transition-colors flex items-center gap-1.5"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" /> Limpar Campos
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={saving || isReadOnly}
-                      className="px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {saving ? (
-                        <>
-                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" /> Finalizando...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4" /> Finalizar Consulta
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  {selectedAppointment.status !== 'concluido' && (
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAnamneseNotes('');
+                          setWeight('');
+                          setHeight('');
+                          setBodyFat('');
+                          setMuscleMass('');
+                        }}
+                        className="px-4 py-2.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm transition-colors flex items-center gap-1.5"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Limpar Campos
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={saving || isReadOnly}
+                        className="px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {saving ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" /> Finalizando...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" /> Finalizar Consulta
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
               </form>

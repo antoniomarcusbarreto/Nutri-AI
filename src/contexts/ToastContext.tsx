@@ -34,7 +34,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 font-sans">
+        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 font-sans print:!hidden">
           <div className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl border ${
             toast.type === 'success' 
               ? 'bg-emerald-50 border-emerald-250 text-emerald-800' 

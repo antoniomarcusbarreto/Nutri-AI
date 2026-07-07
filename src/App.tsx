@@ -18,6 +18,7 @@ import { Financial } from './pages/Financial';
 import { Consultations } from './pages/Consultations';
 import { Tracking } from './pages/Tracking';
 import { MealPlans } from './pages/MealPlans';
+import PublicPlanViewer from './pages/PublicPlanViewer';
 
 import { PatientPortal } from './pages/PatientPortal';
 import { PreConsulta } from './pages/PreConsulta';
@@ -34,6 +35,7 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/ficha/:token" element={<PreConsulta />} />
+          <Route path="/plano/:id" element={<PublicPlanViewer />} />
           <Route path="/confirmar/:appointmentId" element={<ConfirmAppointment />} />
           <Route path="/login" element={<Login />} />
           <Route path="/termos" element={<TermsOfService />} />
