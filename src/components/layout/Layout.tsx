@@ -2,9 +2,10 @@ import React, { useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { uploadAvatar } from '../../lib/storage';
 
 import { useToast } from '../../contexts/ToastContext';
+import { logger } from '../../lib/logger';
 
 export const Layout: React.FC = () => {
   const { profile, updateProfile } = useAuth();
@@ -19,23 +20,13 @@ export const Layout: React.FC = () => {
         return;
       }
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${profile.id}-${Math.random()}.${fileExt}`;
-
       setIsUploading(true);
 
-      const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      
-      await updateProfile({ avatar_url: data.publicUrl });
+      const publicUrl = await uploadAvatar(profile.id, file);
+      await updateProfile({ avatar_url: publicUrl });
       showToast('Foto de perfil atualizada com sucesso!', 'success');
     } catch (error) {
-      console.error('Erro ao fazer upload da imagem:', error);
+      logger.error('Erro ao fazer upload da imagem:', error);
       showToast('Erro ao atualizar foto de perfil.', 'error');
     } finally {
       setIsUploading(false);

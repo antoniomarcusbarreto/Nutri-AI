@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { uploadAvatar } from '../lib/storage';
 import { Building2, Users, ClipboardList, CheckCircle2, User, Apple, Upload } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
+import { logger } from '../lib/logger';
 
 export const Onboarding: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -138,19 +140,11 @@ export const Onboarding: React.FC = () => {
       let finalAvatarUrl = profileData.avatar_url;
 
       if (avatarFile) {
-        const fileExt = avatarFile.name.split('.').pop();
-        const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, avatarFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
-        finalAvatarUrl = data.publicUrl;
+        finalAvatarUrl = await uploadAvatar(session.user.id, avatarFile);
       }
 
+      // is_active não é definido aqui: usa o default da coluna (true) e só muda
+      // via RPC (ver migration 0018 / SEC-01).
       const { error } = await supabase.from('profiles').upsert({
         id: session.user.id,
         full_name: profileData.full_name || 'Usuário',
@@ -158,13 +152,12 @@ export const Onboarding: React.FC = () => {
         phone: profileData.phone,
         crn: profileData.crn,
         avatar_url: finalAvatarUrl,
-        is_active: true
       });
 
       if (error) throw error;
       setStep(2);
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       showToast('Erro ao salvar perfil.', 'error');
     } finally {
       setLoading(false);
@@ -221,7 +214,7 @@ export const Onboarding: React.FC = () => {
       }
       setStep(3);
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       showToast('Erro ao salvar dados da clínica.', 'error');
     } finally {
       setLoading(false);
@@ -267,7 +260,7 @@ export const Onboarding: React.FC = () => {
       if (error) throw error;
       setStep(4);
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       showToast('Erro ao enviar convites.', 'error');
     } finally {
       setLoading(false);
@@ -315,7 +308,7 @@ export const Onboarding: React.FC = () => {
       if (error) throw error;
       window.location.href = '/dashboard';
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       showToast('Erro ao salvar serviços.', 'error');
     } finally {
       setLoading(false);

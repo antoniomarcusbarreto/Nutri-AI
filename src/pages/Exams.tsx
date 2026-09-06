@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, 
   User, 
-  UploadCloud, 
-  Trash2, 
-  Eye, 
+  UploadCloud,
+  Eye,
   Copy, 
-  Sparkles, 
-  Check, 
-  ArrowLeft, 
+  Sparkles,
+  ArrowLeft,
   ClipboardList, 
   ShieldAlert,
   Columns,
@@ -17,29 +15,37 @@ import {
   ChevronRight,
   ZoomIn,
   ZoomOut,
-  Type,
-  MessageSquare
+  Type
 } from 'lucide-react';
 import { format, parseISO, differenceInYears } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { getCanonicalBiomarkerName } from '../utils/biomarkers';
+import { applyBiomarkerNote } from '../utils/biomarkers';
+import { usePatients } from '../hooks/queries/usePatients';
+import { usePatientExams, useExamCache } from '../hooks/queries/usePatientExams';
+import { analyzeExamPdf, blobToBase64, GeminiError } from '../lib/gemini';
+import { createExamSignedUrl, uploadExamFile, removeExamFile } from '../lib/storage';
+import { AiAnalysisPanel } from '../components/exams/AiAnalysisPanel';
+import { ExamHistoryList } from '../components/exams/ExamHistoryList';
+import { logger } from '../lib/logger';
+import type { ExamBiomarker, ExamRecord, PatientRow } from '../types/clinical';
+
+const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
 export const Exams: React.FC = () => {
   const { clinic, isReadOnly, profile, userRole } = useAuth();
   const { showToast } = useToast();
 
+  // Security Check: allowed only for nutritionists/owners
+  const isAuthorized = userRole === 'owner' || userRole === 'nutritionist';
+
   // Search & Navigation States
-  const [patients, setPatients] = useState<any[]>([]);
-  const [loadingPatients, setLoadingPatients] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<PatientRow | null>(null);
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
 
   // Lab Exams States
-  const [exams, setExams] = useState<any[]>([]);
-  const [loadingExams, setLoadingExams] = useState(false);
-  const [selectedExam, setSelectedExam] = useState<any | null>(null);
+  const [selectedExam, setSelectedExam] = useState<ExamRecord | null>(null);
   const [uploadingExam, setUploadingExam] = useState(false);
   const [analyzingExam, setAnalyzingExam] = useState(false);
   const [selectedExamSignedUrl, setSelectedExamSignedUrl] = useState<string | null>(null);
@@ -50,261 +56,67 @@ export const Exams: React.FC = () => {
   const [workspaceLayout, setWorkspaceLayout] = useState<'split' | 'pdf-focus' | 'ai-focus'>('split');
   const [pdfZoom, setPdfZoom] = useState(100); // 75, 100, 125, 150
   const [aiTextSize, setAiTextSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base');
-  const [examToDelete, setExamToDelete] = useState<any | null>(null);
+  const [examToDelete, setExamToDelete] = useState<ExamRecord | null>(null);
 
-  // Estados locais para controle de cache e isolamento de exames
-  const [alteracoesCriticas, setAlteracoesCriticas] = useState<any[] | null>(null);
-  const [parecerClinico, setParecerClinico] = useState<string | null>(null);
-  const [biomarcadores, setBiomarcadores] = useState<any[] | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
+  // Dados via TanStack Query (Onda 4): lista de pacientes e exames com ai_feedback.
+  const { data: patients = [], isLoading: loadingPatients } = usePatients(clinic?.id, { enabled: isAuthorized });
+  const { data: exams = [], isLoading: loadingExams } = usePatientExams(selectedPatient?.id);
+  const { upsertExam, removeExam, invalidate: invalidateExams } = useExamCache(selectedPatient?.id);
 
-  // Observações e Anotações Clínicas
-  const [activeNoteEditIndex, setActiveNoteEditIndex] = useState<number | null>(null);
-  const [tempNoteText, setTempNoteText] = useState<string>('');
+  // ai_feedback já vem em `exams` — parecer/alertas/biomarcadores são DERIVADOS
+  // do exame selecionado (PERF-04: sem useEffect que rebusca esse campo).
+  const alteracoesCriticas: ExamBiomarker[] | null = selectedExam?.ai_feedback?.alertas ?? null;
+  const parecerClinico: string | null = selectedExam?.ai_feedback?.insights ?? null;
 
-  // Security Check: allowed only for nutritionists/owners
-  const isAuthorized = userRole === 'owner' || userRole === 'nutritionist';
-
-  // Helper Functions for Clinical Evolution and Note Processing
-  const parseNumericValue = (valStr: string) => {
-    if (!valStr) return { numeric: null, unit: '' };
-    const cleanStr = valStr.trim();
-    const numMatch = cleanStr.match(/(-?[0-9]+([.,][0-9]+)?)/);
-    if (!numMatch) return { numeric: null, unit: '' };
-    const numeric = parseFloat(numMatch[1].replace(',', '.'));
-    const unit = cleanStr.replace(numMatch[1], '').trim();
-    return { numeric, unit };
-  };
-
-  const getPreviousExamBiomarker = (currentExam: any, marcador: string) => {
-    if (!exams || exams.length <= 1 || !currentExam) return null;
-    
-    const currentExamDate = new Date(currentExam.exam_date || currentExam.created_at);
-    
-    const olderExams = exams
-      .filter((e: any) => e.id !== currentExam.id)
-      .filter((e: any) => {
-        const eDate = new Date(e.exam_date || e.created_at);
-        return eDate < currentExamDate;
-      })
-      .sort((a: any, b: any) => {
-        const aDate = new Date(a.exam_date || a.created_at);
-        const bDate = new Date(b.exam_date || b.created_at);
-        return bDate.getTime() - aDate.getTime();
-      });
-      
-    if (olderExams.length === 0) return null;
-    
-    const prevExam = olderExams[0];
-    if (!prevExam.ai_feedback?.todos_biomarcadores) return null;
-    
-    return prevExam.ai_feedback.todos_biomarcadores.find(
-      (b: any) => getCanonicalBiomarkerName(b.marcador).toLowerCase() === getCanonicalBiomarkerName(marcador).toLowerCase()
-    );
-  };
-
-  const getEvolutionIndicator = (currentValStr: string, prevValStr: string) => {
-    const current = parseNumericValue(currentValStr);
-    const prev = parseNumericValue(prevValStr);
-    
-    if (current.numeric === null || prev.numeric === null) {
-      return { text: '—', color: 'text-slate-400', diffStr: '' };
-    }
-    
-    const diff = current.numeric - prev.numeric;
-    const absDiff = Math.abs(diff).toFixed(1);
-    
-    if (diff > 0.05) {
-      return {
-        text: '↗',
-        color: 'text-rose-600 font-semibold',
-        diffStr: `+${absDiff} ${current.unit || ''}`
-      };
-    } else if (diff < -0.05) {
-      return {
-        text: '↘',
-        color: 'text-emerald-600 font-semibold',
-        diffStr: `-${absDiff} ${current.unit || ''}`
-      };
-    } else {
-      return {
-        text: '→',
-        color: 'text-slate-500 font-semibold',
-        diffStr: 'Estável'
-      };
-    }
-  };
-
-  const handleSaveBiomarkerNote = async (idx: number) => {
-    if (!selectedExam || !biomarcadores) return;
-    
-    const updatedBiomarkers = [...biomarcadores];
-    updatedBiomarkers[idx] = {
-      ...updatedBiomarkers[idx],
-      nota_clinica: tempNoteText.trim()
-    };
-    
-    const updatedAlerts = alteracoesCriticas ? [...alteracoesCriticas] : [];
-    const marcadorName = updatedBiomarkers[idx].marcador;
-    
-    const alertIdx = updatedAlerts.findIndex((a: any) => a.marcador === marcadorName);
-    if (alertIdx !== -1) {
-      updatedAlerts[alertIdx] = {
-        ...updatedAlerts[alertIdx],
-        nota_clinica: tempNoteText.trim()
-      };
-    }
-    
-    const updatedFeedback = {
-      alertas: updatedAlerts,
-      insights: parecerClinico || "",
-      todos_biomarcadores: updatedBiomarkers
-    };
-    
+  const handleSaveBiomarkerNote = async (idx: number, text: string) => {
+    if (!selectedExam) return;
+    const updatedFeedback = applyBiomarkerNote(selectedExam.ai_feedback ?? null, idx, text);
     try {
       const { error: dbError } = await supabase
         .from('patient_exams')
         .update({ ai_feedback: updatedFeedback })
         .eq('id', selectedExam.id);
-        
       if (dbError) throw dbError;
-      
-      setBiomarcadores(updatedBiomarkers);
-      setAlteracoesCriticas(updatedAlerts);
-      
-      const updatedExam = { ...selectedExam, ai_feedback: updatedFeedback };
+
+      const updatedExam: ExamRecord = { ...selectedExam, ai_feedback: updatedFeedback };
       setSelectedExam(updatedExam);
-      setExams(prev => prev.map(e => e.id === selectedExam.id ? updatedExam : e));
-      
-      setActiveNoteEditIndex(null);
-      setTempNoteText('');
+      upsertExam(updatedExam);
       showToast('Observação clínica salva com sucesso!', 'success');
-    } catch (err: any) {
-      console.error('Erro ao salvar nota do biomarcador:', err);
+    } catch (err) {
+      logger.error('Erro ao salvar nota do biomarcador:', err);
       showToast('Erro ao salvar observação clínica.', 'error');
     }
   };
 
-  // Fetch all patients of the clinic
-  const fetchPatients = async () => {
-    if (!clinic?.id) return;
-    setLoadingPatients(true);
-    try {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .eq('clinic_id', clinic.id)
-        .order('name');
-
-      if (error) throw error;
-      setPatients(data || []);
-    } catch (err: any) {
-      console.error('Erro ao buscar pacientes:', err);
-      showToast('Falha ao carregar lista de pacientes.', 'error');
-    } finally {
-      setLoadingPatients(false);
-    }
-  };
-
-  // Fetch patient exams history
-  const fetchPatientExams = async (patientId: string) => {
-    if (!patientId) return;
-    setLoadingExams(true);
-    try {
-      const { data, error } = await supabase
-        .from('patient_exams')
-        .select('*')
-        .eq('patient_id', patientId)
-        .order('exam_date', { ascending: false });
-
-      if (error) throw error;
-      setExams(data || []);
-    } catch (err: any) {
-      console.error('Erro ao buscar exames:', err);
-      showToast('Falha ao carregar histórico de exames.', 'error');
-    } finally {
-      setLoadingExams(false);
-    }
-  };
-
+  // Ao trocar de paciente, limpa a seleção de exame (a lista vem do cache).
   useEffect(() => {
-    if (clinic?.id && isAuthorized) {
-      fetchPatients();
-    }
-  }, [clinic?.id, userRole]);
+    setSelectedExam(null);
+    setSelectedExamSignedUrl(null);
+  }, [selectedPatient?.id]);
 
+  // Mantém `selectedExam` sincronizado com a versão em cache (após note/analyze).
   useEffect(() => {
-    if (selectedPatient?.id) {
-      setSelectedExam(null);
-      setSelectedExamSignedUrl(null);
-      fetchPatientExams(selectedPatient.id);
-    }
-  }, [selectedPatient]);
+    if (!selectedExam?.id) return;
+    const fresh = exams.find((e) => e.id === selectedExam.id);
+    if (fresh && fresh !== selectedExam) setSelectedExam(fresh);
+  }, [exams, selectedExam]);
 
-  useEffect(() => {
-    if (!selectedExam?.id) {
-      setAlteracoesCriticas(null);
-      setParecerClinico(null);
-      setBiomarcadores(null);
-      setLoadingDetails(false);
-      return;
-    }
+  const selectedExamIdRef = useRef<string | null>(null);
 
-    const fetchExamDetails = async () => {
-      setLoadingDetails(true);
-      try {
-        const { data, error } = await supabase
-          .from('patient_exams')
-          .select('ai_feedback')
-          .eq('id', selectedExam.id)
-          .single();
-
-        if (error) throw error;
-
-        const feedback = data?.ai_feedback;
-        if (feedback) {
-          setAlteracoesCriticas(feedback.alertas || []);
-          setParecerClinico(feedback.insights || "");
-          setBiomarcadores(feedback.todos_biomarcadores || []);
-        } else {
-          setAlteracoesCriticas(null);
-          setParecerClinico(null);
-          setBiomarcadores(null);
-        }
-      } catch (err: any) {
-        console.error('Erro ao buscar detalhes dinâmicos do exame:', err);
-        showToast('Erro ao carregar detalhes do exame.', 'error');
-        setAlteracoesCriticas(null);
-        setParecerClinico(null);
-        setBiomarcadores(null);
-      } finally {
-        setLoadingDetails(false);
-      }
-    };
-
-    fetchExamDetails();
-  }, [selectedExam?.id]);
-
-  const handleSelectExam = async (exam: any) => {
+  const handleSelectExam = async (exam: ExamRecord | null) => {
+    selectedExamIdRef.current = exam?.id ?? null;
     setSelectedExam(exam);
     setSelectedExamSignedUrl(null);
-    setAlteracoesCriticas(null);
-    setParecerClinico(null);
-    setBiomarcadores(null);
-    setLoadingDetails(exam ? true : false);
     if (!exam) return;
 
     try {
-      const { data, error } = await supabase.storage
-        .from('exams-bucket')
-        .createSignedUrl(exam.file_url, 60 * 60);
-
-      if (error) throw error;
-      if (data?.signedUrl) {
-        setSelectedExamSignedUrl(data.signedUrl);
+      const signedUrl = await createExamSignedUrl(exam.file_url);
+      // Guarda contra corrida: só aplica se este ainda é o exame ativo.
+      if (selectedExamIdRef.current === exam.id) {
+        setSelectedExamSignedUrl(signedUrl);
       }
-    } catch (err: any) {
-      console.error('Erro ao gerar URL assinada:', err);
+    } catch (err) {
+      logger.error('Erro ao gerar URL assinada:', err);
       showToast('Não foi possível carregar o arquivo do exame.', 'error');
     }
   };
@@ -324,14 +136,7 @@ export const Exams: React.FC = () => {
 
     try {
       const patientId = selectedPatient.id;
-      const fileNameClean = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const filePath = `${patientId}/${Date.now()}_${fileNameClean}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('exams-bucket')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
+      const { path: filePath } = await uploadExamFile(patientId, file);
 
       const { data: examData, error: insertError } = await supabase
         .from('patient_exams')
@@ -347,20 +152,20 @@ export const Exams: React.FC = () => {
       if (insertError) throw insertError;
 
       showToast('Exame enviado com sucesso!', 'success');
-      await fetchPatientExams(patientId);
-      
+      await invalidateExams();
+
       if (examData) {
         await handleSelectExam(examData);
       }
-    } catch (err: any) {
-      console.error('Erro ao enviar exame:', err);
-      showToast(err.message || 'Falha ao enviar arquivo do exame.', 'error');
+    } catch (err) {
+      logger.error('Erro ao enviar exame:', err);
+      showToast(errMessage(err) || 'Falha ao enviar arquivo do exame.', 'error');
     } finally {
       setUploadingExam(false);
     }
   };
 
-  const handleDeleteExam = (exam: any, e: React.MouseEvent) => {
+  const handleDeleteExam = (exam: ExamRecord, e: React.MouseEvent) => {
     e.stopPropagation();
     if (isReadOnly) {
       showToast('O sistema está em modo de somente leitura.', 'error');
@@ -375,11 +180,7 @@ export const Exams: React.FC = () => {
     setExamToDelete(null);
 
     try {
-      const { error: storageError } = await supabase.storage
-        .from('exams-bucket')
-        .remove([exam.file_url]);
-
-      if (storageError) console.warn('Erro ao remover arquivo do storage:', storageError);
+      await removeExamFile(exam.file_url);
 
       const { error: dbError } = await supabase
         .from('patient_exams')
@@ -391,13 +192,14 @@ export const Exams: React.FC = () => {
       showToast('Exame excluído com sucesso!', 'success');
       
       if (selectedExam?.id === exam.id) {
+        selectedExamIdRef.current = null;
         setSelectedExam(null);
         setSelectedExamSignedUrl(null);
       }
-      setExams(prev => prev.filter(e => e.id !== exam.id));
-    } catch (err: any) {
-      console.error('Erro ao excluir exame:', err);
-      showToast(err.message || 'Falha ao excluir o exame.', 'error');
+      removeExam(exam.id);
+    } catch (err) {
+      logger.error('Erro ao excluir exame:', err);
+      showToast(errMessage(err) || 'Falha ao excluir o exame.', 'error');
     }
   };
 
@@ -408,172 +210,16 @@ export const Exams: React.FC = () => {
     }
 
     setAnalyzingExam(true);
-    showToast('Iniciando análise com Gemini 1.5 Pro...', 'success');
-
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
-    if (!apiKey) {
-      console.warn('VITE_GEMINI_API_KEY não configurada. Simulando análise de exames...');
-      showToast('Chave de API do Gemini não configurada. Executando análise simulada...', 'info');
-      
-      setTimeout(async () => {
-        const mockFeedback = {
-          insights: "O paciente apresenta um perfil metabólico excelente com a grande maioria dos marcadores em estado de homeostase. Glicose de jejum, hemoglobina glicada e creatinina estão dentro dos limites recomendados. Recomenda-se continuar com a dieta balanceada e monitoramento de rotina.",
-          alertas: [],
-          todos_biomarcadores: [
-            { marcador: "Glicose de Jejum", valor: "86.6 mg/dL", referencia: "70 a 99 mg/dL", status: "normal" },
-            { marcador: "Hemoglobina Glicada (HbA1c)", valor: "5.3%", referencia: "< 5.7%", status: "normal" },
-            { marcador: "Colesterol LDL", valor: "95 mg/dL", referencia: "< 100 mg/dL", status: "normal" },
-            { marcador: "Colesterol Total", valor: "165 mg/dL", referencia: "< 190 mg/dL", status: "normal" },
-            { marcador: "Colesterol HDL", valor: "55 mg/dL", referencia: "> 40 mg/dL", status: "normal" },
-            { marcador: "Triglicerídeos", valor: "110 mg/dL", referencia: "< 150 mg/dL", status: "normal" },
-            { marcador: "Creatinina", valor: "0.8 mg/dL", referencia: "0.5 a 1.1 mg/dL", status: "normal" },
-            { marcador: "Ureia", valor: "28 mg/dL", referencia: "15 a 45 mg/dL", status: "normal" }
-          ]
-        };
-
-        try {
-          const { error: dbError } = await supabase
-            .from('patient_exams')
-            .update({ ai_feedback: mockFeedback })
-            .eq('id', selectedExam.id);
-
-          if (dbError) throw dbError;
-
-          // Atualiza os estados locais
-          setAlteracoesCriticas(mockFeedback.alertas || []);
-          setParecerClinico(mockFeedback.insights || "");
-          setBiomarcadores(mockFeedback.todos_biomarcadores || []);
-
-          const updatedExam = { ...selectedExam, ai_feedback: mockFeedback };
-          setSelectedExam(updatedExam);
-          setExams(prev => prev.map(e => e.id === selectedExam.id ? updatedExam : e));
-          
-          showToast('Análise de exames simulada concluída!', 'success');
-        } catch (err: any) {
-          console.error('Erro na simulação do exame:', err);
-          showToast('Erro ao gravar feedback simulado.', 'error');
-        } finally {
-          setAnalyzingExam(false);
-        }
-      }, 2500);
-      return;
-    }
+    showToast('Analisando o exame com IA...', 'success');
 
     try {
-      // 1. Fetch file as Blob from Signed URL
       const fileResponse = await fetch(selectedExamSignedUrl);
       if (!fileResponse.ok) throw new Error('Não foi possível fazer download do PDF do storage.');
-      const blob = await fileResponse.blob();
+      const base64Data = await blobToBase64(await fileResponse.blob());
 
-      // 2. Convert Blob to base64
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64data = (reader.result as string).split(',')[1];
-          resolve(base64data);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      const base64Data = await base64Promise;
+      const feedbackJSON = await analyzeExamPdf(base64Data);
 
-      const systemInstruction = `Você é um analisador de exames laboratoriais de altíssima precisão. Sua tarefa é extrair e identificar apenas os marcadores que estão matematicamente fora dos valores de referência descritos pelo laboratório emissor.
-
-Diretrizes Clínicas de Priorização:
-- Alertas de Gravidade Alta: Qualquer marcador que esteja mais de 2x acima do limite superior ou abaixo do limite inferior (Ex: ANTICORPOS ANTI-TPO elevados, TSH muito acima da referência).
-- Não ignore dados hormonais e imunológicos em favor de marcadores metabólicos padrão (como glicose/colesterol). Se a tireoide ou anticorpos estiverem alterados, eles devem liderar os Alertas Críticos.
-
-Retorne o JSON estrito com o mapeamento real dos dados extraídos do documento, garantindo 100% de fidelidade numérica.
-
-Adote uma estratégia de checagem estrita em duas etapas (Chain-of-Thought) antes de gerar o parecer:
-
-Etapa 1: REGRAS ESTRITAS DE EXTRAÇÃO DE DADOS:
-- Mapeie linha por linha o nome exato do "Exame", o "Resultado" numérico exato e o "Valor de Referência" correspondente à idade e ao sexo do paciente.
-- É terminantemente proibido assumir valores ou aplicar médias estatísticas. Se o exame diz um valor específico (ex: "86,6 mg/dL"), o resultado retornado DEVE ser rigorosamente e exatamente o valor descrito no laudo (ex: "86,6 mg/dL").
-
-Etapa 2: COMPARAÇÃO MATEMÁTICA DE REFERÊNCIA:
-- Antes de classificar um biomarcador como alterado, compare matematicamente se o "Resultado" está estritamente fora dos limites inferior ou superior descritos no campo "Valor(es) de referência" do próprio laudo.
-- Um biomarcador SÓ deve ser classificado como alterado se seu valor numérico estiver estritamente acima do limite superior ou estritamente abaixo do limite inferior do valor de referência. Caso contrário, deve ser classificado como normal.
-
-Retorne um objeto JSON estrito com a seguinte estrutura e chaves exatas:
-{
-  "alertas": [
-    {
-      "marcador": "Nome exato do biomarcador alterado",
-      "valor": "Resultado numérico exato com unidade (ex: 18 ng/mL)",
-      "referencia": "Valor de referência exato correspondente à idade/sexo do paciente",
-      "gravidade": "alta" (se >2x o limite superior ou < o limite inferior do valor de referência, ou alteração imunológica/hormonal crítica) ou "media" (se levemente fora da referência)
-    }
-  ],
-  "insights": "Texto corrido com análise clínica e conduta nutricional funcional detalhada com base nos biomarcadores alterados e na priorização clínica (tireoide, anticorpos e marcadores hormonais/imunológicos devem liderar os alertas e análises sobre marcadores metabólicos padrão se estiverem alterados)",
-  "todos_biomarcadores": [
-    {
-      "marcador": "Nome exato de cada biomarcador lido no laudo",
-      "valor": "Resultado numérico exato com unidade (ex: 86,6 mg/dL)",
-      "referencia": "Valor de referência exato",
-      "status": "alterado" (se fora do limite) ou "normal" (se dentro dos limites inferior/superior)
-    }
-  ],
-  "analise_preditiva": "Projeção clínica preditiva sobre a evolução metabólica do paciente com base no tratamento nutricional sugerido (mínimo de 3 linhas de análise preditiva)",
-  "focos_sugeridos": ["Exatamente três focos principais e práticos de suporte nutricional funcional recomendados"],
-  "tempo_estimado": 12
-}`;
-
-      // 3. Request Google AI Studio Gemini API
-      const aiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: 'user',
-                parts: [
-                  {
-                    inlineData: {
-                      mimeType: 'application/pdf',
-                      data: base64Data
-                    }
-                  },
-                  {
-                    text: 'Analise o exame enviado em PDF e retorne o JSON estrito conforme as instruções.'
-                  }
-                ]
-              }
-            ],
-            systemInstruction: {
-              role: 'system',
-              parts: [
-                {
-                  text: systemInstruction
-                }
-              ]
-            },
-            generationConfig: {
-              responseMimeType: 'application/json'
-            }
-          })
-        }
-      );
-
-      if (!aiResponse.ok) {
-        throw new Error(`Erro na API do Gemini! Status: ${aiResponse.status}`);
-      }
-
-      const aiData = await aiResponse.json();
-      const rawText = aiData.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!rawText) {
-        throw new Error('Não foi possível obter a resposta de texto do Gemini.');
-      }
-
-      const feedbackJSON = JSON.parse(rawText.trim());
-
-      // 4. Save to Database
+      // Save to Database
       const { error: dbError } = await supabase
         .from('patient_exams')
         .update({ ai_feedback: feedbackJSON })
@@ -581,19 +227,14 @@ Retorne um objeto JSON estrito com a seguinte estrutura e chaves exatas:
 
       if (dbError) throw dbError;
 
-      // Atualiza os estados locais
-      setAlteracoesCriticas(feedbackJSON.alertas || []);
-      setParecerClinico(feedbackJSON.insights || "");
-      setBiomarcadores(feedbackJSON.todos_biomarcadores || []);
-
       const updatedExam = { ...selectedExam, ai_feedback: feedbackJSON };
-      setSelectedExam(updatedExam);
-      setExams(prev => prev.map(e => e.id === selectedExam.id ? updatedExam : e));
+      setSelectedExam(updatedExam);       // parecer/alertas/biomarcadores são derivados
+      upsertExam(updatedExam);            // sincroniza o cache do TanStack Query
 
       showToast('Exame analisado com inteligência artificial com sucesso!', 'success');
-    } catch (err: any) {
-      console.error('Erro na análise de exames com Gemini:', err);
-      showToast(err.message || 'Erro ao conectar com o serviço de análise.', 'error');
+    } catch (err) {
+      logger.error('Erro na análise de exames:', err);
+      showToast(err instanceof GeminiError ? err.message : 'Erro ao analisar o exame.', 'error');
     } finally {
       setAnalyzingExam(false);
     }
@@ -604,11 +245,11 @@ Retorne um objeto JSON estrito com a seguinte estrutura e chaves exatas:
     const alertas = alteracoesCriticas || [];
     const insights = parecerClinico;
 
-    const formattedAlerts = alertas.map((a: any) => 
-      `- **${a.marcador}:** ${a.valor} (Ref: ${a.referencia}) [Gravidade: ${a.gravidade.toUpperCase()}]`
+    const formattedAlerts = alertas.map((a) =>
+      `- **${a.marcador}:** ${a.valor} (Ref: ${a.referencia}) [Gravidade: ${(a.gravidade ?? '').toUpperCase()}]`
     ).join('\n');
 
-    const fullAnalysisMarkdown = `### 🔬 ANÁLISE DE EXAMES LABORATORIAIS (${format(new Date(selectedExam.exam_date), "dd/MM/yyyy")})
+    const fullAnalysisMarkdown = `### 🔬 ANÁLISE DE EXAMES LABORATORIAIS (${format(new Date(selectedExam.exam_date ?? selectedExam.created_at), "dd/MM/yyyy")})
     
 **Biomarcadores Alterados:**
 ${formattedAlerts || '- Nenhum biomarcador alterado detectado.'}
@@ -1008,275 +649,15 @@ ${insights}`;
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/20 min-h-0">
-                      {loadingDetails ? (
-                        <div className="flex flex-col items-center justify-center h-full text-slate-400 py-20 animate-in fade-in duration-200">
-                          <div className="animate-spin rounded-full h-8 w-8 border-2 border-teal-650 border-t-transparent mb-3" />
-                          <p className="text-xs font-medium">Carregando análise do laudo...</p>
-                        </div>
-                      ) : !alteracoesCriticas && !parecerClinico && !biomarcadores ? (
-                        /* EMPTY STATE / RUN ANALYSIS */
-                        <div className="flex flex-col items-center justify-center h-full text-center p-6 max-w-sm mx-auto space-y-4">
-                          <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-indigo-50 to-primary-50 text-indigo-600 flex items-center justify-center shadow border border-indigo-100/50 animate-bounce">
-                            <Sparkles className="w-8 h-8" />
-                          </div>
-                          <div>
-                            <h5 className="text-base font-semibold text-slate-900">Pronto para Análise Clínica</h5>
-                            <p className="text-sm font-normal text-slate-500 leading-relaxed mt-1.5">
-                              Nesta inteligência artificial lê biomarcadores em PDFs, identifica o que está fora dos valores de referência e constrói insights dietéticos personalizados de forma instantânea.
-                            </p>
-                          </div>
-
-                          <button
-                            onClick={handleAnalyzeExamWithAI}
-                            disabled={analyzingExam}
-                            className="w-full bg-gradient-to-r from-teal-600 to-indigo-600 hover:from-teal-500 hover:to-indigo-500 text-white font-semibold text-sm py-4 rounded-xl shadow transition-all flex items-center justify-center gap-2 disabled:opacity-75"
-                          >
-                            {analyzingExam ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent animate-bounce" />
-                                <span>Analisando PDF...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-4 h-4 text-indigo-200" />
-                                <span>✨ Analisar Exame com IA</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      ) : (
-                        /* RENDER AI FEEDBACK */
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          
-                          {/* Biomarker Alerts */}
-                          <div className="space-y-3">
-                            <h5 className="text-xs font-semibold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="w-1.5 h-3.5 bg-indigo-500 rounded-sm" />
-                              Alterações Críticas Detectadas
-                            </h5>
-
-                            {alteracoesCriticas && alteracoesCriticas.length > 0 ? (
-                              <div className="grid grid-cols-1 gap-2.5">
-                                {alteracoesCriticas.map((alerta: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className={`p-3.5 rounded-xl border flex justify-between items-center shadow-sm transition-all duration-200 ${
-                                      alerta.gravidade === 'alta'
-                                        ? 'bg-rose-50/30 border-rose-100'
-                                        : 'bg-amber-50/20 border-amber-100'
-                                    }`}
-                                  >
-                                    <div>
-                                      <p className={`font-semibold text-slate-900 transition-all ${
-                                        aiTextSize === 'sm' ? 'text-xs' : aiTextSize === 'base' ? 'text-sm' : aiTextSize === 'lg' ? 'text-base' : 'text-lg'
-                                      }`}>{alerta.marcador}</p>
-                                      <p className={`text-slate-500 mt-1 font-normal tracking-wide transition-all ${
-                                        aiTextSize === 'sm' ? 'text-[9px]' : aiTextSize === 'base' ? 'text-[11px]' : aiTextSize === 'lg' ? 'text-xs' : 'text-sm'
-                                      }`}>
-                                        Referência: <span className="text-slate-600 font-medium">{alerta.referencia}</span>
-                                      </p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className={`font-semibold text-slate-900 transition-all ${
-                                        aiTextSize === 'sm' ? 'text-xs' : aiTextSize === 'base' ? 'text-sm' : aiTextSize === 'lg' ? 'text-base' : 'text-lg'
-                                      }`}>{alerta.valor}</p>
-                                      <span className={`inline-block text-[10px] font-medium uppercase px-2.5 py-0.5 rounded-lg border mt-1 ${
-                                        alerta.gravidade === 'alta'
-                                          ? 'bg-rose-50/50 border-rose-200 text-rose-600'
-                                          : 'bg-amber-50 border-amber-250 text-amber-700'
-                                      }`}>
-                                        {alerta.gravidade === 'alta' ? 'Alta' : 'Média'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="p-4 bg-emerald-50/50 border border-emerald-100/50 rounded-xl text-emerald-600 text-sm font-medium flex items-center gap-2">
-                                <Check className="w-4.5 h-4.5 text-emerald-650 shrink-0" />
-                                Todos os biomarcadores analisados parecem estar dentro das referências do laboratório!
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Clinical Insights */}
-                          <div className="space-y-3 pt-1">
-                            <h5 className="text-xs font-semibold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="w-1.5 h-3.5 bg-emerald-500 rounded-sm" />
-                              Parecer Clínico Nutricional
-                            </h5>
-                            <div className={`font-medium text-slate-700 border-l-4 border-emerald-500 bg-emerald-50/10 px-5 py-4 rounded-r-xl shadow-inner whitespace-pre-line transition-all duration-300 ${
-                              aiTextSize === 'sm' 
-                                ? 'text-xs leading-normal' 
-                                : aiTextSize === 'base' 
-                                  ? 'text-sm leading-relaxed' 
-                                  : aiTextSize === 'lg' 
-                                    ? 'text-base leading-relaxed font-semibold' 
-                                    : 'text-lg leading-loose font-semibold'
-                            }`}>
-                              {parecerClinico}
-                            </div>
-                          </div>
-
-                          {/* Full Biomarkers List */}
-                          {biomarcadores && (
-                            <div className="space-y-3 pt-2">
-                              <h5 className="text-xs font-semibold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                                <span className="w-1.5 h-3.5 bg-slate-400 rounded-sm" />
-                                Lista Completa de Biomarcadores ({biomarcadores.length})
-                              </h5>
-                              
-                              <div className="bg-card-premium rounded-xl border border-slate-300/50 overflow-hidden shadow-sm animate-in fade-in duration-200">
-                                <div className="p-3 bg-slate-50/50 grid grid-cols-12 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-300/50">
-                                  <span className="col-span-4 sm:col-span-5">Biomarcador</span>
-                                  <span className="col-span-3 sm:col-span-2 text-right">Resultado</span>
-                                  <span className="col-span-3 sm:col-span-2 text-center">Evolução</span>
-                                  <span className="hidden sm:block sm:col-span-2 pl-4">Referência</span>
-                                  <span className="col-span-2 sm:col-span-1 text-center">Ações</span>
-                                </div>
-                                <div className="divide-y divide-slate-100">
-                                  {biomarcadores.map((bio: any, idx: number) => {
-                                    const isAltered = bio.status === 'alterado';
-                                    
-                                    // Compare dynamically against historical exams
-                                    const prevBio = getPreviousExamBiomarker(selectedExam, bio.marcador);
-                                    const evo = prevBio ? getEvolutionIndicator(bio.valor, prevBio.valor) : null;
-                                    
-                                    const hasNote = !!bio.nota_clinica;
-                                    const isEditingNote = activeNoteEditIndex === idx;
-
-                                    return (
-                                      <div key={idx} className="flex flex-col hover:bg-slate-50/30 transition-colors">
-                                        {/* Main grid row layout */}
-                                        <div className="p-3.5 grid grid-cols-12 items-center text-xs sm:text-sm font-normal">
-                                          
-                                          {/* Biomarcador Column */}
-                                          <div className="col-span-4 sm:col-span-5 flex items-center gap-2 min-w-0">
-                                            <div className={`h-2 w-2 rounded-full shrink-0 ${
-                                              isAltered ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
-                                            }`} />
-                                            <span className="text-slate-750 truncate max-w-[140px] sm:max-w-xs">{bio.marcador}</span>
-                                          </div>
-                                          
-                                          {/* Resultado Column */}
-                                          <div className={`col-span-3 sm:col-span-2 text-right font-medium ${
-                                            isAltered ? 'text-amber-600' : 'text-slate-900'
-                                          }`}>
-                                            {bio.valor}
-                                          </div>
-                                          
-                                          {/* Evolução Column */}
-                                          <div className="col-span-3 sm:col-span-2 text-center flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-xs">
-                                            {evo ? (
-                                              <>
-                                                <span className={`${evo.color} text-sm`}>{evo.text}</span>
-                                                {evo.diffStr && (
-                                                  <span className="text-[10px] text-slate-500 font-medium">({evo.diffStr})</span>
-                                                )}
-                                              </>
-                                            ) : (
-                                              <span className="text-slate-400 font-medium">—</span>
-                                            )}
-                                          </div>
-                                          
-                                          {/* Referência Column */}
-                                          <div className="hidden sm:block sm:col-span-2 pl-4 text-xs text-slate-455 truncate">
-                                            {bio.referencia}
-                                          </div>
-                                          
-                                          {/* Ações Column */}
-                                          <div className="col-span-2 sm:col-span-1 text-center">
-                                            <button
-                                              onClick={() => {
-                                                if (isEditingNote) {
-                                                  setActiveNoteEditIndex(null);
-                                                  setTempNoteText('');
-                                                } else {
-                                                  setActiveNoteEditIndex(idx);
-                                                  setTempNoteText(bio.nota_clinica || '');
-                                                }
-                                              }}
-                                              className={`p-1.5 rounded-lg border transition-all ${
-                                                hasNote 
-                                                  ? 'bg-teal-50 border-teal-200 text-teal-650 hover:bg-teal-100/55' 
-                                                  : isEditingNote
-                                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-650'
-                                                    : 'bg-white border-slate-200 text-slate-400 hover:text-slate-650 hover:bg-slate-50'
-                                              }`}
-                                              title={hasNote ? "Ver / Editar Observação Clínica" : "Adicionar Observação Clínica"}
-                                            >
-                                              <MessageSquare className="w-3.5 h-3.5" />
-                                            </button>
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Inline expansible clinical note section */}
-                                        {(isEditingNote || hasNote) && (
-                                          <div className="px-3.5 pb-3.5 pl-8 border-t border-slate-100/60 bg-slate-50/20 text-xs text-left animate-in slide-in-from-top duration-200">
-                                            {isEditingNote ? (
-                                              <div className="space-y-2 mt-2">
-                                                <div className="flex items-center justify-between">
-                                                  <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Anotação Clínica do Nutricionista</span>
-                                                  {hasNote && (
-                                                    <span className="text-[9px] bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded font-medium">Nota Salva</span>
-                                                  )}
-                                                </div>
-                                                <textarea
-                                                  value={tempNoteText}
-                                                  onChange={(e) => setTempNoteText(e.target.value)}
-                                                  placeholder="Escreva sua percepção ou conduta clínica sobre este biomarcador (ex: ajustar suplementação, focar em micronutrientes)..."
-                                                  rows={2}
-                                                  className="w-full bg-white px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-normal text-sm text-slate-700 placeholder-slate-400 transition-all shadow-sm"
-                                                />
-                                                <div className="flex justify-end gap-2">
-                                                  <button
-                                                    onClick={() => {
-                                                      setActiveNoteEditIndex(null);
-                                                      setTempNoteText('');
-                                                    }}
-                                                    className="px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-650 font-semibold text-xs rounded-lg transition-all"
-                                                  >
-                                                    Cancelar
-                                                  </button>
-                                                  <button
-                                                    onClick={() => handleSaveBiomarkerNote(idx)}
-                                                    className="px-3 py-2 bg-teal-600 hover:bg-teal-500 border border-teal-600 text-white font-semibold text-xs rounded-lg transition-all shadow-sm"
-                                                  >
-                                                    Salvar Nota
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              <div className="mt-2 bg-emerald-50/20 border border-emerald-100/60 p-2.5 rounded-xl flex justify-between items-start gap-4">
-                                                <div className="min-w-0">
-                                                  <p className="text-[9px] font-medium text-emerald-800 uppercase tracking-wider">Observação Clínica Registrada:</p>
-                                                  <p className="font-normal text-slate-700 leading-relaxed mt-1 whitespace-pre-line italic">
-                                                    "{bio.nota_clinica}"
-                                                  </p>
-                                                </div>
-                                                <button
-                                                  onClick={() => {
-                                                    setActiveNoteEditIndex(idx);
-                                                    setTempNoteText(bio.nota_clinica || '');
-                                                  }}
-                                                  className="text-[10px] font-medium text-emerald-700 hover:text-emerald-900 shrink-0 bg-white border border-emerald-200 px-2 py-1 rounded-lg transition-all hover:bg-emerald-50"
-                                                >
-                                                  Editar
-                                                </button>
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          
-                        </div>
-                      )}
+                      <AiAnalysisPanel
+                        analysis={selectedExam?.ai_feedback ?? null}
+                        exams={exams}
+                        selectedExam={selectedExam}
+                        analyzing={analyzingExam}
+                        onAnalyze={handleAnalyzeExamWithAI}
+                        onSaveNote={handleSaveBiomarkerNote}
+                        textSize={aiTextSize}
+                      />
                     </div>
                   </div>
                 )}
@@ -1403,61 +784,22 @@ ${insights}`;
                           <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-450 border-t-transparent mb-1" />
                           <p className="text-xs font-medium">Buscando exames...</p>
                         </div>
-                      ) : exams.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-slate-400 text-center">
-                          <ClipboardList className="w-8 h-8 text-slate-200 stroke-[1.2] mb-1" />
-                          <p className="text-sm font-medium text-slate-600">Nenhum exame enviado</p>
-                          <p className="text-xs text-slate-450 max-w-[150px] leading-normal mt-0.5 mx-auto">
-                            Os relatórios em PDF enviados ficarão arquivados aqui.
-                          </p>
-                        </div>
                       ) : (
-                        exams.map((exam) => {
-                          const fileName = exam.file_url.split('/').pop()?.substring(13) || 'Exame_Laboratorial.pdf';
-                          const parsedDate = new Date(exam.created_at);
-                          const hasAI = !!exam.ai_feedback;
-
-                          return (
-                            <div
-                              key={exam.id}
-                              onClick={() => handleSelectExam(exam)}
-                              className="group flex items-center justify-between p-2.5 bg-slate-50/50 hover:bg-teal-50/30 border border-slate-200/60 hover:border-teal-200 rounded-xl cursor-pointer shadow-sm transition-all duration-200"
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-xs font-semibold ${
-                                  hasAI 
-                                    ? 'bg-indigo-50 border border-indigo-100 text-indigo-650' 
-                                    : 'bg-slate-100 border border-slate-200 text-slate-500'
-                                }`}>
-                                  PDF
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium text-slate-900 truncate max-w-[150px] group-hover:text-teal-700 transition-colors" title={fileName}>
-                                    {fileName}
-                                  </p>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-xs text-slate-500 font-normal">
-                                      {format(parsedDate, 'dd/MM/yyyy')}
-                                    </span>
-                                    {hasAI && (
-                                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium uppercase text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-100">
-                                        IA
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={(e) => handleDeleteExam(exam, e)}
-                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100 opacity-0 group-hover:opacity-100"
-                                title="Excluir exame"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                        <ExamHistoryList
+                          exams={exams}
+                          selectedExamId={undefined /* nesta branch nenhum exame está selecionado */}
+                          onSelect={handleSelectExam}
+                          onDelete={handleDeleteExam}
+                          emptyState={(
+                            <div className="flex flex-col items-center justify-center h-full text-slate-400 text-center">
+                              <ClipboardList className="w-8 h-8 text-slate-200 stroke-[1.2] mb-1" />
+                              <p className="text-sm font-medium text-slate-600">Nenhum exame enviado</p>
+                              <p className="text-xs text-slate-450 max-w-[150px] leading-normal mt-0.5 mx-auto">
+                                Os relatórios em PDF enviados ficarão arquivados aqui.
+                              </p>
                             </div>
-                          );
-                        })
+                          )}
+                        />
                       )}
                     </div>
                   </div>

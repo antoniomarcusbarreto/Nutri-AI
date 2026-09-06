@@ -10,7 +10,7 @@ export const Sidebar: React.FC = () => {
   interface NavItem {
     name: string;
     href: string;
-    icon: React.ComponentType<any>;
+    icon: React.ComponentType<{ className?: string }>;
     roles?: ('owner' | 'nutritionist' | 'secretary')[];
   }
 

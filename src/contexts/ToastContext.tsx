@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -17,9 +17,14 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toast, setToast] = useState<Toast | null>(null);
 
-  const showToast = (message: string, type: ToastType = 'info') => {
+  // Estável: consumidores de useToast() não re-renderizam a cada toast.
+  // O subtree de `children` também não re-renderiza pois seu elemento é criado
+  // em App (que nunca re-renderiza) e passa intacto por este provider (PERF-08).
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
     setToast({ message, type });
-  };
+  }, []);
+
+  const value = useMemo(() => ({ showToast }), [showToast]);
 
   useEffect(() => {
     if (toast) {
@@ -31,7 +36,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [toast]);
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 font-sans print:!hidden">
@@ -70,6 +75,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook coabita com o provider por convenção
 export const useToast = () => {
   const context = useContext(ToastContext);
   if (!context) {

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 interface Profile {
   id: string;
@@ -67,6 +68,7 @@ const AuthContext = createContext<AuthContextType>({
   updateClinic: async () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook coabita com o provider por convenção
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -104,7 +106,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { remainingTrialDays: 0, isReadOnly: true, isTrialActive: false };
     }
 
-    // Default trial logic
+    // Robustez: só a string EXATA 'trial' entra na regra de expiração dos 14
+    // dias. Qualquer outro valor (nulo, legado, digitado errado no painel
+    // Master) NÃO trava a clínica — evita read-only acidental.
+    if (currentClinic.subscription_status !== 'trial') {
+      return { remainingTrialDays: 999, isReadOnly: false, isTrialActive: true };
+    }
+
+    // Default trial logic (subscription_status === 'trial')
     const createdAt = new Date(currentClinic.created_at);
     const expiresAt = new Date(createdAt.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 dias
     const remaining = Math.ceil((expiresAt.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
@@ -116,14 +125,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  const { remainingTrialDays, isReadOnly, isTrialActive } = calculateTrial(clinic);
+  // PERF-08: só recalcula quando a clínica muda (não a cada render).
+  const { remainingTrialDays, isReadOnly, isTrialActive } = useMemo(
+    () => calculateTrial(clinic),
+    [clinic],
+  );
 
-  const applyTheme = (_mode: string, color: string) => {
+  const applyTheme = useCallback((_mode: string, color: string) => {
     const root = document.documentElement;
     root.setAttribute('data-theme', color);
-  };
+  }, []);
 
-  const updateTheme = async (mode: string, color: string) => {
+  const updateTheme = useCallback(async (mode: string, color: string) => {
     if (!profile) return;
     try {
       const { error } = await supabase
@@ -133,31 +146,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) throw error;
       
-      setProfile({ ...profile, theme_mode: mode, theme_color: color });
+      setProfile(prev => (prev ? { ...prev, theme_mode: mode, theme_color: color } : prev));
       applyTheme(mode, color);
     } catch (error) {
-      console.error('Error updating theme:', error);
+      logger.error('Error updating theme:', error);
     }
-  };
+  }, [profile, applyTheme]);
 
-  const updateProfile = async (updates: Partial<Profile>) => {
+  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     if (!profile) return;
+    // Colunas privilegiadas nunca são alteradas pelo canal direto (ver migration
+    // 0018 / SEC-01); a mudança de is_active/is_superadmin passa só por RPC.
+    const { is_active: _ia, is_superadmin: _is, ...safeUpdates } = updates as Partial<Profile>;
     try {
       const { error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update(safeUpdates)
         .eq('id', profile.id);
       
       if (error) throw error;
       
-      setProfile({ ...profile, ...updates });
+      setProfile(prev => (prev ? { ...prev, ...safeUpdates } : prev));
     } catch (error) {
-      console.error('Error updating profile:', error);
+      logger.error('Error updating profile:', error);
       throw error;
     }
-  };
+  }, [profile]);
 
-  const updateClinic = async (updates: Partial<Clinic>) => {
+  const updateClinic = useCallback(async (updates: Partial<Clinic>) => {
     if (!clinic) return;
     try {
       const { error } = await supabase
@@ -167,12 +183,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) throw error;
       
-      setClinic({ ...clinic, ...updates });
+      setClinic(prev => (prev ? { ...prev, ...updates } : prev));
     } catch (error) {
-      console.error('Error updating clinic:', error);
+      logger.error('Error updating clinic:', error);
       throw error;
     }
-  };
+  }, [clinic]);
 
   const fetchUserData = async (currentUser: User) => {
     try {
@@ -219,7 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      logger.error('Error fetching user data:', error);
     }
   };
 
@@ -249,14 +265,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => subscription.unsubscribe();
+    // Montagem única: assina onAuthStateChange e faz o bootstrap da sessão.
+    // `fetchUserData` só usa setters estáveis + applyTheme; não entra nas deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      session, user, profile, clinic, userRole, isPatient, loading, signOut,
+      remainingTrialDays, isReadOnly, isTrialActive, updateTheme, updateProfile, updateClinic,
+    }),
+    [
+      session, user, profile, clinic, userRole, isPatient, loading, signOut,
+      remainingTrialDays, isReadOnly, isTrialActive, updateTheme, updateProfile, updateClinic,
+    ],
+  );
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, clinic, userRole, isPatient, loading, signOut, remainingTrialDays, isReadOnly, isTrialActive, updateTheme, updateProfile, updateClinic }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

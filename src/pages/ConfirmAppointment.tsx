@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Calendar, User, Clock, Building2, Activity, CheckCircle2, XCircle, Loader2, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
+import { logger } from '../lib/logger';
 
 interface AppointmentPublicDetails {
-  id: string;
   date_time: string;
   status: 'pendente' | 'confirmado' | 'concluido' | 'cancelado';
   patient_name: string;
@@ -14,62 +15,62 @@ interface AppointmentPublicDetails {
   clinic_name: string;
 }
 
+const APPT_KEY = (token: string | undefined) => ['appointment-public', token] as const;
+
 export const ConfirmAppointment: React.FC = () => {
-  const { appointmentId } = useParams<{ appointmentId: string }>();
+  const { token } = useParams<{ token: string }>();
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
-  const [appointment, setAppointment] = useState<AppointmentPublicDetails | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchAppointmentDetails = async () => {
-    if (!appointmentId) {
-      setError('Identificador de agendamento inválido.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
+  // Detalhes públicos via TanStack Query (antes: useEffect + 4 setState).
+  const {
+    data: appointment = null,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: APPT_KEY(token),
+    enabled: !!token,
+    retry: false,
+    queryFn: async (): Promise<AppointmentPublicDetails> => {
       const { data, error: rpcError } = await supabase.rpc('get_appointment_details_public', {
-        p_appointment_id: appointmentId,
+        p_token: token,
       });
-
       if (rpcError) {
-        console.error('Erro ao buscar detalhes da consulta:', rpcError);
-        setError('Não foi possível encontrar as informações desta consulta.');
-      } else if (!data || data.length === 0) {
-        setError('Agendamento não encontrado. Verifique o link enviado.');
-      } else {
-        setAppointment(data[0] as AppointmentPublicDetails);
+        logger.error('Erro ao buscar detalhes da consulta:', rpcError);
+        throw new Error('NOT_FOUND');
       }
-    } catch (err) {
-      console.error(err);
-      setError('Ocorreu um erro ao carregar as informações do agendamento.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!data || data.length === 0) throw new Error('EXPIRED');
+      return data[0] as AppointmentPublicDetails;
+    },
+  });
 
-  useEffect(() => {
-    fetchAppointmentDetails();
-  }, [appointmentId]);
+  const error: string | null = !token
+    ? 'Link de confirmação inválido.'
+    : queryError
+      ? queryError instanceof Error && queryError.message === 'EXPIRED'
+        ? 'Este link de confirmação é inválido ou já expirou. Fale com a sua clínica.'
+        : 'Não foi possível encontrar as informações desta consulta.'
+      : null;
 
   const handleUpdateStatus = async (newStatus: 'confirmado' | 'cancelado') => {
-    if (!appointmentId || submitting) return;
+    if (!token || submitting) return;
 
     try {
       setSubmitting(true);
       const { data, error: rpcError } = await supabase.rpc('confirm_appointment_public', {
-        p_appointment_id: appointmentId,
+        p_token: token,
         p_status: newStatus,
       });
 
       if (rpcError || !data) {
-        showToast('Erro ao atualizar o status do agendamento.', 'error');
+        showToast('Não foi possível atualizar o agendamento. O link pode ter expirado.', 'error');
       } else {
-        // Success
-        setAppointment((prev) => prev ? { ...prev, status: newStatus } : null);
+        // Success — atualiza o cache da query (sem estado local).
+        queryClient.setQueryData<AppointmentPublicDetails>(
+          APPT_KEY(token),
+          (prev) => (prev ? { ...prev, status: newStatus } : prev),
+        );
         if (newStatus === 'confirmado') {
           showToast('Presença confirmada com sucesso!', 'success');
         } else {
@@ -77,7 +78,7 @@ export const ConfirmAppointment: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       showToast('Ocorreu um erro ao processar sua solicitação.', 'error');
     } finally {
       setSubmitting(false);

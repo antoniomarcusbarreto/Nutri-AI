@@ -1,8 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Palette, Check, RefreshCw, Lock, Unlock, Key, Search, UserCheck, X, Info, AlertTriangle } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
+import { logger } from '../lib/logger';
+
+const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
+
+interface TeamMember {
+  id: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  crn?: string | null;
+  role?: string | null;
+  is_active?: boolean | null;
+  created_at?: string | null;
+}
+
+interface StaffRpcRow {
+  user_id: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  crn?: string | null;
+  role?: string | null;
+  is_active?: boolean | null;
+  created_at?: string | null;
+}
+
+interface PatientProfileLink {
+  is_active?: boolean | null;
+}
+
+interface PatientAccessRow {
+  id: string;
+  name: string;
+  email?: string | null;
+  user_id?: string | null;
+  has_app_access?: boolean | null;
+  profiles?: PatientProfileLink | PatientProfileLink[] | null;
+}
 
 export const Settings: React.FC = () => {
   const { profile, user, userRole, clinic, updateTheme, updateProfile, updateClinic, remainingTrialDays, isReadOnly } = useAuth();
@@ -17,20 +55,20 @@ export const Settings: React.FC = () => {
   const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
 
   // Patient Access states
-  const [patientAccessList, setPatientAccessList] = useState<any[]>([]);
+  const [patientAccessList, setPatientAccessList] = useState<PatientAccessRow[]>([]);
   const [searchPatientAccess, setSearchPatientAccess] = useState('');
   const [loadingPatientsAccess, setLoadingPatientsAccess] = useState(false);
-  const [passwordModalPatient, setPasswordModalPatient] = useState<any | null>(null);
+  const [passwordModalPatient, setPasswordModalPatient] = useState<PatientAccessRow | null>(null);
   const [newPatientPassword, setNewPatientPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Team states
-  const [teamList, setTeamList] = useState<any[]>([]);
+  const [teamList, setTeamList] = useState<TeamMember[]>([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
   const [searchTeam, setSearchTeam] = useState('');
   const [showAddEditTeamModal, setShowAddEditTeamModal] = useState(false);
-  const [selectedTeamMember, setSelectedTeamMember] = useState<any | null>(null);
+  const [selectedTeamMember, setSelectedTeamMember] = useState<TeamMember | null>(null);
   const [teamFormData, setTeamFormData] = useState({
     name: '',
     email: '',
@@ -72,21 +110,82 @@ export const Settings: React.FC = () => {
       });
 
       if (error) throw error;
-      
-      showToast('Perfil atualizado com sucesso!', 'success');
-      
+
+      // Troca do e-mail de login: passa pelo GoTrue com dupla confirmação (SEC-03).
+      if (profileFormData.email && profileFormData.email !== user?.email) {
+        const { error: emailErr } = await supabase.auth.updateUser({ email: profileFormData.email });
+        if (emailErr) throw emailErr;
+        showToast('Perfil salvo. Confirme o novo e-mail pelo link enviado a ele.', 'success');
+      } else {
+        showToast('Perfil atualizado com sucesso!', 'success');
+      }
+
       await updateProfile({
         full_name: profileFormData.name,
         phone: profileFormData.phone,
         crn: profileFormData.crn || undefined
       });
-    } catch (err: any) {
-      console.error('Erro ao atualizar perfil:', err);
-      showToast(err.message || 'Erro ao salvar os dados do perfil.', 'error');
+    } catch (err) {
+      logger.error('Erro ao atualizar perfil:', err);
+      showToast(errMessage(err) || 'Erro ao salvar os dados do perfil.', 'error');
     } finally {
       setSaving(false);
     }
   };
+
+  const loadTeam = useCallback(async () => {
+    if (!clinic?.id) return;
+    setLoadingTeam(true);
+    try {
+      const { data: members, error: membersError } = await supabase.rpc('get_clinic_staff', {
+        p_clinic_id: clinic.id
+      });
+
+      if (membersError) throw membersError;
+      const mapped: TeamMember[] = ((members ?? []) as StaffRpcRow[]).map((m) => ({
+        id: m.user_id,
+        full_name: m.full_name,
+        email: m.email,
+        phone: m.phone,
+        crn: m.crn,
+        role: m.role,
+        is_active: m.is_active,
+        created_at: m.created_at
+      }));
+      setTeamList(mapped);
+    } catch (err) {
+      logger.error('Erro ao carregar equipe:', err);
+      showToast('Erro ao carregar lista de funcionários.', 'error');
+    } finally {
+      setLoadingTeam(false);
+    }
+  }, [clinic?.id, showToast]);
+
+  const loadServices = useCallback(async () => {
+    if (!clinic?.id) return;
+    const { data } = await supabase.from('services').select('*').eq('clinic_id', clinic.id);
+    if (data) setServices(data);
+  }, [clinic?.id]);
+
+  const loadPatientsAccess = useCallback(async () => {
+    if (!clinic?.id) return;
+    setLoadingPatientsAccess(true);
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('id, name, email, user_id, profiles(is_active)')
+        .eq('clinic_id', clinic.id)
+        .not('user_id', 'is', null)
+        .order('name');
+
+      if (error) throw error;
+      setPatientAccessList((data ?? []) as unknown as PatientAccessRow[]);
+    } catch (err) {
+      logger.error('Erro ao carregar acesso dos pacientes:', err);
+    } finally {
+      setLoadingPatientsAccess(false);
+    }
+  }, [clinic?.id]);
 
   useEffect(() => {
     if (activeTab === 'team' && clinic?.id) {
@@ -96,39 +195,7 @@ export const Settings: React.FC = () => {
     } else if (activeTab === 'patient_access' && clinic?.id) {
       loadPatientsAccess();
     }
-  }, [activeTab, clinic?.id]);
-
-  const loadTeam = async () => {
-    if (!clinic?.id) return;
-    setLoadingTeam(true);
-    try {
-      const { data: members, error: membersError } = await supabase.rpc('get_clinic_staff', {
-        p_clinic_id: clinic.id
-      });
-
-      if (membersError) throw membersError;
-      if (members) {
-        const mapped = members.map((m: any) => ({
-          id: m.user_id,
-          full_name: m.full_name,
-          email: m.email,
-          phone: m.phone,
-          crn: m.crn,
-          role: m.role,
-          is_active: m.is_active,
-          created_at: m.created_at
-        }));
-        setTeamList(mapped);
-      } else {
-        setTeamList([]);
-      }
-    } catch (err) {
-      console.error('Erro ao carregar equipe:', err);
-      showToast('Erro ao carregar lista de funcionários.', 'error');
-    } finally {
-      setLoadingTeam(false);
-    }
-  };
+  }, [activeTab, clinic?.id, loadTeam, loadServices, loadPatientsAccess]);
 
   const handleSaveTeamMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +218,19 @@ export const Settings: React.FC = () => {
         });
 
         if (error) throw error;
-        showToast('Funcionário atualizado com sucesso!', 'success');
+
+        // Troca do e-mail de login de terceiro: só via Edge Function, que exige
+        // que o chamador seja owner da clínica e dispara confirmação (SEC-03).
+        if (email && email !== selectedTeamMember.email) {
+          const { data: emailResp, error: emailErr } = await supabase.functions.invoke(
+            'admin-update-user-email',
+            { body: { target_user_id: selectedTeamMember.id, new_email: email } },
+          );
+          if (emailErr) throw emailErr;
+          showToast(emailResp?.message ?? 'Link de confirmação enviado ao novo e-mail.', 'success');
+        } else {
+          showToast('Funcionário atualizado com sucesso!', 'success');
+        }
       } else {
         if (!email || !password) {
           setTeamError('E-mail e Senha são obrigatórios para cadastro.');
@@ -175,15 +254,15 @@ export const Settings: React.FC = () => {
 
       setShowAddEditTeamModal(false);
       loadTeam();
-    } catch (err: any) {
-      console.error('Erro ao salvar funcionário:', err);
-      setTeamError(err.message || 'Erro ao processar solicitação no banco.');
+    } catch (err) {
+      logger.error('Erro ao salvar funcionário:', err);
+      setTeamError(errMessage(err) || 'Erro ao processar solicitação no banco.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleToggleTeamMemberStatus = async (member: any) => {
+  const handleToggleTeamMemberStatus = async (member: TeamMember) => {
     if (!clinic?.id || !member.id) return;
     setSaving(true);
     try {
@@ -198,15 +277,15 @@ export const Settings: React.FC = () => {
 
       showToast(newActive ? 'Acesso reativado!' : 'Acesso desativado!', 'success');
       loadTeam();
-    } catch (err: any) {
-      console.error('Erro ao alternar status do funcionário:', err);
-      showToast(err.message || 'Erro ao alterar status de acesso.', 'error');
+    } catch (err) {
+      logger.error('Erro ao alternar status do funcionário:', err);
+      showToast(errMessage(err) || 'Erro ao alterar status de acesso.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteTeamMember = async (member: any) => {
+  const handleDeleteTeamMember = async (member: TeamMember) => {
     if (!clinic?.id || !member.id) return;
     if (!window.confirm(`Tem certeza que deseja remover ${member.full_name} da equipe?`)) return;
 
@@ -221,50 +300,24 @@ export const Settings: React.FC = () => {
 
       showToast('Membro removido da equipe!', 'success');
       loadTeam();
-    } catch (err: any) {
-      console.error('Erro ao remover funcionário:', err);
-      showToast(err.message || 'Erro ao remover membro da equipe.', 'error');
+    } catch (err) {
+      logger.error('Erro ao remover funcionário:', err);
+      showToast(errMessage(err) || 'Erro ao remover membro da equipe.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const loadServices = async () => {
-    if (!clinic?.id) return;
-    const { data } = await supabase.from('services').select('*').eq('clinic_id', clinic.id);
-    if (data) setServices(data);
-  };
-
-  const loadPatientsAccess = async () => {
-    if (!clinic?.id) return;
-    setLoadingPatientsAccess(true);
-    try {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('id, name, email, user_id, profiles(is_active)')
-        .eq('clinic_id', clinic.id)
-        .not('user_id', 'is', null)
-        .order('name');
-        
-      if (error) throw error;
-      setPatientAccessList(data || []);
-    } catch (err) {
-      console.error('Erro ao carregar acesso dos pacientes:', err);
-    } finally {
-      setLoadingPatientsAccess(false);
+  const isPatientActive = (patient: PatientAccessRow) => {
+    const p = patient.profiles;
+    if (!p) return true;
+    if (Array.isArray(p)) {
+      return p[0]?.is_active !== false;
     }
+    return p.is_active !== false;
   };
 
-  const isPatientActive = (patient: any) => {
-    const profile = patient.profiles;
-    if (!profile) return true;
-    if (Array.isArray(profile)) {
-      return profile[0]?.is_active !== false;
-    }
-    return profile.is_active !== false;
-  };
-
-  const handleToggleAccess = async (patient: any) => {
+  const handleToggleAccess = async (patient: PatientAccessRow) => {
     if (!patient.user_id) return;
     const currentActive = isPatientActive(patient);
     const newActive = !currentActive;
@@ -289,9 +342,9 @@ export const Settings: React.FC = () => {
         return p;
       }));
       showToast(newActive ? 'Acesso do paciente liberado!' : 'Acesso do paciente bloqueado!', 'success');
-    } catch (err: any) {
-      console.error('Erro ao alterar status de acesso:', err);
-      showToast(err.message || 'Erro ao alterar status de acesso do paciente.', 'error');
+    } catch (err) {
+      logger.error('Erro ao alterar status de acesso:', err);
+      showToast(errMessage(err) || 'Erro ao alterar status de acesso do paciente.', 'error');
     } finally {
       setSaving(false);
     }
@@ -314,9 +367,9 @@ export const Settings: React.FC = () => {
       showToast('Senha alterada com sucesso!', 'success');
       setPasswordModalPatient(null);
       setNewPatientPassword('');
-    } catch (err: any) {
-      console.error('Erro ao alterar senha do paciente:', err);
-      setPasswordError(err.message || 'Erro ao redefinir a senha do paciente.');
+    } catch (err) {
+      logger.error('Erro ao alterar senha do paciente:', err);
+      setPasswordError(errMessage(err) || 'Erro ao redefinir a senha do paciente.');
     } finally {
       setPasswordSaving(false);
     }
@@ -335,7 +388,7 @@ export const Settings: React.FC = () => {
       setNewService({ name: '', duration_minutes: 60, price: 150, modality: 'presencial' });
       showToast('Serviço adicionado com sucesso!', 'success');
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       showToast('Erro ao adicionar serviço.', 'error');
     } finally {
       setSaving(false);
@@ -352,7 +405,7 @@ export const Settings: React.FC = () => {
       setServices(services.filter((_, i) => i !== index));
       showToast('Serviço removido com sucesso!', 'success');
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       showToast('Erro ao remover serviço.', 'error');
     } finally {
       setSaving(false);
@@ -374,7 +427,7 @@ export const Settings: React.FC = () => {
     try {
       await updateTheme(mode, color);
     } catch (error) {
-      console.error('Erro ao atualizar tema:', error);
+      logger.error('Erro ao atualizar tema:', error);
     } finally {
       setSaving(false);
     }
@@ -656,7 +709,7 @@ export const Settings: React.FC = () => {
                 await updateClinic(updates);
                 showToast('Dados salvos com sucesso!', 'success');
               } catch (err) {
-                console.error(err);
+                logger.error(err);
                 showToast('Erro ao salvar os dados da clínica.', 'error');
               } finally {
                 setSaving(false);
@@ -669,47 +722,38 @@ export const Settings: React.FC = () => {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">CEP</label>
-                  {/* @ts-ignore */}
                   <input type="text" name="cep" defaultValue={clinic?.cep || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-4">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Endereço</label>
-                  {/* @ts-ignore */}
                   <input type="text" name="address" defaultValue={clinic?.address || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Número/Complemento</label>
-                  {/* @ts-ignore */}
                   <input type="text" name="complement" defaultValue={clinic?.complement || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Bairro</label>
-                  {/* @ts-ignore */}
                   <input type="text" name="neighborhood" defaultValue={clinic?.neighborhood || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-1">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Cidade</label>
-                  {/* @ts-ignore */}
                   <input type="text" name="city" defaultValue={clinic?.city || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-1">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Estado</label>
-                  {/* @ts-ignore */}
                   <input type="text" name="state" defaultValue={clinic?.state || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-3">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Telefone da Clínica</label>
-                  {/* @ts-ignore */}
                   <input type="text" name="phone" defaultValue={clinic?.phone || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-3">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">E-mail da Clínica</label>
-                  {/* @ts-ignore */}
                   <input type="email" name="email" defaultValue={clinic?.email || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
                 <div className="sm:col-span-6">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Horário de Funcionamento</label>
-                  {/* @ts-ignore */}
                   <input type="text" name="operating_hours" defaultValue={clinic?.operating_hours || ''} className="mt-1 block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm" />
                 </div>
               </div>
@@ -728,7 +772,7 @@ export const Settings: React.FC = () => {
               <h2 className="text-lg font-semibold text-slate-800">Equipe da Clínica</h2>
               <p className="text-sm text-slate-500">Cadastre e gerencie o acesso de nutricionistas e secretárias.</p>
             </div>
-            {!isReadOnly && (
+            {!isReadOnly && userRole === 'owner' && (
               <button
                 type="button"
                 onClick={() => {
@@ -834,7 +878,7 @@ export const Settings: React.FC = () => {
                         </div>
 
                         <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
-                          {!isReadOnly && !isSelf && member.role !== 'owner' && (
+                          {!isReadOnly && userRole === 'owner' && !isSelf && member.role !== 'owner' && (
                             <button
                               type="button"
                               onClick={() => handleToggleTeamMemberStatus(member)}
@@ -859,18 +903,18 @@ export const Settings: React.FC = () => {
                             </button>
                           )}
                           
-                          {!isReadOnly && member.role !== 'owner' && (
+                          {!isReadOnly && userRole === 'owner' && member.role !== 'owner' && (
                             <>
                               <button
                                 type="button"
                                 onClick={() => {
                                   setSelectedTeamMember(member);
                                   setTeamFormData({
-                                    name: member.full_name,
+                                    name: member.full_name || '',
                                     email: member.email || '',
                                     phone: member.phone || '',
                                     crn: member.crn || '',
-                                    role: member.role,
+                                    role: member.role || 'nutritionist',
                                     password: ''
                                   });
                                   setTeamError(null);

@@ -20,36 +20,26 @@ import {
   Mail,
   Smartphone
 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useNutritionistPatients } from '../hooks/queries/usePatients';
+import { usePatientExams } from '../hooks/queries/usePatientExams';
+import { useConsultations, useMealPlans } from '../hooks/queries/usePatientHistory';
+import { qk } from '../lib/queryKeys';
+import { generateMealPlan, GeminiError } from '../lib/gemini';
+import { createExamSignedUrl } from '../lib/storage';
+import { type MealOption, type MealPlanData, MEAL_NAMES } from '../types/mealPlan';
+import { useDebouncedDraft } from '../hooks/useDebouncedDraft';
+import { logger } from '../lib/logger';
+import { pickOne } from '../types/clinical';
+import type { MealPlanRecord } from '../types/clinical';
 
-interface MealOption {
-  description: string;
-  items: string[];
-  kcal: number;
-}
-
-interface MealPlanData {
-  kcal: number;
-  meals: {
-    [key: string]: MealOption[];
-  };
-}
-
-const MEAL_NAMES: { [key: string]: string } = {
-  breakfast: 'Café da Manhã',
-  morning_snack: 'Lanche da Manhã',
-  lunch: 'Almoço',
-  afternoon_snack: 'Lanche da Tarde',
-  pre_workout: 'Pré-Treino',
-  post_workout: 'Pós-Treino',
-  dinner: 'Jantar',
-  supper: 'Ceia'
-};
 export const MealPlans: React.FC = () => {
   const { clinic, isReadOnly, profile, userRole } = useAuth();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
   const getHeaderTheme = () => {
     const themeColor = profile?.theme_color || 'white';
@@ -109,22 +99,44 @@ export const MealPlans: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'editor' | 'history'>('editor');
 
   // Core Data States
-  const [patients, setPatients] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
-  
-  // Patient Context Cache
-  const [latestConsultation, setLatestConsultation] = useState<any | null>(null);
-  const [latestExam, setLatestExam] = useState<any | null>(null);
-  const [pastPlans, setPastPlans] = useState<any[]>([]);
-  
+
+  // Dados via TanStack Query (Onda 4): lista do profissional + contexto do
+  // paciente. As queries de contexto disparam EM PARALELO (fim do waterfall
+  // de 3 awaits do antigo loadPatientContext).
+  const { data: patients = [] } = useNutritionistPatients(profile?.id, { enabled: isAuthorized });
+  const consultationsQuery = useConsultations(selectedPatientId);
+  const examsQuery = usePatientExams(selectedPatientId);
+  const pastPlansQuery = useMealPlans(selectedPatientId);
+  const pastPlans = pastPlansQuery.data ?? [];
+
+  const latestConsultation = useMemo(() => {
+    return (consultationsQuery.data ?? []).find((c) => {
+      const s = pickOne(c.appointments)?.status;
+      return s !== 'cancelado' && s !== 'Cancelado';
+    }) ?? null;
+  }, [consultationsQuery.data]);
+
+  const latestExam = useMemo(
+    () => (examsQuery.data ?? []).find((e) => e.ai_feedback != null) ?? null,
+    [examsQuery.data],
+  );
+
+  const loadingContext = !!selectedPatientId && (
+    consultationsQuery.isLoading || examsQuery.isLoading || pastPlansQuery.isLoading
+  );
+
   // Loading States
-  const [loadingContext, setLoadingContext] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // AI & Plan Parameters
-  const [includeConsultation, setIncludeConsultation] = useState(true);
-  const [includeExams, setIncludeExams] = useState(true);
+  // Toggles de contexto da IA: escolha manual do usuário com fallback na
+  // disponibilidade do dado (antes: 2 useEffect que forçavam setState).
+  const [includeConsultationManual, setIncludeConsultationManual] = useState<boolean | null>(null);
+  const [includeExamsManual, setIncludeExamsManual] = useState<boolean | null>(null);
+  const includeConsultation = includeConsultationManual ?? !!latestConsultation;
+  const includeExams = includeExamsManual ?? !!latestExam;
   const [kcalTarget, setKcalTarget] = useState<string>('2000');
   const [suggestKcalWithAI, setSuggestKcalWithAI] = useState(false);
   const [selectedMeals, setSelectedMeals] = useState<string[]>([
@@ -144,204 +156,84 @@ export const MealPlans: React.FC = () => {
   const [showExamModal, setShowExamModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
-  const [examPdfUrl, setExamPdfUrl] = useState<string | null>(null);
-  const [loadingPdfUrl, setLoadingPdfUrl] = useState(false);
 
-  // Dynamic signed URL fetcher for latest exam PDF
+  // Signed URL do PDF do último exame (só quando o modal abre) — via TanStack
+  // Query, sem efeito com setState (Onda 4/6).
+  const examModalFileUrl = showExamModal ? latestExam?.file_url : undefined;
+  const {
+    data: examPdfUrl = null,
+    isFetching: loadingPdfUrl,
+    error: examPdfError,
+  } = useQuery({
+    queryKey: ['exam-signed-url', examModalFileUrl],
+    enabled: !!examModalFileUrl,
+    staleTime: 50 * 60 * 1000,
+    queryFn: () => createExamSignedUrl(examModalFileUrl as string),
+  });
+
   useEffect(() => {
-    if (!showExamModal || !latestExam?.file_url) {
-      setExamPdfUrl(null);
-      return;
+    if (examPdfError) {
+      logger.error('Erro ao gerar URL assinada para exame:', examPdfError);
+      showToast('Não foi possível carregar o PDF do exame.', 'error');
     }
+  }, [examPdfError, showToast]);
 
-    const fetchExamPdf = async () => {
-      setLoadingPdfUrl(true);
-      try {
-        const { data, error } = await supabase.storage
-          .from('exams-bucket')
-          .createSignedUrl(latestExam.file_url, 60 * 60);
-
-        if (error) throw error;
-        if (data?.signedUrl) {
-          setExamPdfUrl(data.signedUrl);
-        }
-      } catch (err) {
-        console.error('Erro ao gerar URL assinada para exame:', err);
-        showToast('Não foi possível carregar o PDF do exame.', 'error');
-      } finally {
-        setLoadingPdfUrl(false);
-      }
-    };
-
-    fetchExamPdf();
-  }, [showExamModal, latestExam]);
-
-  // Load Clinic Patients based on recent appointments
+  // Seleção inicial de paciente (preferência em localStorage).
   useEffect(() => {
-    const loadPatients = async () => {
-      if (!clinic?.id || !profile?.id) return;
-      if (!isAuthorized) return;
-      
-      try {
-        // Fetch appointments for the logged-in nutritionist
-        const { data: apptsData, error } = await supabase
-          .from('appointments')
-          .select(`
-            patient_id,
-            date_time,
-            patients (
-              id, name, email, phone, birth_date, biological_sex, main_goal, status
-            )
-          `)
-          .eq('nutritionist_id', profile.id)
-          .neq('status', 'cancelado')
-          .neq('status', 'Cancelado')
-          .order('date_time', { ascending: false });
+    if (selectedPatientId || patients.length === 0) return;
+    const stored = localStorage.getItem('nutri-ai:selected-patient-id');
+    const initialId = patients.some((p) => p.id === stored) ? (stored as string) : patients[0].id;
+    // Bootstrap único: sincroniza a seleção com a lista assim que ela carrega.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedPatientId(initialId);
+    localStorage.setItem('nutri-ai:selected-patient-id', initialId);
+  }, [patients, selectedPatientId]);
 
-        if (error) throw error;
-
-        // Extract unique patients from these appointments
-        const patientMap = new Map();
-        if (apptsData) {
-          apptsData.forEach(appt => {
-            const p = appt.patients;
-            const patientObj = Array.isArray(p) ? p[0] : p;
-            
-            // Only add if active and not already added (keeps the most recent due to ordering)
-            if (patientObj && patientObj.status === 'ativo' && !patientMap.has(patientObj.id)) {
-              patientMap.set(patientObj.id, patientObj);
-            }
-          });
-        }
-        
-        const uniquePatients = Array.from(patientMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-        setPatients(uniquePatients);
-
-        if (uniquePatients.length > 0) {
-          const storedId = localStorage.getItem('nutri-ai:selected-patient-id');
-          const exists = uniquePatients.some((p: any) => p.id === storedId);
-          const initialId = exists && storedId ? storedId : uniquePatients[0].id;
-          setSelectedPatientId(initialId);
-          localStorage.setItem('nutri-ai:selected-patient-id', initialId);
-        } else {
-          setSelectedPatientId('');
-        }
-      } catch (err) {
-        console.error('Erro ao carregar pacientes:', err);
-        showToast('Erro ao carregar lista de pacientes do profissional.', 'error');
-      }
-    };
-
-    loadPatients();
-  }, [clinic?.id, profile?.id, isAuthorized]);
-
-  // Load Patient Context & Past Plans
+  // Ao trocar de paciente: reinicia o editor e restaura o rascunho local daquele
+  // paciente. É a sincronização legítima de estado com uma chave externa
+  // (selectedPatientId) — o `react-hooks/set-state-in-effect` do plugin v7 dá
+  // falso-positivo aqui (não há cascata: só roda quando o paciente muda).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!selectedPatientId || !clinic?.id) {
-      setLatestConsultation(null);
-      setLatestExam(null);
-      setPastPlans([]);
+    if (!selectedPatientId) {
       setActivePlan(null);
       return;
     }
-    const loadPatientContext = async () => {
-      setLoadingContext(true);
+    const initialTabs: { [key: string]: number } = {};
+    Object.keys(MEAL_NAMES).forEach(m => { initialTabs[m] = 0; });
+    setOptionActiveTab(initialTabs);
+
+    const draftStr = localStorage.getItem(`nutriai_draft_plano_${selectedPatientId}`);
+    if (draftStr) {
       try {
-        // 1. Fetch latest consultation
-        const { data: consultationData, error: consultationError } = await supabase
-          .from('consultations')
-          .select(`
-            id,
-            anamnese_notes,
-            created_at,
-            appointments!inner (
-              status
-            )
-          `)
-          .eq('patient_id', selectedPatientId)
-          .neq('appointments.status', 'cancelado')
-          .neq('appointments.status', 'Cancelado')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (consultationError) throw consultationError;
-        setLatestConsultation(consultationData);
-        setIncludeConsultation(!!consultationData);
-
-        // 2. Fetch latest exam with ai_feedback and file_url (processed successfully)
-        const { data: examData, error: examError } = await supabase
-          .from('patient_exams')
-          .select('id, ai_feedback, exam_date, created_at, file_url')
-          .eq('patient_id', selectedPatientId)
-          .not('ai_feedback', 'is', null)
-          .order('exam_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (examError) throw examError;
-        setLatestExam(examData);
-        setIncludeExams(!!examData);
-
-        // 3. Fetch past meal plans
-        const { data: plansData, error: plansError } = await supabase
-          .from('meal_plans')
-          .select('id, kcal, meals, created_at')
-          .eq('patient_id', selectedPatientId)
-          .order('created_at', { ascending: false });
-
-        if (plansError) throw plansError;
-        setPastPlans(plansData || []);
-
-        // Prepopulate option active tabs to Option 0 for all meals
-        const initialTabs: { [key: string]: number } = {};
-        Object.keys(MEAL_NAMES).forEach(m => {
-          initialTabs[m] = 0;
-        });
-        setOptionActiveTab(initialTabs);
-
-        // Restore draft if exists
-        const draftKey = `nutriai_draft_plano_${selectedPatientId}`;
-        const draftStr = localStorage.getItem(draftKey);
-        if (draftStr) {
-          try {
-            const draft = JSON.parse(draftStr);
-            setActivePlan(draft.activePlan || null);
-            setEditingTitle(draft.editingTitle || 'Plano Alimentar Inteligente');
-          } catch (e) {
-            console.error('Erro ao recuperar rascunho de plano:', e);
-            setActivePlan(null);
-            setEditingTitle('Plano Alimentar Inteligente');
-          }
-        } else {
-          setActivePlan(null);
-          setEditingTitle('Plano Alimentar Inteligente');
-        }
-      } catch (err) {
-        console.error('Erro ao buscar histórico do paciente:', err);
-        showToast('Erro ao buscar histórico clínico.', 'error');
-      } finally {
-        setLoadingContext(false);
+        const draft = JSON.parse(draftStr);
+        setActivePlan(draft.activePlan || null);
+        setEditingTitle(draft.editingTitle || 'Plano Alimentar Inteligente');
+      } catch {
+        setActivePlan(null);
+        setEditingTitle('Plano Alimentar Inteligente');
       }
-    };
-
-    loadPatientContext();
-  }, [selectedPatientId, clinic?.id]);
-
-  // Auto-Save Draft logic for Meal Plans
-  useEffect(() => {
-    if (!selectedPatientId) return;
-    const draftKey = `nutriai_draft_plano_${selectedPatientId}`;
-    if (!activePlan) {
-      localStorage.removeItem(draftKey);
     } else {
-      const draftObj = {
-        activePlan,
-        editingTitle
-      };
-      localStorage.setItem(draftKey, JSON.stringify(draftObj));
+      setActivePlan(null);
+      setEditingTitle('Plano Alimentar Inteligente');
     }
-  }, [activePlan, editingTitle, selectedPatientId]);
+  }, [selectedPatientId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+
+  // Erro de qualquer query de contexto.
+  useEffect(() => {
+    if (consultationsQuery.error || examsQuery.error || pastPlansQuery.error) {
+      showToast('Erro ao buscar histórico clínico.', 'error');
+    }
+  }, [consultationsQuery.error, examsQuery.error, pastPlansQuery.error, showToast]);
+
+  // Auto-save de rascunho com debounce (PERF-10)
+  useDebouncedDraft(
+    selectedPatientId ? `nutriai_draft_plano_${selectedPatientId}` : null,
+    { activePlan, editingTitle },
+    { isEmpty: (v) => !v.activePlan },
+  );
 
   const selectedPatient = useMemo(() => {
     return patients.find(p => p.id === selectedPatientId);
@@ -361,7 +253,7 @@ export const MealPlans: React.FC = () => {
   };
 
   // Generate blank plan structure for manual entry
-  const handleStartManualPlan = () => {
+  const handleStartManualPlan = (isFallback = false) => {
     if (!selectedPatientId) return;
     
     const blankMeals: { [key: string]: MealOption[] } = {};
@@ -378,7 +270,9 @@ export const MealPlans: React.FC = () => {
       meals: blankMeals
     });
     setEditingTitle('Plano Alimentar Manual');
-    showToast('Estrutura de plano alimentar criada para preenchimento manual.', 'success');
+    if (!isFallback) {
+      showToast('Estrutura de plano alimentar criada para preenchimento manual.', 'success');
+    }
   };
 
   // Trigger Gemini AI Generation with Context
@@ -386,8 +280,6 @@ export const MealPlans: React.FC = () => {
     if (!selectedPatientId || !clinic?.id || !profile?.id) return;
     setGenerating(true);
     showToast('A IA está analisando o histórico e estruturando a dieta...', 'info');
-
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     // Consolidate prompt context
     let contextPrompt = `Paciente: ${selectedPatient?.name || 'Paciente'}, sexo biológico ${selectedPatient?.biological_sex || 'Não definido'}, objetivo principal: ${selectedPatient?.main_goal || 'Equilíbrio nutricional'}.\n`;
@@ -408,8 +300,8 @@ export const MealPlans: React.FC = () => {
       contextPrompt += `\n### HISTÓRICO DE EXAME RECENTE:\n`;
       if (alerts.length > 0) {
         contextPrompt += `Biomarcadores alterados:\n`;
-        alerts.forEach((a: any) => {
-          contextPrompt += `- ${a.marcador}: ${a.valor} (Referência: ${a.referencia}) [Gravidade: ${a.gravidade}]\n`;
+        alerts.forEach((a) => {
+          contextPrompt += `- ${a.marcador}: ${a.valor} (Referência: ${a.referencia}) [Gravidade: ${a.gravidade ?? 'n/d'}]\n`;
         });
       }
       if (insights) {
@@ -426,144 +318,32 @@ export const MealPlans: React.FC = () => {
     contextPrompt += `- Refeições solicitadas (gere exatamente essas chaves no JSON): ${selectedMeals.join(', ')}.\n`;
     contextPrompt += `- Regra estrita de opções: Para cada uma das refeições listadas, crie exatamente 3 opções de cardápios alternativos ricos em nutrientes, com descrição (description), lista de alimentos específicos (items) e calorias estimadas para cada opção (kcal).\n`;
 
-    const systemInstruction = `Você é um assistente de inteligência artificial especialista em nutrição clínica integrativa e medicina funcional.
-Analise o histórico e exames fornecidos do paciente.
-Crie um plano alimentar estruturado em JSON com a meta de calorias exata e as refeições solicitadas.
-Você deve sugerir alimentos práticos, anti-inflamatórios e saudáveis adequados às restrições ou biomarcadores alterados do paciente.
-Por exemplo, se o exame mostra Vitamina D baixa ou glicemia alterada, sugira alimentos/hábitos condizentes.
-Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutura exata:
-{
-  "kcal": <número total de calorias sugerido pela IA ou correspondente a meta solicitada>,
-  "meals": {
-    "breakfast": [
-      { "description": "Tapioca com ovos caipiras", "items": ["2 ovos", "3 colheres de goma de tapioca", "30g queijo coalho"], "kcal": 420 },
-      { "description": "Mingau de aveia com whey e amêndoas", "items": ["30g whey protein", "40g aveia", "15g amêndoas"], "kcal": 380 },
-      { "description": "Panqueca de banana funcional", "items": ["1 banana", "1 ovo", "2 colheres de farelo de aveia"], "kcal": 350 }
-    ],
-    ... para cada uma das refeições solicitadas ...
-  }
-}`;
-
-    if (!apiKey) {
-      console.warn('VITE_GEMINI_API_KEY não configurada. Simulando plano inteligente de alta fidelidade...');
-      setTimeout(() => {
-        // High fidelity simulation
-        const mockPlan: MealPlanData = {
-          kcal: suggestKcalWithAI ? 1950 : parseInt(kcalTarget) || 2000,
-          meals: {}
-        };
-
-        selectedMeals.forEach(meal => {
-          if (meal === 'breakfast') {
-            mockPlan.meals.breakfast = [
-              { description: 'Tapioca funcional com ovos e queijo branco', items: ['2 ovos caipiras mexidos', '3 colheres de sopa de goma de tapioca', '30g de queijo branco fresco', '1 xícara de café sem açúcar'], kcal: 380 },
-              { description: 'Omelete de claras com espinafre e aveia', items: ['3 claras e 1 gema de ovo', '1 punhado de espinafre fresco picado', '2 colheres de aveia em flocos', '1 xícara de chá verde'], kcal: 320 },
-              { description: 'Shake proteico com banana e pasta de amendoim', items: ['30g de whey protein isolado', '1 banana prata média', '1 colher de sopa de pasta de amendoim integral', '200ml de água mineral'], kcal: 360 }
-            ];
-          } else if (meal === 'morning_snack') {
-            mockPlan.meals.morning_snack = [
-              { description: 'Mix de castanhas e sementes com coco', items: ['4 castanhas-do-pará', '5 amêndoas torradas', '10g de lascas de coco seco'], kcal: 180 },
-              { description: 'Fruta com semente de chia', items: ['1 fatia de mamão formosa médio', '1 colher de sopa de sementes de chia hidratadas'], kcal: 120 },
-              { description: 'Iogurte natural proteico com morangos', items: ['1 pote de iogurte grego natural desnatado', '5 morangos frescos higienizados'], kcal: 140 }
-            ];
-          } else if (meal === 'lunch') {
-            mockPlan.meals.lunch = [
-              { description: 'Frango grelhado ao limão com arroz integral e legumes', items: ['120g de filé de peito de frango grelhado', '3 colheres de sopa de arroz integral', '1 concha média de feijão carioca', 'Salada de folhas verdes à vontade com azeite de oliva extra virgem', '80g de brócolis cozido no vapor'], kcal: 580 },
-              { description: 'Posta de salmão ao forno com batata doce', items: ['100g de filé de salmão assado', '100g de batata doce assada com alecrim', 'Salada de alface, tomate cereja e pepino', '1 colher de chá de gergelim preto'], kcal: 620 },
-              { description: 'Patinho moído com purê de abóbora e aspargos', items: ['120g de carne moída (patinho) refogada com alho e cebola', '120g de purê de abóbora cabotiá', '6 aspargos grelhados com azeite'], kcal: 540 }
-            ];
-          } else if (meal === 'afternoon_snack') {
-            mockPlan.meals.afternoon_snack = [
-              { description: 'Torrada integral com homus de grão-de-bico', items: ['2 fatias de pão integral de fermentação natural tostadas', '2 colheres de sopa de homus tahine'], kcal: 220 },
-              { description: 'Muffin de banana funcional feito na caneca', items: ['1 ovo', '1 colher de farinha de coco', '1/2 banana prata amassada', '1 colher de chá de cacau em pó 70%'], kcal: 190 },
-              { description: 'Abacate com cacau e whey protein', items: ['80g de abacate fresco', '15g de whey protein sabor chocolate', '1 colher de sobremesa de cacau nibs'], kcal: 240 }
-            ];
-          } else if (meal === 'pre_workout') {
-            mockPlan.meals.pre_workout = [
-              { description: 'Banana com aveia e mel', items: ['1 banana prata', '2 colheres de sopa de farelo de aveia', '1 colher de sobremesa de mel de abelhas'], kcal: 160 },
-              { description: 'Batata doce cozida com peito de frango', items: ['80g de batata doce cozida', '50g de peito de frango desfiado'], kcal: 180 },
-              { description: 'Torrada de arroz com geleia e pasta de amendoim', items: ['2 torradas de arroz integral', '1 colher de sobremesa de pasta de amendoim', '1 colher de chá de geleia sem açúcar'], kcal: 150 }
-            ];
-          } else if (meal === 'post_workout') {
-            mockPlan.meals.post_workout = [
-              { description: 'Shake de Whey Protein com dextrose', items: ['30g de whey protein concentrado', '20g de dextrose/maltodextrina', '250ml de água de coco'], kcal: 210 },
-              { description: 'Omelete de claras com arroz branco', items: ['3 claras de ovo mexidas', '2 colheres de sopa de arroz branco cozido'], kcal: 170 },
-              { description: 'Sanduíche de atum funcional', items: ['2 fatias de pão de forma integral', '60g de atum em conserva ao natural', '1 colher de sopa de creme de ricota light'], kcal: 230 }
-            ];
-          } else if (meal === 'dinner') {
-            mockPlan.meals.dinner = [
-              { description: 'Filet de peixe branco grelhado com purê de mandioquinha', items: ['130g de filé de tilápia grelhado com ervas finas', '100g de purê de mandioquinha com leite de coco', 'Couve-flor assada com cúrcuma'], kcal: 450 },
-              { description: 'Omelete caprese completo com salada', items: ['3 ovos caipiras batidos', '1 tomate italiano picado', '30g de muçarela de búfala', 'Folhas de manjericão fresco', 'Salada verde temperada com limão'], kcal: 420 },
-              { description: 'Caldo verde funcional de mandioquinha com frango desfiado', items: ['250ml de sopa de mandioquinha com couve fatiada finamente', '100g de peito de frango cozido e desfiado', '1 fio de azeite de oliva extra virgem'], kcal: 380 }
-            ];
-          } else if (meal === 'supper') {
-            mockPlan.meals.supper = [
-              { description: 'Chá de camomila com amêndoas', items: ['1 xícara de chá de camomila quente', '6 amêndoas inteiras cruas'], kcal: 90 },
-              { description: 'Kiwi com sementes de abóbora', items: ['1 kiwi grande descascado e fatiado', '1 colher de sobremesa de sementes de abóbora sem casca'], kcal: 110 },
-              { description: 'Gelatina de agar-agar caseira de uva', items: ['150g de gelatina natural feita com suco de uva integral e agar-agar'], kcal: 70 }
-            ];
-          }
-        });
-
-        setActivePlan(mockPlan);
-        if (suggestKcalWithAI) {
-          setKcalTarget(mockPlan.kcal.toString());
-        }
-        setEditingTitle(`Plano Alimentar Inteligente de ${selectedPatient?.name.split(' ')[0]}`);
-        setGenerating(false);
-        showToast('Plano alimentar simulado gerado com sucesso com base no contexto clínico!', 'success');
-      }, 3000);
-      return;
-    }
-
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: 'user',
-                parts: [{ text: `Gere a dieta personalizada baseada neste histórico:\n\n${contextPrompt}` }]
-              }
-            ],
-            systemInstruction: {
-              role: 'system',
-              parts: [{ text: systemInstruction }]
-            },
-            generationConfig: {
-              responseMimeType: 'application/json'
-            }
-          })
-        }
-      );
-
-      if (!response.ok) throw new Error(`Erro na API do Gemini. Status: ${response.status}`);
-      const data = await response.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (!rawText) throw new Error('Retorno vazio da IA.');
-
-      const parsedJSON: MealPlanData = JSON.parse(rawText.trim());
+      const parsedJSON = await generateMealPlan(contextPrompt);
       setActivePlan(parsedJSON);
       if (suggestKcalWithAI && parsedJSON.kcal) {
         setKcalTarget(parsedJSON.kcal.toString());
       }
       setEditingTitle(`Plano Alimentar Inteligente de ${selectedPatient?.name.split(' ')[0]}`);
       showToast('Plano alimentar gerado pela IA com sucesso!', 'success');
-    } catch (err: any) {
-      console.error('Erro na chamada do Gemini:', err);
-      showToast('Falha ao gerar plano alimentar na IA. Usando esqueleto manual como fallback.', 'error');
-      handleStartManualPlan();
+    } catch (err) {
+      logger.error('Erro na geração do plano:', err);
+      const msg = err instanceof GeminiError ? err.message : 'Erro desconhecido';
+      showToast(`Falha na IA: ${msg}. Usando modo manual.`, 'error');
+      handleStartManualPlan(true);
     } finally {
       setGenerating(false);
     }
   };
 
+
   // Update specific meal option in local state
-  const handleUpdateOption = (mealKey: string, optionIdx: number, field: keyof MealOption, value: any) => {
+  const handleUpdateOption = <K extends keyof MealOption>(
+    mealKey: string,
+    optionIdx: number,
+    field: K,
+    value: MealOption[K],
+  ) => {
     if (!activePlan) return;
 
     const updatedMeals = { ...activePlan.meals };
@@ -646,18 +426,12 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
       // Clean draft from localStorage on success
       localStorage.removeItem(`nutriai_draft_plano_${selectedPatientId}`);
       setActivePlan(null);
-      
-      // Reload past plans
-      const { data: plansData } = await supabase
-        .from('meal_plans')
-        .select('id, kcal, meals, created_at')
-        .eq('patient_id', selectedPatientId)
-        .order('created_at', { ascending: false });
 
-      if (plansData) setPastPlans(plansData);
+      // Recarrega os planos do cache (TanStack Query)
+      await queryClient.invalidateQueries({ queryKey: qk.mealPlans.byPatient(selectedPatientId) });
       setActiveTab('history'); // Navigate to history view
     } catch (err) {
-      console.error('Erro ao salvar plano alimentar:', err);
+      logger.error('Erro ao salvar plano alimentar:', err);
       showToast('Falha ao salvar o plano alimentar no servidor.', 'error');
     } finally {
       setSaving(false);
@@ -677,9 +451,12 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
 
       if (error) throw error;
       showToast('Plano alimentar excluído com sucesso.', 'success');
-      setPastPlans(prev => prev.filter(p => p.id !== planId));
+      queryClient.setQueryData<MealPlanRecord[]>(
+        qk.mealPlans.byPatient(selectedPatientId),
+        (prev) => prev?.filter(p => p.id !== planId) ?? prev,
+      );
     } catch (err) {
-      console.error('Erro ao excluir plano alimentar:', err);
+      logger.error('Erro ao excluir plano alimentar:', err);
       showToast('Falha ao excluir o plano no servidor.', 'error');
     } finally {
       setSaving(false);
@@ -832,7 +609,7 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
                           type="checkbox"
                           disabled={!latestConsultation}
                           checked={includeConsultation && !!latestConsultation}
-                          onChange={e => setIncludeConsultation(e.target.checked)}
+                          onChange={e => setIncludeConsultationManual(e.target.checked)}
                           className="sr-only peer"
                         />
                         <div className={`w-9 h-5 rounded-full peer-focus:outline-none transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${
@@ -883,7 +660,7 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
                           type="checkbox"
                           disabled={!latestExam}
                           checked={includeExams && !!latestExam}
-                          onChange={e => setIncludeExams(e.target.checked)}
+                          onChange={e => setIncludeExamsManual(e.target.checked)}
                           className="sr-only peer"
                         />
                         <div className={`w-9 h-5 rounded-full peer-focus:outline-none transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${
@@ -970,7 +747,7 @@ Retorne APENAS um objeto JSON válido, sem markdown, contendo a seguinte estrutu
 
                 <button
                   type="button"
-                  onClick={handleStartManualPlan}
+                  onClick={() => handleStartManualPlan()}
                   disabled={isReadOnly}
                   className="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >

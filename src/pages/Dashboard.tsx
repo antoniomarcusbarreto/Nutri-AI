@@ -2,24 +2,28 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, CalendarCheck, Clock, CheckCircle, Circle, Trash2, Plus, ChevronLeft, ChevronRight, Lock, Utensils, Copy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
+import { useClinicStats, useUpcomingAppointments, useReminders } from '../hooks/queries/useDashboard';
+import { useReminderMutations } from '../hooks/mutations/useReminderMutations';
+import { pickOne } from '../types/clinical';
 
 export const Dashboard: React.FC = () => {
   const { isReadOnly, clinic, profile } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    patientsCount: 0,
-    appointmentsToday: 0
-  });
 
-  const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
-  const [reminders, setReminders] = useState<any[]>([]);
   const [newReminderText, setNewReminderText] = useState('');
   const [newReminderDate, setNewReminderDate] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // PERF-03/PERF-16: 3 queries independentes, disparadas em paralelo pelo
+  // TanStack Query. `upcoming` não tem o mês na key → não refaz ao trocar de mês.
+  const { data: stats } = useClinicStats(clinic?.id, selectedDate);
+  const { data: upcomingAppointments = [] } = useUpcomingAppointments(clinic?.id);
+  const { data: reminders = [] } = useReminders(clinic?.id, selectedDate);
+  const { add: addReminderMutation, toggle: toggleReminderMutation, remove: removeReminderMutation } =
+    useReminderMutations();
 
   const isPastMonth = () => {
     const now = new Date();
@@ -40,116 +44,39 @@ export const Dashboard: React.FC = () => {
     }
   }, [profile, navigate]);
 
-  useEffect(() => {
-    if (!clinic) return;
-
-    const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-    const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59, 999);
-
-    const fetchStats = async () => {
-      // Get total active patients
-      const { count: pCount } = await supabase
-        .from('patients')
-        .select('*', { count: 'exact', head: true })
-        .eq('clinic_id', clinic.id)
-        .eq('status', 'ativo');
-
-      // Get appointments for the month
-      const { count: aCount } = await supabase
-        .from('appointments')
-        .select('*', { count: 'exact', head: true })
-        .eq('clinic_id', clinic.id)
-        .gte('date_time', monthStart.toISOString())
-        .lte('date_time', monthEnd.toISOString());
-
-      setStats({
-        patientsCount: pCount || 0,
-        appointmentsToday: aCount || 0
-      });
-    };
-
-    const fetchReminders = async () => {
-      const { data } = await supabase
-        .from('reminders')
-        .select('*, profiles:user_id(full_name)')
-        .eq('clinic_id', clinic.id)
-        .gte('due_date', monthStart.toISOString())
-        .lte('due_date', monthEnd.toISOString())
-        .order('is_completed', { ascending: true })
-        .order('due_date', { ascending: true });
-      if (data) setReminders(data);
-    };
-
-    const fetchUpcomingAppointments = async () => {
-      const nowStr = new Date().toISOString();
-      const { data } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          clinic_id,
-          patient_id,
-          service_id,
-          nutritionist_id,
-          date_time,
-          status,
-          patients:patient_id(name),
-          services:service_id(name),
-          profiles:nutritionist_id(full_name)
-        `)
-        .eq('clinic_id', clinic.id)
-        .gte('date_time', nowStr)
-        .order('date_time', { ascending: true })
-        .limit(5);
-
-      if (data) setUpcomingAppointments(data);
-    };
-
-    fetchStats();
-    fetchReminders();
-    fetchUpcomingAppointments();
-  }, [clinic, selectedDate]);
-
   const addReminder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReminderText || !newReminderDate || !clinic || !profile) return;
-    
-    const { data, error } = await supabase.from('reminders').insert([{
-      clinic_id: clinic.id,
-      user_id: profile.id,
-      description: newReminderText,
-      due_date: newReminderDate
-    }]).select('*, profiles:user_id(full_name)').single();
-    
-    if (!error && data) {
-      setReminders([...reminders, data].sort((a,b) => {
-        if (a.is_completed === b.is_completed) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-        return a.is_completed ? 1 : -1;
-      }));
+    try {
+      await addReminderMutation.mutateAsync({
+        clinicId: clinic.id,
+        userId: profile.id,
+        description: newReminderText,
+        dueDate: newReminderDate,
+      });
       setNewReminderText('');
       setNewReminderDate('');
+    } catch {
+      showToast('Não foi possível salvar o lembrete.', 'error');
     }
   };
 
-  const toggleReminder = async (id: string, currentStatus: boolean) => {
-    const { error } = await supabase.from('reminders').update({ is_completed: !currentStatus }).eq('id', id);
-    if (!error) {
-      setReminders(prev => prev.map(r => r.id === id ? { ...r, is_completed: !currentStatus } : r));
-    }
+  const toggleReminder = (id: string, currentStatus: boolean) => {
+    toggleReminderMutation.mutate({ id, isCompleted: currentStatus });
   };
 
-  const confirmDelete = async (id: string) => {
-    const { error } = await supabase.from('reminders').delete().eq('id', id);
-    if (!error) {
-      setReminders(prev => prev.filter(r => r.id !== id));
-      setDeletingId(null);
-    }
+  const confirmDelete = (id: string) => {
+    removeReminderMutation.mutate(id, {
+      onSuccess: () => setDeletingId(null),
+      onError: () => showToast('Não foi possível excluir o lembrete.', 'error'),
+    });
   };
-  
+
   const displayStats = [
-    { name: 'Pacientes Ativos', value: stats.patientsCount.toString(), icon: Users, change: 'Total', gradient: 'from-blue-600 to-indigo-600' },
-    { name: 'Consultas no Mês', value: stats.appointmentsToday.toString(), icon: CalendarCheck, change: 'Neste mês', gradient: 'from-emerald-600 to-teal-600' },
-    { name: 'Refeições Registradas', value: 'Em breve', icon: Utensils, change: 'Acompanhamento', gradient: 'from-amber-500 to-orange-500' },
-    { name: 'Horas Atendidas', value: 'Em breve', icon: Clock, change: 'Este mês', gradient: 'from-violet-600 to-purple-600' },
+    { name: 'Pacientes Ativos', value: (stats?.patientsCount ?? 0).toString(), icon: Users, change: 'Total', gradient: 'from-blue-600 to-indigo-600' },
+    { name: 'Consultas no Mês', value: (stats?.appointmentsInMonth ?? 0).toString(), icon: CalendarCheck, change: 'Neste mês', gradient: 'from-emerald-600 to-teal-600' },
+    { name: 'Planos Alimentares', value: (stats?.mealPlansInMonth ?? 0).toString(), icon: Utensils, change: 'Neste mês', gradient: 'from-amber-500 to-orange-500' },
+    { name: 'Horas Atendidas', value: `${stats?.attendedHours ?? 0}h`, icon: Clock, change: 'Neste mês', gradient: 'from-violet-600 to-purple-600' },
   ];
 
   return (
@@ -190,11 +117,7 @@ export const Dashboard: React.FC = () => {
               <p className="ml-18 truncate text-xs font-medium uppercase tracking-wider text-white/80">{stat.name}</p>
             </dt>
             <dd className="ml-18 flex items-baseline pb-1 mt-1 sm:pb-2">
-              <p className={`text-2xl text-white ${
-                stat.value === 'Em breve' 
-                  ? 'font-medium tracking-normal text-white/75' 
-                  : 'font-medium tracking-tight'
-              }`}>
+              <p className="text-2xl text-white font-medium tracking-tight">
                 {stat.value}
               </p>
               <p
@@ -243,7 +166,9 @@ export const Dashboard: React.FC = () => {
                 const dateObj = new Date(apt.date_time);
                 const formattedTime = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                 const formattedDate = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                const profName = apt.profiles?.full_name?.split(' ')[0] || 'Nutri';
+                const profName = pickOne(apt.profiles)?.full_name?.split(' ')[0] || 'Nutri';
+                const patientName = pickOne(apt.patients)?.name || 'Paciente';
+                const serviceName = pickOne(apt.services)?.name || 'Serviço';
                 
                 return (
                   <div key={apt.id} className="flex items-center justify-between p-4 bg-slate-50/30 hover:bg-slate-50 border border-slate-200 hover:border-slate-350 rounded-2xl transition-all duration-200 shadow-sm hover:shadow-md group min-w-0">
@@ -256,11 +181,11 @@ export const Dashboard: React.FC = () => {
                       
                       <div className="min-w-0">
                         <p className="text-base font-semibold text-slate-900 tracking-wide truncate">
-                          {apt.patients?.name || 'Paciente'}
+                          {patientName}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 mt-1.5">
                           <span className="inline-flex items-center text-xs font-medium text-emerald-600 bg-emerald-50/50 px-2.5 py-0.5 rounded-lg border border-emerald-150 truncate max-w-[170px]">
-                            {apt.services?.name || 'Serviço'}
+                            {serviceName}
                           </span>
                           
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-650 bg-indigo-50/50 px-2.5 py-0.5 rounded-lg border border-indigo-100 truncate max-w-[170px]">
@@ -290,7 +215,11 @@ export const Dashboard: React.FC = () => {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          const link = `${window.location.origin}/confirmar/${apt.id}`;
+                          if (!apt.public_token) {
+                            showToast('Link indisponível. Recarregue a página.', 'error');
+                            return;
+                          }
+                          const link = `${window.location.origin}/confirmar/${apt.public_token}`;
                           navigator.clipboard.writeText(link);
                           showToast('Link de confirmação copiado! Envie ao paciente via WhatsApp.', 'success');
                         }}

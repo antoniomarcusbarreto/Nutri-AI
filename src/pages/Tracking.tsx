@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Activity, 
-  Sparkles, 
-  Calendar, 
-  TrendingUp, 
-  CheckCircle2,
+import { useQuery } from '@tanstack/react-query';
+import { usePatients } from '../hooks/queries/usePatients';
+import { usePatientExams } from '../hooks/queries/usePatientExams';
+import { useConsultations, useMealPlans, usePatientAppointments } from '../hooks/queries/usePatientHistory';
+import { createExamSignedUrl } from '../lib/storage';
+import {
+  Activity,
+  Sparkles,
+  Calendar,
   ShieldAlert,
   FileText,
   ClipboardList,
   Eye,
-  Info,
   CalendarRange,
-  X,
-  ChevronDown,
-  ChevronUp
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -24,17 +24,100 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   AreaChart,
   Area
 } from 'recharts';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { getCanonicalBiomarkerName } from '../utils/biomarkers';
+import { logger } from '../lib/logger';
+import type {
+  AnthropometryJson,
+  AppointmentRecord,
+  ConsultationRecord,
+  ExamBiomarker,
+  ExamRecord,
+  MealPlanRecord,
+  PatientLite,
+  RechartsTooltipProps,
+} from '../types/clinical';
+import { pickOne } from '../types/clinical';
 
 // Helper to parse dates in local timezone (avoiding UTC offset conversion bugs)
+const EMPTY: never[] = [];
+
+/** Tooltip de biomarcadores — hoisted (react-hooks/static-components). */
+const CustomBiomarkerTooltip: React.FC<
+  RechartsTooltipProps & { resolveOriginal: (name: string, dateStr: string) => string | null }
+> = ({ active, payload, label, resolveOriginal }) => {
+  if (!active || !payload || !payload.length) return null;
+  const labelStr = label != null ? String(label) : '';
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-md text-left min-w-[200px]">
+      <p className="text-xs font-semibold text-slate-500 mb-2">{labelStr}</p>
+      <div className="space-y-1.5">
+        {payload.map((item, index) => {
+          const originalVal = item.name ? resolveOriginal(item.name, labelStr) : null;
+          const displayVal = originalVal || `${item.value}`;
+          return (
+            <div key={index} className="flex items-center gap-2 text-xs">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+              <span className="text-slate-600 font-medium">{item.name}:</span>
+              <span className="text-slate-900 font-bold ml-auto">{displayVal}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/** Tooltip de antropometria — hoisted (react-hooks/static-components). */
+const CustomAnthropometryTooltip: React.FC<RechartsTooltipProps> = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-md text-left min-w-[200px]">
+      <p className="text-xs font-semibold text-slate-500 mb-2">{label != null ? String(label) : ''}</p>
+      <div className="space-y-1.5">
+        {payload.map((item, index) => {
+          let unit = '';
+          if (item.dataKey === 'weight') unit = ' kg';
+          else if (item.dataKey === 'bodyFat' || item.dataKey === 'muscleMass') unit = '%';
+          return (
+            <div key={index} className="flex items-center gap-2 text-xs">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+              <span className="text-slate-650 font-medium">{item.name}:</span>
+              <span className="text-slate-900 font-bold ml-auto">{item.value}{unit}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+interface TimelineMeta {
+  notes?: string | null;
+  weight?: string | number | null;
+  body_fat?: string | number | null;
+  muscle_mass?: string | number | null;
+  alertsCount?: number;
+  insights?: string;
+  exam?: ExamRecord;
+  kcal?: number;
+  mealsCount?: number;
+}
+
+interface TimelineEvent {
+  id: string;
+  type: 'consultation' | 'exam' | 'mealplan';
+  date: Date;
+  title: string;
+  subtitle: string;
+  meta: TimelineMeta;
+}
+
 const parseExamDate = (dateVal: string | null | undefined): Date => {
   if (!dateVal) return new Date();
   if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
@@ -49,25 +132,57 @@ export const Tracking: React.FC = () => {
   const { clinic, userRole } = useAuth();
   const { showToast } = useToast();
 
-  // Patients & Loading States
-  const [patients, setPatients] = useState<any[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
-  const [loadingPatients, setLoadingPatients] = useState(false);
-  const [loadingContext, setLoadingContext] = useState(false);
+  // Security Check: allowed only for nutritionists/owners
+  const isAuthorized = userRole === 'owner' || userRole === 'nutritionist';
 
-  // Patient History States
-  const [consultations, setConsultations] = useState<any[]>([]);
-  const [exams, setExams] = useState<any[]>([]);
-  const [mealPlans, setMealPlans] = useState<any[]>([]);
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+
+  // Dados via TanStack Query (Onda 4 / PERF-06): as 4 queries de histórico
+  // disparam EM PARALELO — não há mais o `loadPatientHistory` com 4 awaits.
+  const { data: allPatients = [], isLoading: loadingPatients } = usePatients(clinic?.id, { enabled: isAuthorized });
+  const patients = useMemo<PatientLite[]>(
+    () => allPatients.filter((p: PatientLite) => p.status === 'ativo'),
+    [allPatients],
+  );
+
+  const consultationsQuery = useConsultations(selectedPatientId);
+  const examsQuery = usePatientExams(selectedPatientId);
+  const mealPlansQuery = useMealPlans(selectedPatientId);
+  const appointmentsQuery = usePatientAppointments(selectedPatientId);
+
+  // Só as consultas de agendamentos efetivamente concluídos entram no histórico.
+  const consultations = useMemo(
+    () => ((consultationsQuery.data ?? []) as ConsultationRecord[]).filter((c) => {
+      const status = pickOne(c.appointments)?.status;
+      return status === 'concluido' || status === 'realizada';
+    }),
+    [consultationsQuery.data],
+  );
+  const exams: ExamRecord[] = examsQuery.data ?? EMPTY;
+  const mealPlans: MealPlanRecord[] = mealPlansQuery.data ?? EMPTY;
+  const appointments: AppointmentRecord[] = appointmentsQuery.data ?? EMPTY;
+  const loadingContext = !!selectedPatientId && (
+    consultationsQuery.isLoading || examsQuery.isLoading ||
+    mealPlansQuery.isLoading || appointmentsQuery.isLoading
+  );
 
   // Modal states for details
-  const [selectedExamForModal, setSelectedExamForModal] = useState<any>(null);
-  const [selectedAptForModal, setSelectedAptForModal] = useState<any>(null);
-  const [selectedConsultationForModal, setSelectedConsultationForModal] = useState<any | null>(null);
-  const [selectedMealPlanForModal, setSelectedMealPlanForModal] = useState<any | null>(null);
-  const [modalPdfUrl, setModalPdfUrl] = useState<string | null>(null);
-  const [loadingPdfUrl, setLoadingPdfUrl] = useState<boolean>(false);
+  const [selectedExamForModal, setSelectedExamForModal] = useState<ExamRecord | null>(null);
+  const [selectedAptForModal, setSelectedAptForModal] = useState<AppointmentRecord | null>(null);
+  // Signed URL do PDF do exame aberto no modal — via TanStack Query (sem
+  // efeito com setState; Onda 4/6). `file_url` como chave garante refetch ao
+  // trocar de exame e cache ao reabrir o mesmo.
+  const modalFileUrl = selectedExamForModal?.file_url;
+  const {
+    data: modalPdfUrl = null,
+    isFetching: loadingPdfUrl,
+    error: modalPdfError,
+  } = useQuery({
+    queryKey: ['exam-signed-url', modalFileUrl],
+    enabled: !!modalFileUrl,
+    staleTime: 50 * 60 * 1000, // signed URL vale 1h
+    queryFn: () => createExamSignedUrl(modalFileUrl as string),
+  });
 
   // Visible chart line filters
   const [visibleBiomarkers, setVisibleBiomarkers] = useState<Record<string, boolean>>({});
@@ -77,11 +192,8 @@ export const Tracking: React.FC = () => {
     muscleMass: true
   });
 
-  const [selectedBiomarkerDate, setSelectedBiomarkerDate] = useState<string | null>(null);
-  const [selectedAnthropometryDate, setSelectedAnthropometryDate] = useState<string | null>(null);
-
   // Helper to find original biomarker value from exams data to display with unit in custom tooltip
-  const getOriginalBiomarkerValue = (biomarkerName: string, dateStr: string) => {
+  const getOriginalBiomarkerValue = (biomarkerName: string, dateStr: string): string | null => {
     const exam = exams.find(e => {
       const date = parseExamDate(e.exam_date || e.created_at);
       const formattedDate = format(date, 'MMM/yy', { locale: ptBR });
@@ -89,270 +201,35 @@ export const Tracking: React.FC = () => {
     });
     if (!exam) return null;
     const bio = exam.ai_feedback?.todos_biomarcadores?.find(
-      (b: any) => getCanonicalBiomarkerName(b.marcador).toLowerCase() === biomarkerName.toLowerCase()
+      (b) => getCanonicalBiomarkerName(b.marcador).toLowerCase() === biomarkerName.toLowerCase()
     );
     return bio ? bio.valor : null;
   };
 
-  // Formatter for Biomarkers Tooltip
-  const biomarkerFormatter = (value: any, name: any, entry: any) => {
-    const dateStr = entry?.payload?.dateStr;
-    const originalVal = dateStr ? getOriginalBiomarkerValue(name, dateStr) : null;
-    return [originalVal || value, name];
-  };
-
-  // Formatter for Anthropometry Tooltip
-  const anthropometryFormatter = (value: any, name: any) => {
-    if (name === 'Peso (kg)') return [`${value} kg`, 'Peso'];
-    if (name === 'Gordura (%)') return [`${value}%`, 'Gordura'];
-    if (name === 'Massa Muscular (%)') return [`${value}%`, 'Massa Muscular'];
-    return [value, name];
-  };
-
-  // Formatter for Legend text to ensure high contrast
-  const renderLegendText = (value: any) => {
-    return <span className="text-slate-650 font-semibold text-xs">{value}</span>;
-  };
-
-  // Custom Tooltip for Biomarkers Chart
-  const CustomBiomarkerTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-md text-left min-w-[200px]">
-          <p className="text-xs font-semibold text-slate-500 mb-2">{label}</p>
-          <div className="space-y-1.5">
-            {payload.map((item: any, index: number) => {
-              const originalVal = getOriginalBiomarkerValue(item.name, label);
-              const displayVal = originalVal || `${item.value}`;
-              return (
-                <div key={index} className="flex items-center gap-2 text-xs">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-slate-600 font-medium">{item.name}:</span>
-                  <span className="text-slate-900 font-bold ml-auto">{displayVal}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Custom Tooltip for Anthropometry Chart
-  const CustomAnthropometryTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-md text-left min-w-[200px]">
-          <p className="text-xs font-semibold text-slate-500 mb-2">{label}</p>
-          <div className="space-y-1.5">
-            {payload.map((item: any, index: number) => {
-              let unit = '';
-              if (item.dataKey === 'weight') unit = ' kg';
-              else if (item.dataKey === 'bodyFat' || item.dataKey === 'muscleMass') unit = '%';
-              
-              return (
-                <div key={index} className="flex items-center gap-2 text-xs">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-slate-650 font-medium">{item.name}:</span>
-                  <span className="text-slate-900 font-bold ml-auto">{item.value}{unit}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Legend click handlers to toggle line visibility dynamically
-  const handleBiomarkerLegendClick = (o: any) => {
-    const { dataKey } = o;
-    if (dataKey) {
-      const name = String(dataKey);
-      const isVisible = visibleBiomarkers[name] !== false;
-      setVisibleBiomarkers(prev => ({
-        ...prev,
-        [name]: !isVisible
-      }));
-    }
-  };
-
-  const handleAnthropometryLegendClick = (o: any) => {
-    const { dataKey } = o;
-    if (dataKey) {
-      const key = String(dataKey);
-      const isVisible = visibleAnthropometry[key] !== false;
-      setVisibleAnthropometry(prev => ({
-        ...prev,
-        [key]: !isVisible
-      }));
-    }
-  };
-
-  // Dynamic storage signed URL fetcher when modal opens
   useEffect(() => {
-    if (!selectedExamForModal) {
-      setModalPdfUrl(null);
-      return;
+    if (modalPdfError) {
+      logger.error('Erro ao gerar URL assinada para modal:', modalPdfError);
+      showToast('Não foi possível gerar link de acesso ao PDF.', 'error');
     }
+  }, [modalPdfError, showToast]);
 
-    const fetchSignedUrl = async () => {
-      setLoadingPdfUrl(true);
-      try {
-        const { data, error } = await supabase.storage
-          .from('exams-bucket')
-          .createSignedUrl(selectedExamForModal.file_url, 60 * 60);
-
-        if (error) throw error;
-        if (data?.signedUrl) {
-          setModalPdfUrl(data.signedUrl);
-        }
-      } catch (err) {
-        console.error('Erro ao gerar URL assinada para modal:', err);
-        showToast('Não foi possível gerar link de acesso ao PDF.', 'error');
-      } finally {
-        setLoadingPdfUrl(false);
-      }
-    };
-
-    fetchSignedUrl();
-  }, [selectedExamForModal]);
-
-  // Security Check: allowed only for nutritionists/owners
-  const isAuthorized = userRole === 'owner' || userRole === 'nutritionist';
-
-  // Load Clinic Patients
+  // Seleção inicial de paciente (mantém a preferência em localStorage).
   useEffect(() => {
-    const loadPatients = async () => {
-      if (!clinic?.id || !isAuthorized) return;
-      setLoadingPatients(true);
-      try {
-        const { data, error } = await supabase
-          .from('patients')
-          .select('id, name, email, biological_sex, birth_date, main_goal')
-          .eq('clinic_id', clinic.id)
-          .eq('status', 'ativo')
-          .order('name');
+    if (selectedPatientId || patients.length === 0) return;
+    const stored = localStorage.getItem('nutri-ai:selected-patient-id');
+    const initialId = patients.some((p) => p.id === stored) ? (stored as string) : patients[0].id;
+    // Bootstrap único: sincroniza a seleção com a lista assim que ela carrega.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedPatientId(initialId);
+    localStorage.setItem('nutri-ai:selected-patient-id', initialId);
+  }, [patients, selectedPatientId]);
 
-        if (error) throw error;
-        setPatients(data || []);
-        if (data && data.length > 0) {
-          const storedId = localStorage.getItem('nutri-ai:selected-patient-id');
-          const exists = data.some((p: any) => p.id === storedId);
-          const initialId = exists && storedId ? storedId : data[0].id;
-          setSelectedPatientId(initialId);
-          localStorage.setItem('nutri-ai:selected-patient-id', initialId);
-        }
-      } catch (err) {
-        console.error('Erro ao carregar pacientes:', err);
-        showToast('Erro ao carregar lista de pacientes.', 'error');
-      } finally {
-        setLoadingPatients(false);
-      }
-    };
-
-    loadPatients();
-  }, [clinic?.id, userRole]);
-
-  // Load Selected Patient History Context
+  // Erros de qualquer uma das 4 queries de histórico.
   useEffect(() => {
-    if (!selectedPatientId) {
-      setConsultations([]);
-      setExams([]);
-      setMealPlans([]);
-      setAppointments([]);
-      return;
+    if (consultationsQuery.error || examsQuery.error || mealPlansQuery.error || appointmentsQuery.error) {
+      showToast('Erro ao carregar histórico do paciente.', 'error');
     }
-
-    const loadPatientHistory = async () => {
-      setLoadingContext(true);
-      try {
-        // 1. Fetch consultations with associated appointment status and services
-        const { data: consultationsData, error: consultationsError } = await supabase
-          .from('consultations')
-          .select(`
-            id,
-            anamnese_notes,
-            anthropometry_json,
-            created_at,
-            appointments (
-              status,
-              services (
-                name
-              )
-            )
-          `)
-          .eq('patient_id', selectedPatientId)
-          .order('created_at', { ascending: false });
-
-        if (consultationsError) throw consultationsError;
-
-        // Filter: bring ONLY consultations where appointment status is strictly successful/concluded ('concluido' or 'realizada')
-        // and completely exclude any cancelled or missed appointments ('cancelado' or 'falta')
-        const activeConsultations = (consultationsData || []).filter((c: any) => {
-          const apts = c.appointments;
-          const status = Array.isArray(apts) ? apts[0]?.status : apts?.status;
-          return status === 'concluido' || status === 'realizada';
-        });
-
-        setConsultations(activeConsultations);
-
-        // 2. Fetch exams
-        const { data: examsData, error: examsError } = await supabase
-          .from('patient_exams')
-          .select('id, ai_feedback, exam_date, created_at, file_url')
-          .eq('patient_id', selectedPatientId)
-          .order('exam_date', { ascending: false });
-
-        if (examsError) throw examsError;
-        setExams(examsData || []);
-
-        // 3. Fetch meal plans
-        const { data: plansData, error: plansError } = await supabase
-          .from('meal_plans')
-          .select('id, kcal, meals, created_at')
-          .eq('patient_id', selectedPatientId)
-          .order('created_at', { ascending: false });
-
-        if (plansError) throw plansError;
-        setMealPlans(plansData || []);
-
-        // 4. Fetch appointments (with service names joined from services and consultations)
-        const { data: appointmentsData, error: appointmentsError } = await supabase
-          .from('appointments')
-          .select(`
-            id,
-            date_time,
-            status,
-            created_at,
-            services (
-              name,
-              modality
-            ),
-            consultations (
-              id,
-              anamnese_notes,
-              anthropometry_json
-            )
-          `)
-          .eq('patient_id', selectedPatientId)
-          .order('date_time', { ascending: false });
-
-        if (appointmentsError) throw appointmentsError;
-        setAppointments(appointmentsData || []);
-
-      } catch (err) {
-        console.error('Erro ao buscar histórico clínico:', err);
-        showToast('Erro ao carregar histórico do paciente.', 'error');
-      } finally {
-        setLoadingContext(false);
-      }
-    };
-
-    loadPatientHistory();
-  }, [selectedPatientId]);
+  }, [consultationsQuery.error, examsQuery.error, mealPlansQuery.error, appointmentsQuery.error, showToast]);
 
   // 1. Dynamic AI Treatment Predictive Prognosis
   const prediction = useMemo(() => {
@@ -369,15 +246,15 @@ export const Tracking: React.FC = () => {
     let baseWeeks = latestExam?.ai_feedback?.tempo_estimado || latestExam?.ai_feedback?.base_weeks;
     if (!baseWeeks) {
       const hasHashimoto = latestExam?.ai_feedback?.alertas?.some(
-        (a: any) => a.marcador.toLowerCase().includes('anti-tpo') || a.marcador.toLowerCase().includes('tsh')
+        (a) => a.marcador.toLowerCase().includes('anti-tpo') || a.marcador.toLowerCase().includes('tsh')
       ) || latestConsultation?.anamnese_notes?.toLowerCase().includes('hashimoto') || latestConsultation?.anamnese_notes?.toLowerCase().includes('tireoide');
 
       const hasHighGlucose = latestExam?.ai_feedback?.todos_biomarcadores?.some(
-        (b: any) => b.marcador.toLowerCase().includes('glicose') && parseFloat(b.valor) > 99
+        (b) => b.marcador.toLowerCase().includes('glicose') && parseFloat(b.valor) > 99
       ) || latestConsultation?.anamnese_notes?.toLowerCase().includes('glicose');
 
       const hasLowVitD = latestExam?.ai_feedback?.todos_biomarcadores?.some(
-        (b: any) => b.marcador.toLowerCase().includes('vitamina d') && parseFloat(b.valor) < 30
+        (b) => b.marcador.toLowerCase().includes('vitamina d') && parseFloat(b.valor) < 30
       );
 
       if (hasHashimoto) {
@@ -402,10 +279,10 @@ export const Tracking: React.FC = () => {
       const originalDesc = description;
       description = description.replace(
         /\s*e o plano alimentar está calibrado para manutenção e suporte digestivo padrão de (\d+) semanas/gi,
-        (_, weeks) => `; aguardando a estruturação do plano alimentar personalizado de ${weeks} semanas para início do suporte digestivo`
+        (_: string, weeks: string) => `; aguardando a estruturação do plano alimentar personalizado de ${weeks} semanas para início do suporte digestivo`
       ).replace(
         /\s*o plano alimentar está calibrado para manutenção e suporte digestivo padrão de (\d+) semanas/gi,
-        (_, weeks) => `aguardando a estruturação do plano alimentar personalizado de ${weeks} semanas para início do suporte digestivo`
+        (_: string, weeks: string) => `aguardando a estruturação do plano alimentar personalizado de ${weeks} semanas para início do suporte digestivo`
       ).replace(
         /\s*plano alimentar está calibrado para manutenção e suporte digestivo padrão/gi,
         "aguardando a estruturação do plano alimentar personalizado para início do suporte digestivo"
@@ -416,21 +293,21 @@ export const Tracking: React.FC = () => {
 
       // If description hasn't changed or matches general fallback, replace completely to ensure zero hallucination
       if (originalDesc === description && (description.includes("está calibrado") || description.includes("calibrado"))) {
-        description = `Adequação dietética e reeducação metabólica geral sugeridas. Os exames laboratoriais demonstram biomarcadores séricos ${latestExam?.ai_feedback?.alertas?.length > 0 ? 'alterados' : 'estáveis'}; aguardando a estruturação do plano alimentar personalizado de ${baseWeeks} semanas para início do suporte digestivo.`;
+        description = `Adequação dietética e reeducação metabólica geral sugeridas. Os exames laboratoriais demonstram biomarcadores séricos ${(latestExam?.ai_feedback?.alertas?.length ?? 0) > 0 ? 'alterados' : 'estáveis'}; aguardando a estruturação do plano alimentar personalizado de ${baseWeeks} semanas para início do suporte digestivo.`;
       }
     }
 
     // Dynamic focus points (focos_sugeridos) from the database
-    let focusPoints: string[] = latestExam?.ai_feedback?.focos_sugeridos;
-    if (!focusPoints || !Array.isArray(focusPoints)) {
+    let focusPoints: string[] = latestExam?.ai_feedback?.focos_sugeridos ?? [];
+    if (!focusPoints.length) {
       const hasHashimoto = latestExam?.ai_feedback?.alertas?.some(
-        (a: any) => a.marcador.toLowerCase().includes('anti-tpo') || a.marcador.toLowerCase().includes('tsh')
+        (a) => a.marcador.toLowerCase().includes('anti-tpo') || a.marcador.toLowerCase().includes('tsh')
       );
       const hasHighGlucose = latestExam?.ai_feedback?.todos_biomarcadores?.some(
-        (b: any) => b.marcador.toLowerCase().includes('glicose') && parseFloat(b.valor) > 99
+        (b) => b.marcador.toLowerCase().includes('glicose') && parseFloat(b.valor) > 99
       );
       const hasLowVitD = latestExam?.ai_feedback?.todos_biomarcadores?.some(
-        (b: any) => b.marcador.toLowerCase().includes('vitamina d') && parseFloat(b.valor) < 30
+        (b) => b.marcador.toLowerCase().includes('vitamina d') && parseFloat(b.valor) < 30
       );
 
       if (hasHashimoto) {
@@ -471,23 +348,6 @@ export const Tracking: React.FC = () => {
     };
   }, [selectedPatientId, exams, consultations, mealPlans]);
 
-  // 2. Biomarkers List Extraction
-  const availableBiomarkers = useMemo(() => {
-    const list: string[] = [];
-    exams.forEach(e => {
-      e.ai_feedback?.todos_biomarcadores?.forEach((b: any) => {
-        const name = getCanonicalBiomarkerName(b.marcador);
-        if (!list.some(item => item.toLowerCase() === name.toLowerCase())) {
-          list.push(name);
-        }
-      });
-    });
-    if (list.length === 0) {
-      return ["Anticorpos Anti-TPO", "TSH (Hormônio Tireoestimulante)", "Vitamina D (25-OH)", "Glicose de Jejum", "Colesterol LDL"];
-    }
-    return list;
-  }, [exams]);
-
   // Helper to extract clean numerical values from biomarker strings (e.g. "86.6 mg/dL" -> 86.6)
   const parseBiomarkerValue = (valStr: string): number | null => {
     if (!valStr) return null;
@@ -504,7 +364,7 @@ export const Tracking: React.FC = () => {
   const allBiomarkers = useMemo(() => {
     const counts: Record<string, number> = {};
     exams.forEach(e => {
-      e.ai_feedback?.todos_biomarcadores?.forEach((b: any) => {
+      e.ai_feedback?.todos_biomarcadores?.forEach((b) => {
         const name = getCanonicalBiomarkerName(b.marcador);
         counts[name] = (counts[name] || 0) + 1;
       });
@@ -526,12 +386,12 @@ export const Tracking: React.FC = () => {
       const date = parseExamDate(e.exam_date || e.created_at);
       const formattedDate = format(date, 'MMM/yy', { locale: ptBR });
 
-      const row: Record<string, any> = {
+      const row: Record<string, string | number | Date> = {
         dateStr: formattedDate,
         originalDate: date,
       };
 
-      e.ai_feedback?.todos_biomarcadores?.forEach((b: any) => {
+      e.ai_feedback?.todos_biomarcadores?.forEach((b) => {
         const name = getCanonicalBiomarkerName(b.marcador);
         const val = parseBiomarkerValue(b.valor);
         if (val !== null) {
@@ -556,9 +416,9 @@ export const Tracking: React.FC = () => {
         const date = new Date(c.created_at);
         const formattedDate = format(date, 'MMM/yy', { locale: ptBR });
         
-        const weight = parseFloat(c.anthropometry_json?.weight);
-        const bodyFat = parseFloat(c.anthropometry_json?.body_fat);
-        const muscleMass = parseFloat(c.anthropometry_json?.muscle_mass);
+        const weight = parseFloat(String(c.anthropometry_json?.weight ?? ''));
+        const bodyFat = parseFloat(String(c.anthropometry_json?.body_fat ?? ''));
+        const muscleMass = parseFloat(String(c.anthropometry_json?.muscle_mass ?? ''));
 
         return {
           dateStr: formattedDate,
@@ -575,7 +435,7 @@ export const Tracking: React.FC = () => {
   const timelineEvents = useMemo(() => {
     if (!selectedPatientId) return [];
 
-    const events: { id: string, type: 'consultation' | 'exam' | 'mealplan', date: Date, title: string, subtitle: string, meta: any }[] = [];
+    const events: TimelineEvent[] = [];
 
     consultations.forEach(c => {
       events.push({
@@ -624,72 +484,6 @@ export const Tracking: React.FC = () => {
 
     return events.sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [selectedPatientId, consultations, exams, mealPlans]);
-
-  // Helper to render value labels on active (clicked) dots for Biomarkers
-  const renderBiomarkerLabel = (props: any) => {
-    const { x, y, value, payload } = props;
-    if (payload && payload.dateStr === selectedBiomarkerDate && value !== undefined && value !== null) {
-      return (
-        <g>
-          {/* Subtle background pill */}
-          <rect 
-            x={x - 22} 
-            y={y - 25} 
-            width={44} 
-            height={16} 
-            rx={4} 
-            fill="#1e293b" 
-            stroke="#475569" 
-            strokeWidth={1}
-          />
-          <text 
-            x={x} 
-            y={y - 14} 
-            fill="#ffffff" 
-            fontSize={9} 
-            fontWeight="600" 
-            textAnchor="middle"
-          >
-            {value}
-          </text>
-        </g>
-      );
-    }
-    return null;
-  };
-
-  // Helper to render value labels on active (clicked) dots for Anthropometry
-  const renderAnthropometryLabel = (props: any) => {
-    const { x, y, value, payload } = props;
-    if (payload && payload.dateStr === selectedAnthropometryDate && value !== undefined && value !== null) {
-      return (
-        <g>
-          {/* Subtle background pill */}
-          <rect 
-            x={x - 22} 
-            y={y - 25} 
-            width={44} 
-            height={16} 
-            rx={4} 
-            fill="#1e293b" 
-            stroke="#475569" 
-            strokeWidth={1}
-          />
-          <text 
-            x={x} 
-            y={y - 14} 
-            fill="#ffffff" 
-            fontSize={9} 
-            fontWeight="600" 
-            textAnchor="middle"
-          >
-            {value}
-          </text>
-        </g>
-      );
-    }
-    return null;
-  };
 
   // Standard visual styles
   if (!isAuthorized) {
@@ -930,14 +724,14 @@ export const Tracking: React.FC = () => {
                       margin={{ top: 15, right: 10, left: -20, bottom: 0 }}
                       className="cursor-pointer"
                       style={{ outline: 'none', border: 'none' }}
-                      onMouseDown={(e) => e?.preventDefault()}
+                      onMouseDown={(_, e) => (e as React.MouseEvent)?.preventDefault?.()}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis dataKey="dateStr" stroke="#94a3b8" tick={{ fill: '#475569', fontSize: 10 }} />
                       <YAxis stroke="#94a3b8" tick={{ fill: '#475569', fontSize: 10 }} />
                       <Tooltip 
                         cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '3 3' }}
-                        content={<CustomBiomarkerTooltip />}
+                        content={<CustomBiomarkerTooltip resolveOriginal={getOriginalBiomarkerValue} />}
                         shared={false}
                       />
                       {/* Redundant Recharts Legend Removed to match Anthropometry chart */}
@@ -1018,7 +812,7 @@ export const Tracking: React.FC = () => {
                       margin={{ top: 15, right: 10, left: -20, bottom: 0 }}
                       className="cursor-pointer"
                       style={{ outline: 'none', border: 'none' }}
-                      onMouseDown={(e) => e?.preventDefault()}
+                      onMouseDown={(_, e) => (e as React.MouseEvent)?.preventDefault?.()}
                     >
                       <defs>
                         <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
@@ -1119,26 +913,19 @@ export const Tracking: React.FC = () => {
                     const dateObj = new Date(apt.date_time);
                     const formattedDate = format(dateObj, 'dd/MM/yyyy');
                     const formattedTime = format(dateObj, 'HH:mm');
-                    const serviceName = (apt.services as any)?.name || 'Consulta Geral';
-                    const modality = (apt.services as any)?.modality || 'Presencial';
+                    const service = pickOne(apt.services);
+                    const serviceName = service?.name || 'Consulta Geral';
+                    const modality = service?.modality || 'Presencial';
                     
                     // Status color mappings
-                    let statusBadge = '';
-                    let statusLabel = '';
-                    
-                    if (apt.status === 'concluido') {
-                      statusBadge = 'bg-emerald-50/50 border-emerald-100/30 text-emerald-600';
-                      statusLabel = 'Realizada';
-                    } else if (apt.status === 'cancelado') {
-                      statusBadge = 'bg-rose-50/50 border-rose-100/30 text-rose-600';
-                      statusLabel = 'Cancelada';
-                    } else {
-                      statusBadge = 'bg-teal-50/50 border border-teal-150/30 text-teal-650';
-                      statusLabel = 'Agendada';
-                    }
+                    const { badge: statusBadge, label: statusLabel } =
+                      apt.status === 'concluido'
+                        ? { badge: 'bg-emerald-50/50 border-emerald-100/30 text-emerald-600', label: 'Realizada' }
+                        : apt.status === 'cancelado'
+                          ? { badge: 'bg-rose-50/50 border-rose-100/30 text-rose-600', label: 'Cancelada' }
+                          : { badge: 'bg-teal-50/50 border border-teal-150/30 text-teal-650', label: 'Agendada' };
 
-                    const consultationArray = Array.isArray(apt.consultations) ? apt.consultations : [apt.consultations].filter(Boolean);
-                    const consultation = consultationArray[0];
+                    const consultation = pickOne(apt.consultations);
                     const hasDetails = apt.status === 'concluido' && !!consultation;
 
                     return (
@@ -1261,7 +1048,7 @@ export const Tracking: React.FC = () => {
                                 </div>
                               )}
 
-                              {evt.type === 'exam' && evt.meta.alertsCount > 0 && (
+                              {evt.type === 'exam' && (evt.meta.alertsCount ?? 0) > 0 && (
                                 <div className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg">
                                   ⚠️ {evt.meta.alertsCount} biomarcadores alterados
                                 </div>
@@ -1273,7 +1060,7 @@ export const Tracking: React.FC = () => {
                               <button
                                 onClick={() => {
                                   if (evt.type === 'exam') {
-                                    setSelectedExamForModal(evt.meta.exam);
+                                    setSelectedExamForModal(evt.meta.exam ?? null);
                                   } else {
                                     showToast('Para visualizar consultas completas ou dietas estruturadas, navegue pelos respectivos painéis no menu lateral.', 'info');
                                   }
@@ -1385,7 +1172,7 @@ export const Tracking: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-150">
-                      {selectedExamForModal.ai_feedback?.todos_biomarcadores?.map((bio: any, idx: number) => {
+                      {selectedExamForModal.ai_feedback?.todos_biomarcadores?.map((bio: ExamBiomarker, idx: number) => {
                         const isAlterado = bio.status?.toLowerCase() === 'alterado';
                         return (
                           <React.Fragment key={idx}>
@@ -1454,11 +1241,8 @@ export const Tracking: React.FC = () => {
 
       {/* 5. MODAL RESUMO DO ATENDIMENTO (O QUE FOI FEITO) */}
       {selectedAptForModal && (() => {
-        const consultationArray = Array.isArray(selectedAptForModal.consultations) 
-          ? selectedAptForModal.consultations 
-          : [selectedAptForModal.consultations].filter(Boolean);
-        const consultation = consultationArray[0];
-        const ant = consultation?.anthropometry_json || {};
+        const consultation = pickOne(selectedAptForModal.consultations);
+        const ant: AnthropometryJson = consultation?.anthropometry_json ?? {};
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
             <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden animate-in scale-in duration-300">
@@ -1470,7 +1254,7 @@ export const Tracking: React.FC = () => {
                     <ClipboardList className="w-3 h-3 text-[#5024fc]" /> Resumo do Atendimento
                   </span>
                   <h3 className="text-lg font-semibold text-slate-900">
-                    {(selectedAptForModal.services as any)?.name || 'Consulta Geral'}
+                    {pickOne(selectedAptForModal.services)?.name || 'Consulta Geral'}
                   </h3>
                 </div>
                 <button 

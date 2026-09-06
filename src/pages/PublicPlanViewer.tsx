@@ -1,30 +1,17 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Lock, Clock, CheckCircle2, FileText, Printer, Apple } from 'lucide-react';
+import { Lock, Clock, CheckCircle2, Printer, Apple } from 'lucide-react';
 import { format, parse } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { logger } from '../lib/logger';
+import { type MealOption, MEAL_NAMES } from '../types/mealPlan';
 
-interface MealItem {
-  description: string;
+interface PublicPlan {
+  meals: Record<string, MealOption[]>;
+  kcal?: number;
+  nutritionist?: { name?: string | null } | null;
+  patient?: { name?: string | null } | null;
 }
-
-interface MealOption {
-  description: string;
-  items: MealItem[];
-  kcal: number;
-}
-
-const MEAL_NAMES: { [key: string]: string } = {
-  breakfast: 'Café da Manhã',
-  morning_snack: 'Lanche da Manhã',
-  lunch: 'Almoço',
-  afternoon_snack: 'Lanche da Tarde',
-  pre_workout: 'Pré-Treino',
-  post_workout: 'Pós-Treino',
-  dinner: 'Jantar',
-  supper: 'Ceia'
-};
 
 const getHeaderTheme = (mealKey: string) => {
   if (['breakfast', 'morning_snack'].includes(mealKey)) {
@@ -75,7 +62,7 @@ export default function PublicPlanViewer() {
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [planData, setPlanData] = useState<any | null>(null);
+  const [planData, setPlanData] = useState<PublicPlan | null>(null);
   const [birthDate, setBirthDate] = useState('');
   const [optionActiveTab, setOptionActiveTab] = useState<{ [key: string]: number }>({});
 
@@ -120,9 +107,10 @@ export default function PublicPlanViewer() {
       });
       setOptionActiveTab(initialTabs);
       
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message === 'Data de nascimento incorreta' ? 'Data de nascimento incorreta.' : 'Erro ao acessar plano. Verifique o link e a data de nascimento.');
+    } catch (err) {
+      logger.error(err);
+      const message = err instanceof Error ? err.message : '';
+      setError(message === 'Data de nascimento incorreta' ? 'Data de nascimento incorreta.' : 'Erro ao acessar plano. Verifique o link e a data de nascimento.');
     } finally {
       setLoading(false);
     }
@@ -228,9 +216,9 @@ export default function PublicPlanViewer() {
                       return order.indexOf(a) - order.indexOf(b);
                     })
                     .map(mealKey => {
-                    const options = planData.meals[mealKey];
+                    const options: MealOption[] = planData.meals[mealKey] || [];
                     const activeOptionIdx = optionActiveTab[mealKey] !== undefined ? optionActiveTab[mealKey] : 0;
-                    const currentOption = options[activeOptionIdx] || options[0] || { description: '', items: [], kcal: 0 };
+                    const currentOption: MealOption = options[activeOptionIdx] || options[0] || { description: '', items: [], kcal: 0 };
                     const headerTheme = getHeaderTheme(mealKey);
 
                     return (
@@ -245,7 +233,7 @@ export default function PublicPlanViewer() {
                           
                           {/* 3 Options Tab Switchers */}
                           <div className={`flex p-0.5 ${headerTheme.switcherBg} rounded-lg shrink-0 print:hidden`}>
-                            {options.map((_, optIdx) => (
+                            {options.map((_opt, optIdx) => (
                               <button
                                 key={optIdx}
                                 onClick={() => setOptionActiveTab(prev => ({ ...prev, [mealKey]: optIdx }))}
@@ -280,10 +268,11 @@ export default function PublicPlanViewer() {
                               Alimentos / Componentes
                             </label>
                             <ul className="space-y-2">
-                              {currentOption.items?.map((item: any, itemIdx: number) => (
+                              {currentOption.items?.map((item, itemIdx: number) => (
                                 <li key={itemIdx} className="flex gap-3 text-sm text-slate-600 font-medium group">
                                   <span className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 shrink-0"></span>
-                                  <p>{item.description}</p>
+                                  {/* `items` é string[] (formato da IA/editor) — DEBT-05 */}
+                                  <p>{typeof item === 'string' ? item : (item as unknown as { description?: string }).description}</p>
                                 </li>
                               ))}
                             </ul>

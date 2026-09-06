@@ -1,21 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Shield, Key, Calendar, Save, UserPlus, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
+const errMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Erro inesperado');
+
+interface AdminClinicMember {
+  role?: string | null;
+  clinic_id?: string | null;
+  clinics?: { name?: string | null } | null;
+}
+interface AdminPatientLink {
+  clinic_id?: string | null;
+  clinics?: { name?: string | null } | null;
+}
+interface AdminUser {
+  id: string;
+  full_name?: string | null;
+  crn?: string | null;
+  avatar_url?: string | null;
+  is_active?: boolean | null;
+  is_superadmin?: boolean | null;
+  created_at: string;
+  clinic_members?: AdminClinicMember[] | null;
+  patients?: AdminPatientLink[] | null;
+}
+interface AdminClinic {
+  id: string;
+  name?: string | null;
+  owner?: { full_name?: string | null } | null;
+  subscription_status?: string | null;
+  subscription_end_date?: string | null;
+  created_at: string;
+}
+
+async function fetchAdminData(): Promise<{ users: AdminUser[]; clinics: AdminClinic[] }> {
+  const [usersRes, clinicsRes] = await Promise.all([
+    supabase.from('profiles').select('*, clinic_members(role, clinic_id, clinics(name)), patients(clinic_id, clinics(name))').order('created_at', { ascending: false }),
+    supabase.from('clinics').select('*, owner:profiles(full_name)').order('created_at', { ascending: false }),
+  ]);
+  return {
+    users: (usersRes.data ?? []) as unknown as AdminUser[],
+    clinics: (clinicsRes.data ?? []) as unknown as AdminClinic[],
+  };
+}
+
 export const AdminDashboard: React.FC = () => {
   const { profile } = useAuth();
-  const [users, setUsers] = useState<any[]>([]);
-  const [clinics, setClinics] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  
+
+  // Dados do painel Master via TanStack Query (antes: useEffect + fetchData + 3 setState).
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ['admin', 'panel'],
+    enabled: !!profile?.is_superadmin,
+    queryFn: fetchAdminData,
+  });
+  const users = data?.users ?? [];
+  const clinics = data?.clinics ?? [];
+  const fetchData = () => { void refetch(); };
+
   // Modal states
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [newPassword, setNewPassword] = useState('');
-  
+
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
-  const [selectedClinic, setSelectedClinic] = useState<any>(null);
+  const [selectedClinic, setSelectedClinic] = useState<AdminClinic | null>(null);
   const [subStatus, setSubStatus] = useState('trial');
   const [subDate, setSubDate] = useState('');
 
@@ -26,25 +76,7 @@ export const AdminDashboard: React.FC = () => {
 
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  const fetchData = async () => {
-    setLoading(true);
-    const [usersRes, clinicsRes] = await Promise.all([
-      supabase.from('profiles').select('*, clinic_members(role, clinic_id, clinics(name)), patients(clinic_id, clinics(name))').order('created_at', { ascending: false }),
-      supabase.from('clinics').select('*, owner:profiles(full_name)').order('created_at', { ascending: false })
-    ]);
-    
-    if (usersRes.data) setUsers(usersRes.data);
-    if (clinicsRes.data) setClinics(clinicsRes.data);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (profile?.is_superadmin) {
-      fetchData();
-    }
-  }, [profile]);
-
-  const callAdminAction = async (action: string, payload: any) => {
+  const callAdminAction = async (action: string, payload: Record<string, unknown>) => {
     const { data: session } = await supabase.auth.getSession();
     const token = session.session?.access_token;
     
@@ -57,35 +89,36 @@ export const AdminDashboard: React.FC = () => {
       body: JSON.stringify({ action, ...payload })
     });
     
-    const result = await response.json();
+    const result = (await response.json()) as { error?: string };
     if (!response.ok) throw new Error(result.error || 'Erro na requisição');
     return result;
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedUser) return;
     try {
       await callAdminAction('change_password', { targetUserId: selectedUser.id, newPassword });
       setMessage({ text: 'Senha alterada com sucesso!', type: 'success' });
       setIsPasswordModalOpen(false);
       setNewPassword('');
-    } catch (err: any) {
-      setMessage({ text: err.message, type: 'error' });
+    } catch (err) {
+      setMessage({ text: errMessage(err), type: 'error' });
     }
   };
 
-  const handleToggleStatus = async (user: any) => {
+  const handleToggleStatus = async (user: AdminUser) => {
     try {
       const newStatus = !user.is_active;
       await callAdminAction('toggle_status', { targetUserId: user.id, isActive: newStatus });
       setMessage({ text: `Usuário ${newStatus ? 'ativado' : 'desativado'} com sucesso!`, type: 'success' });
       fetchData();
-    } catch (err: any) {
-      setMessage({ text: err.message, type: 'error' });
+    } catch (err) {
+      setMessage({ text: errMessage(err), type: 'error' });
     }
   };
 
-  const handleDeleteUser = async (user: any) => {
+  const handleDeleteUser = async (user: AdminUser) => {
     if (user.id === profile?.id) {
       setMessage({ text: 'Você não pode excluir seu próprio perfil Master.', type: 'error' });
       return;
@@ -94,15 +127,13 @@ export const AdminDashboard: React.FC = () => {
       return;
     }
     
-    setLoading(true);
     try {
       const { error } = await supabase.rpc('delete_user_master', { p_user_id: user.id });
       if (error) throw error;
       setMessage({ text: 'Usuário excluído com sucesso!', type: 'success' });
       fetchData();
-    } catch (err: any) {
-      setMessage({ text: err.message, type: 'error' });
-      setLoading(false);
+    } catch (err) {
+      setMessage({ text: errMessage(err), type: 'error' });
     }
   };
 
@@ -110,29 +141,28 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     if (!selectedUser || !allocateClinicId) return;
     
-    setLoading(true);
     try {
       const { error } = await supabase.rpc('allocate_user_to_clinic', {
         p_user_id: selectedUser.id,
         p_clinic_id: allocateClinicId,
         p_role: allocateRole
       });
-      
+
       if (error) throw error;
-      
+
       setMessage({ text: 'Usuário alocado à clínica com sucesso!', type: 'success' });
       setIsAllocateModalOpen(false);
       setAllocateClinicId('');
       setAllocateRole('nutritionist');
       fetchData();
-    } catch (err: any) {
-      setMessage({ text: err.message, type: 'error' });
-      setLoading(false);
+    } catch (err) {
+      setMessage({ text: errMessage(err), type: 'error' });
     }
   };
 
   const handleSubUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedClinic) return;
     try {
       const { error } = await supabase
         .from('clinics')
@@ -147,8 +177,8 @@ export const AdminDashboard: React.FC = () => {
       setMessage({ text: 'Assinatura atualizada!', type: 'success' });
       setIsSubModalOpen(false);
       fetchData();
-    } catch (err: any) {
-      setMessage({ text: err.message, type: 'error' });
+    } catch (err) {
+      setMessage({ text: errMessage(err), type: 'error' });
     }
   };
 

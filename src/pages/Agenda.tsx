@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Plus, 
   ChevronLeft, 
@@ -34,6 +34,44 @@ import { ptBR } from 'date-fns/locale';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getDaysInMonth, getDaysInWeek } from '../utils/calendar';
+import { logger } from '../lib/logger';
+
+interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
+interface AgendaServiceLink { id?: string; name?: string | null; duration_minutes?: number | null; price?: number | null }
+interface AgendaConsultationLink { id?: string; anamnese_notes?: string | null }
+
+interface AgendaAppointment {
+  id: string;
+  date_time: string;
+  status: string;
+  clinic_id?: string | null;
+  patient_id?: string | null;
+  nutritionist_id?: string | null;
+  service_id?: string | null;
+  public_token?: string | null;
+  patients?: AgendaPatientLink | null;
+  services?: AgendaServiceLink | null;
+  consultations?: AgendaConsultationLink[] | null;
+}
+
+interface AgendaProfessional {
+  id: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  is_active?: boolean | null;
+  role?: string | null;
+}
+interface AgendaPatient { id: string; name: string; email?: string | null; phone?: string | null }
+interface AgendaService { id: string; name: string; duration_minutes?: number | null; price?: number | null }
+interface AgendaReschedule {
+  id: string;
+  reason?: string | null;
+  old_date_time: string;
+  new_date_time: string;
+  created_at: string;
+  rescheduled_by?: string | null;
+  profiles?: { full_name?: string | null } | null;
+}
 
 export const Agenda: React.FC = () => {
   const { clinic, isReadOnly, profile } = useAuth();
@@ -44,10 +82,10 @@ export const Agenda: React.FC = () => {
   
   // Filters & Data states
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>('all');
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [professionals, setProfessionals] = useState<any[]>([]);
-  const [patients, setPatients] = useState<any[]>([]);
-  const [services, setServices] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<AgendaAppointment[]>([]);
+  const [professionals, setProfessionals] = useState<AgendaProfessional[]>([]);
+  const [patients, setPatients] = useState<AgendaPatient[]>([]);
+  const [services, setServices] = useState<AgendaService[]>([]);
   
   // UI states
   const [loading, setLoading] = useState(true);
@@ -66,12 +104,12 @@ export const Agenda: React.FC = () => {
   });
   
   // Details Modal state
-  const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AgendaAppointment | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Reschedule states
-  const [reschedules, setReschedules] = useState<any[]>([]);
+  const [reschedules, setReschedules] = useState<AgendaReschedule[]>([]);
   const [loadingReschedules, setLoadingReschedules] = useState(false);
   const [isRescheduleMode, setIsRescheduleMode] = useState(false);
   const [rescheduleData, setRescheduleData] = useState({
@@ -99,9 +137,9 @@ export const Agenda: React.FC = () => {
   }, [toast]);
 
   // Load clinic dropdowns (Patients, Services, Professionals)
-  const loadDropdownData = async () => {
+  const loadDropdownData = useCallback(async () => {
     if (!clinic?.id) return;
-    
+
     try {
       // 1. Fetch patients
       const { data: patientsData } = await supabase
@@ -109,7 +147,7 @@ export const Agenda: React.FC = () => {
         .select('id, name, email, phone')
         .eq('clinic_id', clinic.id)
         .order('name');
-      if (patientsData) setPatients(patientsData);
+      if (patientsData) setPatients(patientsData as AgendaPatient[]);
 
       // 2. Fetch services
       const { data: servicesData } = await supabase
@@ -117,7 +155,7 @@ export const Agenda: React.FC = () => {
         .select('id, name, duration_minutes, price')
         .eq('clinic_id', clinic.id)
         .order('name');
-      if (servicesData) setServices(servicesData);
+      if (servicesData) setServices(servicesData as AgendaService[]);
 
       // 3. Fetch professionals safely via clinic_members & profiles
       const { data: members, error: membersError } = await supabase
@@ -146,12 +184,12 @@ export const Agenda: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error('Erro ao carregar dados do formulário:', err);
+      logger.error('Erro ao carregar dados do formulário:', err);
     }
-  };
+  }, [clinic?.id]);
 
   // Load appointments
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     if (!clinic?.id) return;
     setLoading(true);
     
@@ -166,6 +204,7 @@ export const Agenda: React.FC = () => {
           patient_id,
           nutritionist_id,
           service_id,
+          public_token,
           patients ( id, name, email, phone ),
           services ( id, name, duration_minutes, price ),
           consultations ( id, anamnese_notes )
@@ -174,18 +213,18 @@ export const Agenda: React.FC = () => {
         .order('date_time', { ascending: true });
         
       if (!error && data) {
-        setAppointments(data);
+        setAppointments(data as unknown as AgendaAppointment[]);
       } else if (error) {
-        console.error('Erro ao carregar consultas:', error);
+        logger.error('Erro ao carregar consultas:', error);
       }
     } catch (err) {
-      console.error('Erro na requisição de consultas:', err);
+      logger.error('Erro na requisição de consultas:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [clinic?.id]);
 
-  const isAttention = (apt: any) => {
+  const isAttention = (apt: AgendaAppointment) => {
     if (!apt) return false;
     if (apt.status === 'cancelado' || apt.status === 'concluido') return false;
     
@@ -205,9 +244,9 @@ export const Agenda: React.FC = () => {
       fetchAppointments();
       loadDropdownData();
     }
-  }, [clinic?.id]);
+  }, [clinic?.id, fetchAppointments, loadDropdownData]);
 
-  const fetchReschedules = async (appointmentId: string) => {
+  const fetchReschedules = useCallback(async (appointmentId: string) => {
     setLoadingReschedules(true);
     try {
       const { data, error } = await supabase
@@ -224,21 +263,23 @@ export const Agenda: React.FC = () => {
         .eq('appointment_id', appointmentId)
         .order('created_at', { ascending: false });
       if (!error && data) {
-        setReschedules(data);
+        setReschedules(data as unknown as AgendaReschedule[]);
       }
     } catch (err) {
-      console.error('Erro ao carregar histórico de reagendamentos:', err);
+      logger.error('Erro ao carregar histórico de reagendamentos:', err);
     } finally {
       setLoadingReschedules(false);
     }
-  };
+  }, []);
 
+  const selectedApptId = selectedAppointment?.id;
+  const selectedApptDateTime = selectedAppointment?.date_time;
   useEffect(() => {
-    if (selectedAppointment?.id) {
-      fetchReschedules(selectedAppointment.id);
+    if (selectedApptId && selectedApptDateTime) {
+      fetchReschedules(selectedApptId);
       setIsRescheduleMode(false);
-      
-      const apptDate = new Date(selectedAppointment.date_time);
+
+      const apptDate = new Date(selectedApptDateTime);
       setRescheduleData({
         date: format(apptDate, 'yyyy-MM-dd'),
         time: format(apptDate, 'HH:mm'),
@@ -248,7 +289,7 @@ export const Agenda: React.FC = () => {
       setReschedules([]);
       setIsRescheduleMode(false);
     }
-  }, [selectedAppointment?.id]);
+  }, [selectedApptId, selectedApptDateTime, fetchReschedules]);
 
   // Calendar dates generation
   const calendarDays = useMemo(() => {
@@ -271,9 +312,9 @@ export const Agenda: React.FC = () => {
   }, [appointments, selectedProfessionalId]);
 
   // Get appointments for a specific day
-  const getAppointmentsForDay = (date: Date) => {
+  const getAppointmentsForDay = useCallback((date: Date) => {
     return filteredAppointments.filter(apt => isSameDay(new Date(apt.date_time), date));
-  };
+  }, [filteredAppointments]);
 
   // Format date helper for localized headers
   const getHeaderTitle = () => {
@@ -359,7 +400,7 @@ export const Agenda: React.FC = () => {
     setIsNewModalOpen(true);
   };
 
-  const handleAppointmentClick = (apt: any, e: React.MouseEvent) => {
+  const handleAppointmentClick = (apt: AgendaAppointment, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering day cell click
     setSelectedAppointment(apt);
   };
@@ -403,7 +444,7 @@ export const Agenda: React.FC = () => {
       fetchAppointments(); // Refresh grid
       showToast('Consulta agendada com sucesso!', 'success');
     } catch (err) {
-      console.error('Erro ao agendar consulta:', err);
+      logger.error('Erro ao agendar consulta:', err);
       setFormError('Ocorreu um erro ao criar a consulta no banco de dados.');
     } finally {
       setSaving(false);
@@ -430,10 +471,10 @@ export const Agenda: React.FC = () => {
       
       // Update local state
       setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, status: newStatus } : a));
-      setSelectedAppointment((prev: any) => prev ? { ...prev, status: newStatus } : null);
+      setSelectedAppointment((prev) => prev ? { ...prev, status: newStatus } : null);
       showToast('Status da consulta atualizado com sucesso!', 'success');
     } catch (err) {
-      console.error('Erro ao atualizar status da consulta:', err);
+      logger.error('Erro ao atualizar status da consulta:', err);
       showToast('Falha ao atualizar o status no servidor.', 'error');
     } finally {
       setUpdatingStatus(false);
@@ -488,7 +529,7 @@ export const Agenda: React.FC = () => {
       setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, date_time: newDateTime.toISOString() } : a));
       
       // Update selectedAppointment so details modal reflects new date/time
-      setSelectedAppointment((prev: any) => prev ? { ...prev, date_time: newDateTime.toISOString() } : null);
+      setSelectedAppointment((prev) => prev ? { ...prev, date_time: newDateTime.toISOString() } : null);
       
       // Reset reschedule mode
       setIsRescheduleMode(false);
@@ -496,7 +537,7 @@ export const Agenda: React.FC = () => {
       // Refresh the reschedules list
       fetchReschedules(selectedAppointment.id);
     } catch (err) {
-      console.error('Erro ao reagendar consulta:', err);
+      logger.error('Erro ao reagendar consulta:', err);
       showToast('Ocorreu um erro ao salvar o reagendamento no servidor.', 'error');
     } finally {
       setRescheduling(false);
@@ -521,7 +562,7 @@ export const Agenda: React.FC = () => {
       setDeletingId(null);
       showToast('Consulta excluída com sucesso!', 'success');
     } catch (err) {
-      console.error('Erro ao excluir consulta:', err);
+      logger.error('Erro ao excluir consulta:', err);
       showToast('Falha ao excluir a consulta no servidor.', 'error');
     }
   };
@@ -534,7 +575,7 @@ export const Agenda: React.FC = () => {
 
   const selectedDayAppointments = useMemo(() => {
     return getAppointmentsForDay(selectedDate);
-  }, [filteredAppointments, selectedDate]);
+  }, [getAppointmentsForDay, selectedDate]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col font-sans">
@@ -712,7 +753,7 @@ export const Agenda: React.FC = () => {
                             {dayAppointments.slice(0, 3).map(apt => {
                               const prof = professionals.find(p => p.id === apt.nutritionist_id);
                               const initials = prof
-                                ? prof.full_name.split(' ').filter(Boolean).map((n: any) => n[0]).join('').slice(0, 2).toUpperCase()
+                                ? (prof.full_name ?? '').split(' ').filter(Boolean).map((n) => n[0]).join('').slice(0, 2).toUpperCase()
                                 : '';
                               const attention = isAttention(apt);
                               return (
@@ -842,7 +883,7 @@ export const Agenda: React.FC = () => {
                                   <p className="text-[10px] text-slate-500 truncate mt-0.5">{apt.services?.name || 'Serviço'}</p>
                                   {prof && (
                                     <div className="mt-2 pt-1.5 border-t border-slate-100/50 flex items-center gap-1 text-[9px] font-semibold text-slate-400">
-                                      <span className="truncate">Nutri: {prof.full_name.split(' ')[0]}</span>
+                                      <span className="truncate">Nutri: {(prof.full_name ?? '').split(' ')[0]}</span>
                                     </div>
                                   )}
                                 </div>
@@ -1257,7 +1298,11 @@ export const Agenda: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    const link = `${window.location.origin}/confirmar/${selectedAppointment.id}`;
+                    if (!selectedAppointment.public_token) {
+                      showToast('Link indisponível. Recarregue a agenda e tente novamente.', 'error');
+                      return;
+                    }
+                    const link = `${window.location.origin}/confirmar/${selectedAppointment.public_token}`;
                     navigator.clipboard.writeText(link);
                     showToast('Link de confirmação copiado com sucesso!', 'success');
                   }}

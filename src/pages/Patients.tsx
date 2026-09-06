@@ -1,19 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Mail, Phone, Lock, X, Edit, Power, PowerOff, Check, ClipboardList } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { usePatients } from '../hooks/queries/usePatients';
+import { qk } from '../lib/queryKeys';
+import { logger } from '../lib/logger';
+import type { PatientRow } from '../types/clinical';
+
+const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
 export const Patients: React.FC = () => {
   const { clinic, isReadOnly, isTrialActive } = useAuth();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  const [patients, setPatients] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const { data: patients = [], isLoading: loading } = usePatients(clinic?.id);
+  const refetchPatients = () => queryClient.invalidateQueries({ queryKey: qk.patients.all });
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingPatient, setEditingPatient] = useState<any>(null);
+  const [editingPatient, setEditingPatient] = useState<PatientRow | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     cpf: '',
@@ -32,7 +41,7 @@ export const Patients: React.FC = () => {
 
   // Clinical modal states
   const [isClinicalModalOpen, setIsClinicalModalOpen] = useState(false);
-  const [selectedClinicalPatient, setSelectedClinicalPatient] = useState<any>(null);
+  const [selectedClinicalPatient, setSelectedClinicalPatient] = useState<PatientRow | null>(null);
   const [clinicalFormData, setClinicalFormData] = useState({
     allergies: '',
     dietary_restrictions: '',
@@ -45,26 +54,7 @@ export const Patients: React.FC = () => {
   const [clinicalSaving, setClinicalSaving] = useState(false);
   const [clinicalError, setClinicalError] = useState<string | null>(null);
 
-  const fetchPatients = async () => {
-    if (!clinic) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('patients')
-      .select('*')
-      .eq('clinic_id', clinic.id)
-      .order('name');
-      
-    if (!error && data) {
-      setPatients(data);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchPatients();
-  }, [clinic]);
-
-  const filteredPatients = patients.filter(p => 
+  const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -113,7 +103,7 @@ export const Patients: React.FC = () => {
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
   };
 
-  const handleOpenModal = (patient?: any) => {
+  const handleOpenModal = (patient?: PatientRow) => {
     setError(null);
     if (patient) {
       setEditingPatient(patient);
@@ -182,9 +172,21 @@ export const Patients: React.FC = () => {
         });
 
         if (updateError) throw updateError;
+
+        // Troca do e-mail de LOGIN do paciente (se tem conta de acesso): só via
+        // Edge Function, com confirmação. `p_email` acima é só contato (SEC-03).
+        if (editingPatient.user_id && formData.email && formData.email !== editingPatient.email) {
+          const { error: emailErr } = await supabase.functions.invoke('admin-update-user-email', {
+            body: { target_user_id: editingPatient.user_id, new_email: formData.email },
+          });
+          if (emailErr) throw emailErr;
+          showToast('Link de confirmação enviado ao novo e-mail do paciente.', 'success');
+        }
       } else {
         // Create new patient via RPC
-        const generatedPassword = formData.has_app_access ? formData.password : Math.random().toString(36).slice(-8) + 'A1@';
+        const generatedPassword = formData.has_app_access
+          ? formData.password
+          : `${crypto.randomUUID().slice(0, 10)}A1@`;
         
         const { error: rpcError } = await supabase.rpc('create_patient_account', {
           p_clinic_id: clinic.id,
@@ -202,17 +204,17 @@ export const Patients: React.FC = () => {
         if (rpcError) throw rpcError;
       }
 
-      await fetchPatients();
+      refetchPatients();
       setIsModalOpen(false);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Erro ao salvar paciente.');
+    } catch (err) {
+      logger.error(err);
+      setError(errMessage(err) || 'Erro ao salvar paciente.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleOpenClinicalModal = (patient: any) => {
+  const handleOpenClinicalModal = (patient: PatientRow) => {
     setClinicalError(null);
     setSelectedClinicalPatient(patient);
     setClinicalFormData({
@@ -250,17 +252,17 @@ export const Patients: React.FC = () => {
 
       if (updateError) throw updateError;
 
-      await fetchPatients();
+      refetchPatients();
       setIsClinicalModalOpen(false);
-    } catch (err: any) {
-      console.error(err);
-      setClinicalError(err.message || 'Erro ao salvar ficha clínica.');
+    } catch (err) {
+      logger.error(err);
+      setClinicalError(errMessage(err) || 'Erro ao salvar ficha clínica.');
     } finally {
       setClinicalSaving(false);
     }
   };
 
-  const toggleStatus = async (patient: any) => {
+  const toggleStatus = async (patient: PatientRow) => {
     if (isReadOnly) return;
     const newStatus = patient.status === 'ativo' ? 'inativo' : 'ativo';
     try {
@@ -269,11 +271,14 @@ export const Patients: React.FC = () => {
         .update({ status: newStatus })
         .eq('id', patient.id);
         
-      if (!error) {
-        setPatients(patients.map(p => p.id === patient.id ? { ...p, status: newStatus } : p));
-      }
+      if (error) throw error;
+      queryClient.setQueryData<PatientRow[]>(
+        qk.patients.list(clinic!.id),
+        (prev) => prev?.map(p => (p.id === patient.id ? { ...p, status: newStatus } : p)) ?? prev,
+      );
     } catch (err) {
-      console.error('Error toggling status', err);
+      logger.error('Error toggling status', err);
+      showToast('Não foi possível alterar o status do paciente.', 'error');
     }
   };
 

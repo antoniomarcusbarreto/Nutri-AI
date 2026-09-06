@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Clock, DollarSign, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import type { ServiceRow } from '../types/clinical';
 
 export const Services: React.FC = () => {
   const { clinic, userRole, isReadOnly } = useAuth();
-  const [services, setServices] = useState<any[]>([]);
+  const [services, setServices] = useState<ServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,7 +21,7 @@ export const Services: React.FC = () => {
         .order('name');
         
       if (!error && data) {
-        setServices(data);
+        setServices(data as ServiceRow[]);
       }
       setLoading(false);
     };

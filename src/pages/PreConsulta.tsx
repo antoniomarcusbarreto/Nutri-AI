@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ClipboardList, CheckCircle } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 export const PreConsulta = () => {
   const { token } = useParams<{ token: string }>();
@@ -52,7 +53,7 @@ export const PreConsulta = () => {
           setError('Ficha não encontrada ou token expirado.');
         }
       } catch (err) {
-        console.error(err);
+        logger.error(err);
         setError('Ocorreu um erro ao carregar a ficha.');
       } finally {
         setLoading(false);
@@ -89,7 +90,7 @@ export const PreConsulta = () => {
         setError('Não foi possível salvar os dados. Tente novamente.');
       }
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       setError('Ocorreu um erro ao salvar a ficha.');
     } finally {
       setSaving(false);

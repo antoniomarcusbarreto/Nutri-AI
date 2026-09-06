@@ -13,13 +13,11 @@ export const Login: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSignUp, setIsSignUp] = useState(searchParams.get('mode') === 'signup');
-  
-  useEffect(() => {
-    if (searchParams.get('mode') === 'signup') {
-      setIsSignUp(true);
-    }
-  }, [searchParams]);
+  // `isSignUp` = escolha manual do usuário, com fallback no ?mode=signup da URL.
+  // (Antes: `useState` + `useEffect setIsSignUp(true)` a cada mudança de URL.)
+  const urlWantsSignUp = searchParams.get('mode') === 'signup';
+  const [manualIsSignUp, setManualIsSignUp] = useState<boolean | null>(null);
+  const isSignUp = manualIsSignUp ?? urlWantsSignUp;
 
   const [justSignedUp, setJustSignedUp] = useState(false);
 
@@ -67,8 +65,8 @@ export const Login: React.FC = () => {
         });
         if (signInError) throw signInError;
       }
-    } catch (err: any) {
-      let errorMessage = err.message || 'Ocorreu um erro durante a autenticação.';
+    } catch (err) {
+      let errorMessage = (err instanceof Error && err.message) || 'Ocorreu um erro durante a autenticação.';
       if (errorMessage === 'Invalid login credentials') {
         errorMessage = 'Credenciais de login inválidas. Verifique seu e-mail e senha.';
       } else if (errorMessage === 'User already registered') {
@@ -97,8 +95,8 @@ export const Login: React.FC = () => {
         }
       });
       if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || 'Erro ao conectar com o Google.');
+    } catch (err) {
+      setError((err instanceof Error && err.message) || 'Erro ao conectar com o Google.');
       setLoading(false);
     }
   };
@@ -119,7 +117,7 @@ export const Login: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              setIsSignUp(!isSignUp);
+              setManualIsSignUp(!isSignUp);
               setError(null);
             }}
             className="ml-1 font-medium text-primary-600 hover:text-primary-500 transition-colors"
