@@ -493,6 +493,7 @@ html[data-theme="blue"] {
 @layer base {
   html {
     font-size: 93.75%; /* Reduz a base padrão de 16px para 15px para um leiaute mais compacto e elegante */
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-[#e2e8f0] text-slate-900 antialiased transition-colors duration-200;
@@ -726,6 +727,18 @@ html[data-theme="blue"] {
 
 /* 🎬 Vocabulário de movimento do NutriAI ("Instrumento Clínico Calmo").
    Um beat, nunca um loop. Desaceleração confiante — sem bounce/elastic. */
+
+/* Face pública (landing): uma única subida na chegada — não em loop, não por seção. */
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.landing-rise { animation: landing-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.landing-rise-late { animation-delay: 140ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise { animation: rm-fade 160ms ease-out both !important; }
+}
 
 /* Assentamento único: o ícone de um estado vazio/erro que o usuário encontra
    não deve pular em loop — ele se acomoda uma vez e fica parado. */
