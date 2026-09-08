@@ -15,6 +15,9 @@ dist-ssr
 # Supabase CLI local state
 supabase/.temp
 
+# Impeccable skill working state (DESIGN.md / PRODUCT.md são versionados)
+.impeccable/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

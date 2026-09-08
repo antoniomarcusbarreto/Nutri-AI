@@ -44,7 +44,7 @@ const BiomarkerRowBase: React.FC<Props> = ({
           {evo ? (
             <>
               <span className={`${evo.color} text-sm`}>{evo.text}</span>
-              {evo.diffStr && <span className="text-[10px] text-slate-500 font-medium">({evo.diffStr})</span>}
+              {evo.diffStr && <span className="text-xs text-slate-500 font-medium">({evo.diffStr})</span>}
             </>
           ) : (
             <span className="text-slate-400 font-medium">—</span>
@@ -85,13 +85,13 @@ const BiomarkerRowBase: React.FC<Props> = ({
           ) : (
             <div className="mt-2 bg-emerald-50/20 border border-emerald-100/60 p-2.5 rounded-xl flex justify-between items-start gap-4">
               <div className="min-w-0">
-                <p className="text-[9px] font-medium text-emerald-800 uppercase tracking-wider">Observação Clínica Registrada:</p>
+                <p className="text-xs font-medium text-emerald-800 uppercase tracking-wider">Observação Clínica Registrada:</p>
                 <p className="font-normal text-slate-700 leading-relaxed mt-1 whitespace-pre-line italic">"{bio.nota_clinica}"</p>
               </div>
               <button
                 type="button"
                 onClick={onStartEdit}
-                className="text-[10px] font-medium text-emerald-700 hover:text-emerald-900 shrink-0 bg-white border border-emerald-200 px-2 py-1 rounded-lg transition-all hover:bg-emerald-50"
+                className="text-xs font-medium text-emerald-700 hover:text-emerald-900 shrink-0 bg-white border border-emerald-200 px-2 py-1 rounded-lg transition-all hover:bg-emerald-50"
               >
                 Editar
               </button>

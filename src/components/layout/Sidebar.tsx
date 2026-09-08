@@ -3,7 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Calendar, Users, Settings, LogOut, Apple, Shield, DollarSign, FileText, Activity, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  /** Chamado ao navegar ou sair — usado para fechar o drawer no mobile. */
+  onNavigate?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   const location = useLocation();
   const { signOut, clinic, profile, userRole } = useAuth();
 
@@ -34,11 +39,11 @@ export const Sidebar: React.FC = () => {
 
     if (themeColor === 'blue') {
       return {
-        container: 'bg-[#11162a] border-r-0 text-white',
+        container: 'bg-sidebar-navy border-r-0 text-white',
         border: 'border-b border-white/10',
         logoText: 'text-white',
         logoIcon: 'text-blue-400',
-        activeItem: 'bg-[#1c2342] text-white',
+        activeItem: 'bg-sidebar-navy-active text-white',
         inactiveItem: 'text-slate-300 hover:bg-white/5 hover:text-white transition-all',
         itemIconActive: 'text-white',
         itemIconInactive: 'text-slate-400 group-hover:text-white transition-all'
@@ -47,7 +52,7 @@ export const Sidebar: React.FC = () => {
 
     if (themeColor === 'teal') {
       return {
-        container: 'bg-[#115e59] border-r-0 text-white', // teal-800 (Turquesa original)
+        container: 'bg-sidebar-teal border-r-0 text-white', // teal-800 (Turquesa original)
         border: 'border-b border-teal-700/20',
         logoText: 'text-white',
         logoIcon: 'text-teal-200',
@@ -60,12 +65,12 @@ export const Sidebar: React.FC = () => {
 
     if (themeColor === 'dark') {
       return {
-        container: 'bg-[#1a1a1a] border-r border-[#333333] text-slate-100', // Grafite e preto profundo
-        border: 'border-b border-[#333333]/60',
+        container: 'bg-sidebar-graphite border-r border-sidebar-hairline text-slate-100', // Grafite e preto profundo
+        border: 'border-b border-sidebar-hairline/60',
         logoText: 'text-slate-100 font-extrabold',
         logoIcon: 'text-primary-400',
-        activeItem: 'bg-[#242424] text-primary-400 font-bold border-l-4 border-primary-500 rounded-r-xl rounded-l-none',
-        inactiveItem: 'text-slate-400 hover:bg-[#242424]/60 hover:text-primary-400 transition-all',
+        activeItem: 'bg-sidebar-graphite-raised text-primary-400 font-bold border-l-4 border-primary-500 rounded-r-xl rounded-l-none',
+        inactiveItem: 'text-slate-400 hover:bg-sidebar-graphite-raised/60 hover:text-primary-400 transition-all',
         itemIconActive: 'text-primary-400',
         itemIconInactive: 'text-slate-500 group-hover:text-primary-400 transition-all'
       };
@@ -92,15 +97,16 @@ export const Sidebar: React.FC = () => {
         <Apple className={`h-8 w-8 ${theme.logoIcon}`} />
         <span className={`ml-3 text-xl font-semibold ${theme.logoText} tracking-tight`}>NutriAI</span>
       </div>
-      <nav className="flex flex-1 flex-col px-4 pt-6 pb-4">
-        <ul role="list" className="flex flex-1 flex-col justify-between h-full">
-          {/* Top navigation items */}
-          <div className="space-y-1">
+      <nav aria-label="Navegação principal" className="flex flex-1 flex-col px-4 pt-6 pb-4">
+        {/* Top navigation items */}
+        <ul role="list" className="flex flex-1 flex-col space-y-1">
             {/* If superadmin, show Painel Master as the top primary item! */}
             {profile?.is_superadmin && (
               <li>
                 <Link
                   to="/admin"
+                  onClick={onNavigate}
+                  aria-current={location.pathname.startsWith('/admin') ? 'page' : undefined}
                   className={classNames(
                     location.pathname.startsWith('/admin') ? theme.activeItem : theme.inactiveItem,
                     'group flex gap-x-3 rounded-md p-3 text-sm font-medium leading-6 transition-colors duration-200'
@@ -127,6 +133,8 @@ export const Sidebar: React.FC = () => {
                 <li key={item.name}>
                   <Link
                     to={item.href}
+                    onClick={onNavigate}
+                    aria-current={isActive ? 'page' : undefined}
                     className={classNames(
                       isActive ? theme.activeItem : theme.inactiveItem,
                       'group flex gap-x-3 rounded-md p-3 text-sm font-medium leading-6 transition-colors duration-200'
@@ -144,13 +152,15 @@ export const Sidebar: React.FC = () => {
                 </li>
               );
             })}
-          </div>
+        </ul>
 
-          {/* Bottom navigation items */}
-          <div className="space-y-1 mt-auto border-t pt-4 border-slate-200/20">
+        {/* Bottom navigation items */}
+        <ul role="list" className="space-y-1 mt-auto border-t pt-4 border-slate-200/20">
             <li>
               <Link
                 to="/settings"
+                onClick={onNavigate}
+                aria-current={location.pathname.startsWith('/settings') ? 'page' : undefined}
                 className={classNames(
                   location.pathname.startsWith('/settings') ? theme.activeItem : theme.inactiveItem,
                   'group flex gap-x-3 rounded-md p-3 text-sm font-medium leading-6 transition-colors duration-200'
@@ -165,14 +175,13 @@ export const Sidebar: React.FC = () => {
             </li>
             <li>
               <button
-                onClick={signOut}
+                onClick={() => { onNavigate?.(); signOut(); }}
                 className="w-full group flex gap-x-3 rounded-md p-3 text-sm font-medium leading-6 text-red-600 hover:bg-red-50 transition-colors duration-200"
               >
                 <LogOut className="h-5 w-5 shrink-0 text-red-500 group-hover:text-red-600" aria-hidden="true" />
                 Sair
               </button>
             </li>
-          </div>
         </ul>
       </nav>
     </div>

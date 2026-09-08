@@ -16,11 +16,11 @@ interface Props {
 export const BiomarkerNoteEditor: React.FC<Props> = ({ value, onChange, onCancel, onSave, hasNote, saving }) => (
   <div className="space-y-2 mt-2">
     <div className="flex items-center justify-between">
-      <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+      <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
         Anotação Clínica do Nutricionista
       </span>
       {hasNote && (
-        <span className="text-[9px] bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded font-medium">
+        <span className="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded font-medium">
           Nota Salva
         </span>
       )}

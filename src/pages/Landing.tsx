@@ -7,20 +7,20 @@ export const Landing: React.FC = () => {
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-primary-100 selection:text-primary-900">
       {/* Header */}
       <header className="absolute inset-x-0 top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/50">
-        <nav className="flex items-center justify-between p-6 lg:px-8 max-w-7xl mx-auto" aria-label="Global">
-          <div className="flex lg:flex-1 items-center gap-3">
-            <div className="h-10 w-10 bg-primary-100 rounded-xl flex items-center justify-center shadow-sm">
-              <Apple className="h-6 w-6 text-primary-600" />
+        <nav className="flex items-center justify-between gap-3 px-4 py-4 sm:p-6 lg:px-8 max-w-7xl mx-auto" aria-label="Global">
+          <div className="flex lg:flex-1 items-center gap-2 sm:gap-3 min-w-0">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 bg-primary-100 rounded-xl flex items-center justify-center shadow-sm">
+              <Apple className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" />
             </div>
-            <span className="text-xl font-bold text-slate-900 tracking-tight">NutriAI</span>
+            <span className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">NutriAI</span>
           </div>
-          <div className="flex flex-1 justify-end items-center gap-6">
-            <Link to="/login" className="text-sm font-semibold leading-6 text-slate-700 hover:text-primary-600 transition-colors">
+          <div className="flex flex-1 justify-end items-center gap-3 sm:gap-6 shrink-0">
+            <Link to="/login" className="text-sm font-semibold leading-6 text-slate-700 hover:text-primary-600 transition-colors py-2">
               Entrar
             </Link>
             <Link
               to="/login?mode=signup"
-              className="rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all hover:scale-105"
+              className="rounded-full bg-primary-600 px-4 sm:px-5 py-2.5 text-sm font-semibold text-white whitespace-nowrap shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all hover:scale-105"
             >
               Comece Grátis
             </Link>
@@ -28,7 +28,7 @@ export const Landing: React.FC = () => {
         </nav>
       </header>
 
-      <main className="isolate pt-14">
+      <div role="main" className="isolate pt-14">
         {/* Hero Section */}
         <div className="relative pt-14 lg:pt-24 pb-20 sm:pb-32 overflow-hidden">
           <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80" aria-hidden="true">
@@ -42,14 +42,14 @@ export const Landing: React.FC = () => {
               <p className="mt-6 text-lg leading-8 text-slate-600">
                 Agendamentos inteligentes, prontuários digitais avançados e gestão financeira simplificada. Tudo que você precisa para focar no que realmente importa: a saúde dos seus pacientes.
               </p>
-              <div className="mt-10 flex items-center justify-center gap-x-6">
+              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-x-6">
               <Link
                 to="/login?mode=signup"
-                className="rounded-full bg-primary-600 px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/30 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-500/40 transition-all hover:-translate-y-1"
+                className="w-full sm:w-auto text-center rounded-full bg-primary-600 px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/30 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-500/40 transition-all hover:-translate-y-1"
               >
                 Criar conta gratuita
               </Link>
-                <a href="#features" className="text-sm font-semibold leading-6 text-slate-900 flex items-center gap-1 hover:text-primary-600 transition-colors">
+                <a href="#features" className="text-sm font-semibold leading-6 text-slate-900 flex items-center gap-1 hover:text-primary-600 transition-colors py-2">
                   Conheça os recursos <ArrowRight className="h-4 w-4" />
                 </a>
               </div>
@@ -65,8 +65,8 @@ export const Landing: React.FC = () => {
               Tudo que um nutricionista moderno precisa
             </p>
           </div>
-          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
+          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 md:max-w-none">
+            <dl className="grid max-w-xl mx-auto grid-cols-1 gap-x-8 gap-y-10 md:max-w-none md:grid-cols-2 md:gap-y-12 lg:grid-cols-3">
               {[
                 {
                   name: 'Prontuário e Anamnese Dinâmica',
@@ -183,7 +183,7 @@ export const Landing: React.FC = () => {
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-12">

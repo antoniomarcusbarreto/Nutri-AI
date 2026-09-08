@@ -14,6 +14,57 @@
   --color-primary-900: #134e4a;
   --color-teal-150: #b2f5ea;
   --color-teal-650: #0b8277;
+
+  /* Passos intermediários de escala usados no app — registrados como tokens reais
+     para que as classes resolvam também no tema claro (antes só o .theme-dark as definia). */
+  --color-slate-105: #eef2f7;
+  --color-slate-150: #e9eef4;
+  --color-slate-250: #d7dde6;
+  --color-slate-350: #b0bcca;
+  --color-slate-450: #7c8b9f;
+  --color-slate-550: #556074;
+  --color-slate-605: #46536a;
+  --color-slate-650: #3d4a5d;
+  --color-slate-655: #3b4759;
+  --color-slate-750: #2a3547;
+  --color-slate-850: #172032;
+  --color-slate-955: #010512;
+
+  --color-primary-550: #109c8f;
+  --color-primary-650: #0e857b;
+  --color-primary-655: #0e837a;
+  --color-primary-750: #106a61;
+
+  --color-emerald-150: #c2f2d8;
+  --color-emerald-250: #8bedc4;
+  --color-emerald-650: #06805f;
+  --color-emerald-850: #06563f;
+
+  --color-rose-150: #fed9de;
+  --color-rose-250: #febbc1;
+  --color-rose-650: #cf1842;
+  --color-rose-750: #ae1139;
+  --color-rose-850: #94123a;
+
+  --color-amber-250: #fddc6b;
+  --color-amber-850: #853a0c;
+
+  --color-indigo-150: #d4dcfe;
+  --color-indigo-650: #4a3fda;
+  --color-indigo-850: #342f92;
+
+  --color-red-650: #cb2020;
+  --color-red-750: #a51a1a;
+
+  /* Superfícies dos temas de navegação (antes hex literais em Sidebar/Layout). Ver DESIGN.md > Navigation themes. */
+  --color-sidebar-navy: #11162a;
+  --color-sidebar-navy-active: #1c2342;
+  --color-sidebar-teal: #115e59;
+  --color-sidebar-graphite: #1a1a1a;
+  --color-sidebar-graphite-raised: #242424;
+  --color-sidebar-hairline: #333333;
+  --color-dark-ground: #0b0f19;
+
   --font-sans: "Inter", "Roboto", sans-serif;
   --font-internal: "Inter", "Plus Jakarta Sans", var(--font-sans);
 }
@@ -31,7 +82,23 @@ table,
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 👑 DESIGN SYSTEM UNIFICADO (RECALIBRAÇÃO ERGONÔMICA GLOBAL) */
+/* 👑 DESIGN SYSTEM UNIFICADO (RECALIBRAÇÃO ERGONÔMICA GLOBAL)
+   ──────────────────────────────────────────────────────────────────────────
+   CONTRATO DE CASCATA (por que não há `!important` aqui):
+
+   1. Este bloco é *unlayered*. O Tailwind v4 emite os utilitários em
+      `@layer utilities`. Declarações normais *sem* camada vencem QUALQUER
+      declaração em camada — então `main .text-slate-500 { color: #64748b }`
+      já ganha de `.text-slate-500` sem precisar de `!important`.
+
+   2. Entre as próprias regras de recalibração, a ordem é decidida por
+      especificidade. As regras que os temas (`.theme-dark …`) precisam
+      sobrescrever ficam em (0,1,0) ou menos — via `:where()` — para que
+      `.theme-dark .bg-white` (0,2,0) e afins vençam naturalmente.
+
+   NÃO reintroduza `!important` aqui. Se algo não está pegando, é
+   especificidade — ajuste com `:where()` ou reordene, não com `!important`.
+   ────────────────────────────────────────────────────────────────────────── */
 
 /* 1. Camada Base do Fundo do Painel Interno */
 main {
@@ -42,8 +109,8 @@ main {
 main h1, main h2, main h3, main h4, main h5, main h6,
 .modal h1, .modal h2, .modal h3, .modal h4, .modal h5, .modal h6,
 [role="dialog"] h1, [role="dialog"] h2, [role="dialog"] h3, [role="dialog"] h4, [role="dialog"] h5, [role="dialog"] h6 {
-  font-weight: 600 !important;
-  color: #0f172a !important; /* Force slate-900 sólido para títulos */
+  font-weight: 600;
+  color: #0f172a; /* Force slate-900 sólido para títulos */
 }
 
 /* 3. Banimento de Negrito Bruto em Textos Comuns (Mapeia bold/black/semibold para Medium 500 em textos não-heading) */
@@ -59,24 +126,21 @@ main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-bl
 [role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-semibold,
 [role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-extrabold,
 [role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(button):not(a).font-black {
-  font-weight: 500 !important;
+  font-weight: 500;
 }
 
-/* 4. Camada de Superfície (Fim do branco puro agressivo) */
-main .bg-white:not(input):not(select):not(textarea):not(.bg-white-pure),
-.modal .bg-white:not(input):not(select):not(textarea):not(.bg-white-pure),
-[role="dialog"] .bg-white:not(input):not(select):not(textarea):not(.bg-white-pure) {
-  background-color: #f1f5f9 !important; /* slate-100 fosco e relaxante */
+/* 4. Camada de Superfície (Fim do branco puro agressivo).
+   Especificidade mantida baixa de propósito (`:where()` = 0): a regra é
+   *unlayered*, então já vence os utilitários `.bg-white` (que ficam em
+   `@layer utilities`) sem precisar de `!important`; e ao ficar em (0,1,0)
+   ela perde para as regras de tema `.theme-dark .bg-white` (0,2,0). */
+:where(main, .modal, [role="dialog"]) .bg-white:not(:where(input, select, textarea, .bg-white-pure)) {
+  background-color: #f1f5f9; /* slate-100 fosco e relaxante */
 }
 
 /* 5. Camada de Destaque / Elementos Internos (bg-white aninhado recupera pure white para efeito 3D) */
-main .bg-white .bg-white,
-main .bg-card-premium .bg-white,
-.modal .bg-white .bg-white,
-.modal .bg-card-premium .bg-white,
-[role="dialog"] .bg-white .bg-white,
-[role="dialog"] .bg-card-premium .bg-white {
-  background-color: #ffffff !important;
+:where(main, .modal, [role="dialog"]) :where(.bg-white, .bg-card-premium) .bg-white {
+  background-color: #ffffff;
 }
 
 /* 6. Hierarquia Cromática e Design de Cores por Propósito (Claro) */
@@ -87,7 +151,7 @@ main .text-slate-900,
 main .text-slate-800,
 .modal .text-slate-800,
 [role="dialog"] .text-slate-800 {
-  color: #0f172a !important;
+  color: #0f172a;
 }
 
 /* Textos de Suporte/Legendas (Slate-500) */
@@ -97,16 +161,16 @@ main .text-slate-400,
 .modal .text-slate-400,
 [role="dialog"] .text-slate-500,
 [role="dialog"] .text-slate-400 {
-  color: #64748b !important;
-  font-weight: 400 !important; /* legendas/suportes sempre font-normal */
+  color: #64748b;
+  font-weight: 400; /* legendas/suportes sempre font-normal */
 }
 
 /* Números de Destaque / Métricas / Semanas (Azul Tecnológico vibrante, font-medium) */
 main .text-\[\#5024fc\],
 .modal .text-\[\#5024fc\],
 [role="dialog"] .text-\[\#5024fc\] {
-  color: #5024fc !important;
-  font-weight: 500 !important; /* Destaque pela cor e tamanho, nunca pela grossura */
+  color: #5024fc;
+  font-weight: 500; /* Destaque pela cor e tamanho, nunca pela grossura */
 }
 
 /* Força números de destaque grandes (ex: text-3xl) a usarem o Azul Tecnológico e peso font-medium */
@@ -114,8 +178,8 @@ main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-3xl,
 main :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-4xl,
 .modal :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-3xl,
 [role="dialog"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-3xl {
-  color: #5024fc !important;
-  font-weight: 500 !important;
+  color: #5024fc;
+  font-weight: 500;
 }
 
 /* 🟢 Correção de Contraste para Elementos dentro de Cards com Gradientes */
@@ -128,28 +192,28 @@ main [class*="bg-gradient-"] h6,
 main [class*="bg-gradient-"] .text-slate-900,
 main [class*="bg-gradient-"] .text-slate-800,
 main [class*="bg-gradient-"] .text-slate-700 {
-  color: #ffffff !important;
+  color: #ffffff;
 }
 
 main [class*="bg-gradient-"] .text-slate-500,
 main [class*="bg-gradient-"] .text-slate-400,
 main [class*="bg-gradient-"] .text-indigo-300 {
-  color: #cbd5e1 !important; /* slate-300 */
+  color: #cbd5e1; /* slate-300 */
 }
 
 main [class*="bg-gradient-"] .text-white\/80 {
-  color: rgba(255, 255, 255, 0.8) !important;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 main [class*="bg-gradient-"] .text-white\/70 {
-  color: rgba(255, 255, 255, 0.7) !important;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 main [class*="bg-gradient-"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-3xl,
 main [class*="bg-gradient-"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-4xl,
 main [class*="bg-gradient-"] :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6).text-5xl,
 main [class*="bg-gradient-"] .text-\[\#5024fc\] {
-  color: #ffffff !important;
+  color: #ffffff;
 }
 
 
@@ -159,7 +223,7 @@ main .text-emerald-650,
 main .text-emerald-700,
 .modal .text-emerald-600,
 [role="dialog"] .text-emerald-600 {
-  color: #059669 !important;
+  color: #059669;
 }
 main .bg-emerald-50,
 main .bg-emerald-50\/50,
@@ -169,8 +233,8 @@ main .bg-emerald-50\/20,
 .modal .bg-emerald-50\/50,
 [role="dialog"] .bg-emerald-50,
 [role="dialog"] .bg-emerald-50\/50 {
-  background-color: rgba(236, 253, 245, 0.5) !important;
-  border-color: rgba(16, 185, 129, 0.15) !important;
+  background-color: rgba(236, 253, 245, 0.5);
+  border-color: rgba(16, 185, 129, 0.15);
 }
 
 /* Status Críticos/Alertas -> text-rose-600, bg-rose-50/50 */
@@ -181,7 +245,7 @@ main .text-red-600,
 main .text-red-650,
 .modal .text-rose-600,
 [role="dialog"] .text-rose-600 {
-  color: #e11d48 !important;
+  color: #e11d48;
 }
 main .bg-rose-50,
 main .bg-rose-50\/50,
@@ -194,23 +258,23 @@ main .bg-red-50,
 [role="dialog"] .bg-rose-50,
 [role="dialog"] .bg-rose-50\/50,
 [role="dialog"] .bg-rose-50\/30 {
-  background-color: rgba(255, 241, 242, 0.5) !important;
-  border-color: rgba(244, 63, 94, 0.15) !important;
+  background-color: rgba(255, 241, 242, 0.5);
+  border-color: rgba(244, 63, 94, 0.15);
 }
 
 /* 7. Padronização de Abas e Botões Segmentados (Dividido, Foco PDF, etc.) */
 /* Os botões devem usar font-medium e text-slate-600. Ativos mudam apenas para text-slate-900 sem engordar a letra */
 main .bg-slate-200\/70 button:not([class*="bg-white"]):not([class*="active"]),
 main .bg-slate-100 button:not([class*="bg-white"]):not([class*="active"]) {
-  color: #475569 !important; /* text-slate-600 */
-  font-weight: 500 !important; /* font-medium */
+  color: #475569; /* text-slate-600 */
+  font-weight: 500; /* font-medium */
 }
 main .bg-slate-200\/70 button[class*="bg-white"],
 main .bg-slate-200\/70 button.active,
 main .bg-slate-100 button[class*="bg-white"],
 main .bg-slate-100 button.active {
-  color: #0f172a !important; /* text-slate-900 */
-  font-weight: 500 !important; /* Mantém font-medium - não engorda */
+  color: #0f172a; /* text-slate-900 */
+  font-weight: 500; /* Mantém font-medium - não engorda */
 }
 
 /* 8. Ajuste de Bordas Globais para Sintonia Máxima (Claro) */
@@ -227,8 +291,14 @@ main .divide-slate-200,
 [role="dialog"] .border-slate-200,
 [role="dialog"] .divide-slate-100,
 [role="dialog"] .divide-slate-200 {
-  border-color: rgba(203, 213, 225, 0.5) !important; /* border-slate-300/50 */
-  divide-color: rgba(203, 213, 225, 0.5) !important;
+  border-color: rgba(203, 213, 225, 0.5); /* border-slate-300/50 */
+}
+
+/* Divisórias internas (utilitário divide-*) — o Tailwind aplica no filho, não no container */
+main :is(.divide-slate-100, .divide-slate-200) > :not([hidden]) ~ :not([hidden]),
+.modal :is(.divide-slate-100, .divide-slate-200) > :not([hidden]) ~ :not([hidden]),
+[role="dialog"] :is(.divide-slate-100, .divide-slate-200) > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(203, 213, 225, 0.5);
 }
 
 /* 👑 PADRONIZAÇÃO GLOBAL DE FORMULÁRIOS, INPUTS E BOTÕES (GOLDEN STANDARD) */
@@ -246,25 +316,25 @@ main textarea,
 [role="dialog"] input,
 [role="dialog"] select,
 [role="dialog"] textarea {
-  padding-top: 0.5rem !important; /* py-2 */
-  padding-bottom: 0.5rem !important;
-  padding-left: 0.75rem !important; /* px-3 */
-  padding-right: 0.75rem !important;
-  font-size: 0.875rem !important; /* text-sm */
-  line-height: 1.25rem !important;
-  border-radius: 0.5rem !important; /* rounded-lg */
-  border: 1px solid #e2e8f0 !important; /* border-slate-200 */
-  background-color: #ffffff !important;
-  color: #334155 !important; /* text-slate-700 */
-  outline: none !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; /* shadow-sm */
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+  padding-top: 0.5rem; /* py-2 */
+  padding-bottom: 0.5rem;
+  padding-left: 0.75rem; /* px-3 */
+  padding-right: 0.75rem;
+  font-size: 0.875rem; /* text-sm */
+  line-height: 1.25rem;
+  border-radius: 0.5rem; /* rounded-lg */
+  border: 1px solid #e2e8f0; /* border-slate-200 */
+  background-color: #ffffff;
+  color: #334155; /* text-slate-700 */
+  outline: none;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
 main input.pl-12,
 .modal input.pl-12,
 [role="dialog"] input.pl-12 {
-  padding-left: 3rem !important;
+  padding-left: 3rem;
 }
 
 
@@ -277,20 +347,41 @@ main textarea:focus,
 [role="dialog"] input:focus,
 [role="dialog"] select:focus,
 [role="dialog"] textarea:focus {
-  border-color: #5024fc !important; /* focus:border-indigo-600 */
-  box-shadow: 0 0 0 1px #5024fc !important; /* focus:ring-1 focus:ring-indigo-600 */
-  outline: none !important;
+  border-color: #5024fc; /* focus:border-indigo-600 */
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #5024fc; /* anel de 2px com offset — WCAG 2.4.11 */
+  outline: none;
 }
 
-/* Labels do Sistema */
-main label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])),
-.modal label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])),
-[role="dialog"] label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])) {
-  color: #334155 !important; /* text-slate-700 */
-  font-weight: 500 !important; /* font-medium */
-  font-size: 0.875rem !important; /* text-sm */
-  margin-bottom: 0.25rem !important; /* mb-1 */
-  display: block !important; /* block */
+/* 👁️ Foco visível por teclado em todos os controles interativos (WCAG 2.4.7).
+   :focus-visible só dispara na navegação por teclado, não no clique de mouse. */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid #5024fc;
+  outline-offset: 2px;
+}
+
+.theme-dark a:focus-visible,
+.theme-dark button:focus-visible,
+.theme-dark select:focus-visible,
+.theme-dark [role="button"]:focus-visible,
+.theme-dark [tabindex]:not([tabindex="-1"]):focus-visible {
+  outline-color: #8b6dff;
+}
+
+/* Labels do Sistema. `:where()` mantém a especificidade em (0,0,1) para que
+   `.theme-dark label` (0,1,1) vença naturalmente no tema grafite. */
+:where(main, .modal, [role="dialog"]) label:not(:where(:has(input[type="checkbox"]), :has(input[type="radio"]))) {
+  color: #334155; /* text-slate-700 */
+  font-weight: 500; /* font-medium */
+  font-size: 0.875rem; /* text-sm */
+  margin-bottom: 0.25rem; /* mb-1 */
+  display: block; /* block */
 }
 
 /* Alinhamento dos Rodapés de Ações e Espaçamentos do Grid */
@@ -300,12 +391,12 @@ main form div[class*="flex-end"],
 .modal form div[class*="flex-end"],
 [role="dialog"] form div[class*="justify-end"],
 [role="dialog"] form div[class*="flex-end"] {
-  display: flex !important;
-  justify-content: flex-end !important;
-  gap: 0.75rem !important; /* gap-3 */
-  padding-top: 1.5rem !important; /* pt-6 */
-  border-top: 1px solid #f1f5f9 !important; /* border-t border-slate-100 */
-  margin-top: 1.5rem !important;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem; /* gap-3 */
+  padding-top: 1.5rem; /* pt-6 */
+  border-top: 1px solid #f1f5f9; /* border-t border-slate-100 */
+  margin-top: 1.5rem;
 }
 
 /* Botões de Formulários (Golden Standard) */
@@ -316,19 +407,19 @@ main form button[type="submit"],
 main form button.bg-primary-600,
 .modal form button.bg-primary-600,
 [role="dialog"] form button.bg-primary-600 {
-  background-color: #5024fc !important; /* Azul Tecnológico */
-  border-radius: 0.75rem !important; /* rounded-xl */
-  font-weight: 600 !important; /* font-semibold */
-  padding-top: 0.625rem !important; /* py-2.5 */
-  padding-bottom: 0.625rem !important;
-  padding-left: 1.25rem !important; /* px-5 */
-  padding-right: 1.25rem !important;
-  font-size: 0.875rem !important; /* text-sm */
-  color: #ffffff !important;
-  border: none !important;
-  cursor: pointer !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out !important;
+  background-color: #5024fc; /* Azul Tecnológico */
+  border-radius: 0.75rem; /* rounded-xl */
+  font-weight: 600; /* font-semibold */
+  padding-top: 0.625rem; /* py-2.5 */
+  padding-bottom: 0.625rem;
+  padding-left: 1.25rem; /* px-5 */
+  padding-right: 1.25rem;
+  font-size: 0.875rem; /* text-sm */
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
 
 main form button[type="submit"]:hover,
@@ -337,8 +428,8 @@ main form button[type="submit"]:hover,
 main form button.bg-primary-600:hover,
 .modal form button.bg-primary-600:hover,
 [role="dialog"] form button.bg-primary-600:hover {
-  opacity: 0.9 !important;
-  background-color: #431cdb !important;
+  opacity: 0.9;
+  background-color: #431cdb;
 }
 
 /* Botão Secundário (Cancelar/Fechar) */
@@ -348,18 +439,18 @@ main form button.bg-slate-100,
 main form button[type="button"].bg-slate-100,
 .modal form button[type="button"],
 [role="dialog"] form button[type="button"] {
-  background-color: #f1f5f9 !important; /* bg-slate-100 */
-  color: #334155 !important; /* text-slate-700 */
-  border-radius: 0.75rem !important; /* rounded-xl */
-  padding-top: 0.625rem !important; /* py-2.5 */
-  padding-bottom: 0.625rem !important;
-  padding-left: 1.25rem !important; /* px-5 */
-  padding-right: 1.25rem !important;
-  font-size: 0.875rem !important; /* text-sm */
-  font-weight: 500 !important; /* font-medium */
-  border: none !important;
-  cursor: pointer !important;
-  transition: background-color 0.2s ease-in-out !important;
+  background-color: #f1f5f9; /* bg-slate-100 */
+  color: #334155; /* text-slate-700 */
+  border-radius: 0.75rem; /* rounded-xl */
+  padding-top: 0.625rem; /* py-2.5 */
+  padding-bottom: 0.625rem;
+  padding-left: 1.25rem; /* px-5 */
+  padding-right: 1.25rem;
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 500; /* font-medium */
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
 }
 
 main form button.bg-slate-100:hover,
@@ -368,35 +459,35 @@ main form button.bg-slate-100:hover,
 main form button[type="button"].bg-slate-100:hover,
 .modal form button[type="button"]:hover,
 [role="dialog"] form button[type="button"]:hover {
-  background-color: #e2e8f0 !important; /* hover:bg-slate-200 */
+  background-color: #e2e8f0; /* hover:bg-slate-200 */
 }
 
 /* 🔵 Dynamic Blue Theme Override */
 html[data-theme="blue"] {
-  --color-primary-50: rgba(17, 22, 42, 0.08) !important;
-  --color-primary-100: rgba(17, 22, 42, 0.15) !important;
-  --color-primary-200: #93c5fd !important;
-  --color-primary-300: #60a5fa !important;
-  --color-primary-400: #3b82f6 !important;
-  --color-primary-500: #1c2342 !important;
-  --color-primary-600: #11162a !important;
-  --color-primary-700: #0d1020 !important;
-  --color-primary-800: #080a14 !important;
-  --color-primary-900: #04050a !important;
+  --color-primary-50: rgba(17, 22, 42, 0.08);
+  --color-primary-100: rgba(17, 22, 42, 0.15);
+  --color-primary-200: #93c5fd;
+  --color-primary-300: #60a5fa;
+  --color-primary-400: #3b82f6;
+  --color-primary-500: #1c2342;
+  --color-primary-600: #11162a;
+  --color-primary-700: #0d1020;
+  --color-primary-800: #080a14;
+  --color-primary-900: #04050a;
 
-  --color-teal-50: rgba(17, 22, 42, 0.08) !important;
-  --color-teal-100: rgba(17, 22, 42, 0.15) !important;
-  --color-teal-150: rgba(17, 22, 42, 0.22) !important;
-  --color-teal-200: #93c5fd !important;
-  --color-teal-350: #60a5fa !important;
-  --color-teal-300: #60a5fa !important;
-  --color-teal-400: #3b82f6 !important;
-  --color-teal-500: #1c2342 !important;
-  --color-teal-600: #11162a !important;
-  --color-teal-650: #0d1020 !important;
-  --color-teal-700: #0d1020 !important;
-  --color-teal-800: #080a14 !important;
-  --color-teal-900: #04050a !important;
+  --color-teal-50: rgba(17, 22, 42, 0.08);
+  --color-teal-100: rgba(17, 22, 42, 0.15);
+  --color-teal-150: rgba(17, 22, 42, 0.22);
+  --color-teal-200: #93c5fd;
+  --color-teal-350: #60a5fa;
+  --color-teal-300: #60a5fa;
+  --color-teal-400: #3b82f6;
+  --color-teal-500: #1c2342;
+  --color-teal-600: #11162a;
+  --color-teal-650: #0d1020;
+  --color-teal-700: #0d1020;
+  --color-teal-800: #080a14;
+  --color-teal-900: #04050a;
 }
 
 @layer base {
@@ -411,20 +502,20 @@ html[data-theme="blue"] {
 /* 🌙 Dark Mode Harmony - Targeted exclusively under .theme-dark */
 .theme-dark {
   color-scheme: dark;
-  background-color: #0b0f19 !important;
-  color: #f5f5f5 !important;
+  background-color: #0b0f19;
+  color: #f5f5f5;
 }
 
 .theme-dark main {
-  background-color: #0b0f19 !important;
+  background-color: #0b0f19;
 }
 
 /* Cards, modais e prontuários em modo escuro */
 .theme-dark .bg-white,
 .theme-dark .bg-card {
-  background-color: #242424 !important;
-  color: #f5f5f5 !important;
-  border-color: #383838 !important; /* Borda mais nítida */
+  background-color: #242424;
+  color: #f5f5f5;
+  border-color: #383838; /* Borda mais nítida */
 }
 
 /* Desativa sombras no modo escuro para manter o leiaute plano e nítido */
@@ -434,7 +525,7 @@ html[data-theme="blue"] {
 .theme-dark .shadow-xl,
 .theme-dark .shadow-2xl,
 .theme-dark [class*="shadow-"] {
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 /* Inner elements, nested blocks, lists, inputs */
@@ -444,9 +535,9 @@ html[data-theme="blue"] {
 .theme-dark .bg-slate-100,
 .theme-dark .bg-slate-100\/50,
 .theme-dark .bg-slate-150 {
-  background-color: #1a1a1a !important;
-  color: #f5f5f5 !important;
-  border-color: #333333 !important;
+  background-color: #1a1a1a;
+  color: #f5f5f5;
+  border-color: #333333;
 }
 
 /* Inputs & Interactive fields in Main Dark Area */
@@ -456,18 +547,18 @@ html[data-theme="blue"] {
 .theme-dark input[type="password"],
 .theme-dark select,
 .theme-dark textarea {
-  background-color: #1a1a1a !important;
-  color: #ffffff !important;
-  border-color: #333333 !important;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  border-color: #333333;
 }
 
 .theme-dark input::placeholder,
 .theme-dark textarea::placeholder {
-  color: #666666 !important;
+  color: #666666;
 }
 
 .theme-dark label {
-  color: #b3b3b3 !important;
+  color: #b3b3b3;
 }
 
 /* Table and list item borders */
@@ -476,8 +567,10 @@ html[data-theme="blue"] {
 .theme-dark .border-slate-200,
 .theme-dark .divide-slate-100,
 .theme-dark .divide-slate-200 {
-  border-color: #333333 !important;
-  divide-color: #333333 !important;
+  border-color: #333333;
+}
+.theme-dark :is(.divide-slate-100, .divide-slate-200) > :not([hidden]) ~ :not([hidden]) {
+  border-color: #333333;
 }
 
 /* High contrast texts inside .theme-dark */
@@ -490,14 +583,14 @@ html[data-theme="blue"] {
 .theme-dark .text-slate-700,
 .theme-dark .text-slate-655,
 .theme-dark .text-slate-600 {
-  color: #f5f5f5 !important;
+  color: #f5f5f5;
 }
 
 .theme-dark .text-slate-550,
 .theme-dark .text-slate-500,
 .theme-dark .text-slate-450,
 .theme-dark .text-slate-400 {
-  color: #b3b3b3 !important;
+  color: #b3b3b3;
 }
 
 .theme-dark h1,
@@ -506,14 +599,14 @@ html[data-theme="blue"] {
 .theme-dark h4,
 .theme-dark h5,
 .theme-dark h6 {
-  color: #ffffff !important;
+  color: #ffffff;
 }
 
 /* Destaques e badges de status positivo / primários */
 .theme-dark .bg-primary-50 {
-  background-color: rgba(20, 184, 166, 0.15) !important;
-  color: #2dd4bf !important;
-  border-color: rgba(20, 184, 166, 0.25) !important;
+  background-color: rgba(20, 184, 166, 0.15);
+  color: #2dd4bf;
+  border-color: rgba(20, 184, 166, 0.25);
 }
 
 /* Keep primary accent colors fully bright */
@@ -522,70 +615,147 @@ html[data-theme="blue"] {
 .theme-dark .text-primary-750,
 .theme-dark .text-primary-800,
 .theme-dark .text-primary-900 {
-  color: #2dd4bf !important;
+  color: #2dd4bf;
 }
 
 /* Status Badges e Alertas no Modo Escuro (Fundo Opaco e Texto de Alto Contraste) */
 .theme-dark .bg-emerald-50 {
-  background-color: rgba(6, 78, 59, 0.4) !important;
-  color: #34d399 !important;
-  border-color: rgba(16, 185, 129, 0.2) !important;
+  background-color: rgba(6, 78, 59, 0.4);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 .theme-dark .bg-rose-50,
 .theme-dark .bg-red-50 {
-  background-color: rgba(127, 29, 29, 0.4) !important;
-  color: #f87171 !important;
-  border-color: rgba(239, 68, 68, 0.2) !important;
+  background-color: rgba(127, 29, 29, 0.4);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.2);
 }
 
 .theme-dark .bg-blue-50,
 .theme-dark .bg-indigo-50 {
-  background-color: rgba(30, 58, 138, 0.4) !important;
-  color: #818cf8 !important;
-  border-color: rgba(99, 102, 241, 0.2) !important;
+  background-color: rgba(30, 58, 138, 0.4);
+  color: #818cf8;
+  border-color: rgba(99, 102, 241, 0.2);
 }
 
 .theme-dark .bg-amber-50,
 .theme-dark .bg-yellow-50 {
-  background-color: rgba(120, 53, 4, 0.4) !important;
-  color: #fbbf24 !important;
-  border-color: rgba(245, 158, 11, 0.2) !important;
+  background-color: rgba(120, 53, 4, 0.4);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.2);
 }
 
 .theme-dark .bg-teal-50 {
-  background-color: rgba(19, 78, 74, 0.4) !important;
-  color: #2dd4bf !important;
-  border-color: rgba(20, 184, 166, 0.2) !important;
+  background-color: rgba(19, 78, 74, 0.4);
+  color: #2dd4bf;
+  border-color: rgba(20, 184, 166, 0.2);
 }
 
 .theme-dark .bg-slate-100 {
-  background-color: #242424 !important;
-  color: #b3b3b3 !important;
-  border-color: #333333 !important;
+  background-color: #242424;
+  color: #b3b3b3;
+  border-color: #333333;
 }
 
 /* Hover adjustments in main area */
 .theme-dark .hover\:bg-slate-50:hover,
 .theme-dark .hover\:bg-slate-100:hover {
-  background-color: #2e2e2e !important;
+  background-color: #2e2e2e;
 }
 
 /* Custom premium card and border styling to prevent glare in light mode */
 .bg-card-premium {
-  background-color: #f1f5f9 !important; /* Soft matte off-white (slate-100) */
+  background-color: #f1f5f9; /* Soft matte off-white (slate-100) */
 }
 
 /* Dark mode overrides to keep it intact */
 .theme-dark .bg-card-premium {
-  background-color: #242424 !important;
+  background-color: #242424;
 }
 
 .theme-dark .border-slate-300\/50 {
-  border-color: #333333 !important;
+  border-color: #333333;
 }
 
-.recharts-wrapper, .recharts-surface, .recharts-responsive-container, [tabindex] { outline: none !important; border: none !important; }
+/* Recharts marca dezenas de nós SVG com tabindex — suprimimos a moldura preta
+   nativa e o nosso anel global :focus-visible dentro do gráfico (ruído demais).
+   Especificidade (0,3,1) para vencer `[tabindex]:not([tabindex="-1"]):focus-visible`
+   (0,3,0) sem `!important`. */
+.recharts-wrapper,
+.recharts-surface,
+.recharts-responsive-container {
+  outline: none;
+  border: none;
+}
+.recharts-wrapper [tabindex]:focus,
+.recharts-wrapper [tabindex]:focus-visible,
+.recharts-surface [tabindex]:focus,
+.recharts-surface [tabindex]:focus-visible {
+  outline: none;
+  border: none;
+}
+
+/* ♿ Respeito à preferência de movimento reduzido (WCAG 2.3.3 / 2.2.2).
+   Mantém a mudança de estado (fade curto) mas remove deslizes, escalas e
+   loops decorativos que causam desconforto vestibular. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Entradas de página: troca slide/zoom por um fade suave e curto que ainda comunica "novo conteúdo". */
+  [class*="animate-in"] {
+    animation: rm-fade 160ms ease-out both !important;
+  }
+  /* Pulsos e indicadores de carregamento essenciais continuam animando, porém mais lentos e suaves. */
+  .animate-spin { animation: spin 1.2s linear infinite !important; }
+  .animate-pulse { animation: rm-soft-pulse 2.4s ease-in-out infinite !important; }
+}
+
+@keyframes rm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rm-soft-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+/* 🎬 Vocabulário de movimento do NutriAI ("Instrumento Clínico Calmo").
+   Um beat, nunca um loop. Desaceleração confiante — sem bounce/elastic. */
+
+/* Assentamento único: o ícone de um estado vazio/erro que o usuário encontra
+   não deve pular em loop — ele se acomoda uma vez e fica parado. */
+@keyframes ia-settle {
+  from { opacity: 0; transform: translateY(8px) scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+.ia-settle { animation: ia-settle 380ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Entrada com energia para O momento autorado (ex.: check de confirmação
+   do agendamento — o paciente acabou de agir). Uma vez só. */
+@keyframes ia-pop {
+  0%   { opacity: 0; transform: scale(0.72); }
+  60%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.ia-pop { animation: ia-pop 460ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Pulso de feedback mais discreto que o padrão do Tailwind (usado em
+   indicadores "ao vivo" e ações de IA em espera). */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.animate-pulse-subtle { animation: pulse-subtle 2.2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ia-settle, .ia-pop { animation: rm-fade 160ms ease-out both !important; }
+  .animate-pulse-subtle { animation: rm-soft-pulse 2.6s ease-in-out infinite !important; }
+}
 
 @media print {
   @page {

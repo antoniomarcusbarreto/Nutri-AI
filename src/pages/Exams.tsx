@@ -30,6 +30,7 @@ import { AiAnalysisPanel } from '../components/exams/AiAnalysisPanel';
 import { ExamHistoryList } from '../components/exams/ExamHistoryList';
 import { logger } from '../lib/logger';
 import type { ExamBiomarker, ExamRecord, PatientRow } from '../types/clinical';
+import { PageHeader, ConfirmDialog } from '../components/ui';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
@@ -307,7 +308,7 @@ ${insights}`;
     return (
       <div className="flex items-center justify-center min-h-[500px] p-6 animate-in fade-in duration-300">
         <div className="bg-white border border-slate-200 p-8 rounded-xl shadow-sm text-center max-w-lg flex flex-col items-center">
-          <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100 mb-4 animate-bounce">
+          <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100 mb-4 ia-settle">
             <ShieldAlert className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-semibold text-slate-900">Acesso Restrito a Profissionais</h2>
@@ -323,16 +324,10 @@ ${insights}`;
     <div className="space-y-6 animate-in fade-in duration-500 flex flex-col h-full font-sans pb-10">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-2">
-            Central de Exames Laboratoriais
-          </h1>
-          <p className="text-base font-medium text-slate-500 mt-1">
-            Gerencie, visualize e analise exames de sangue e relatórios laboratoriais de todos os seus pacientes com suporte de IA.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Central de Exames Laboratoriais"
+        description="Gerencie, visualize e analise exames de sangue e relatórios laboratoriais de todos os seus pacientes com suporte de IA."
+      />
 
       {/* THREE-PANEL WORKSPACE */}
       <div className="flex flex-col lg:flex-row gap-6 items-start animate-in fade-in duration-300 text-left">
@@ -365,7 +360,7 @@ ${insights}`;
               {loadingPatients ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-450">
                   <div className="animate-spin rounded-full h-6 w-6 border-2 border-teal-650 border-t-transparent mb-2" />
-                  <p className="text-[11px] font-medium">Buscando pacientes...</p>
+                  <p className="text-xs font-medium">Buscando pacientes...</p>
                 </div>
               ) : filteredPatients.length === 0 ? (
                 <div className="text-center py-12 text-slate-450">
@@ -521,19 +516,21 @@ ${insights}`;
                       <button
                         onClick={() => setPdfZoom(prev => Math.max(75, prev - 25))}
                         disabled={pdfZoom <= 75}
-                        className="p-1 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-200/40 text-slate-650 rounded-lg transition-all shadow-sm flex items-center justify-center w-6 h-6"
+                        className="p-1 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-200/40 text-slate-650 rounded-lg transition-all shadow-sm flex items-center justify-center w-8 h-8"
                         title="Reduzir Zoom do PDF"
+                        aria-label="Reduzir zoom do PDF"
                       >
                         <ZoomOut className="w-3.5 h-3.5" />
                       </button>
-                      <span className="text-[10px] font-medium text-slate-700 px-1 w-10 text-center select-none">
+                      <span className="text-xs font-medium text-slate-700 px-1 w-10 text-center select-none">
                         {pdfZoom}%
                       </span>
                       <button
                         onClick={() => setPdfZoom(prev => Math.min(150, prev + 25))}
                         disabled={pdfZoom >= 150}
-                        className="p-1 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-200/40 text-slate-650 rounded-lg transition-all shadow-sm flex items-center justify-center w-6 h-6"
+                        className="p-1 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-200/40 text-slate-650 rounded-lg transition-all shadow-sm flex items-center justify-center w-8 h-8"
                         title="Aumentar Zoom do PDF"
+                        aria-label="Aumentar zoom do PDF"
                       >
                         <ZoomIn className="w-3.5 h-3.5" />
                       </button>
@@ -543,7 +540,7 @@ ${insights}`;
                   {/* Contextual AI Font Size Controls */}
                   {(workspaceLayout === 'split' || workspaceLayout === 'ai-focus') && (
                     <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl border border-slate-300/35 shadow-inner animate-in fade-in duration-200">
-                      <div className="p-1 text-slate-500 flex items-center justify-center w-6 h-6">
+                      <div className="p-1 text-slate-500 flex items-center justify-center w-8 h-8">
                         <Type className="w-3.5 h-3.5" />
                       </div>
                       <button
@@ -553,12 +550,13 @@ ${insights}`;
                           else if (aiTextSize === 'base') setAiTextSize('sm');
                         }}
                         disabled={aiTextSize === 'sm'}
-                        className="p-1 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-200/40 text-slate-650 rounded-lg transition-all text-xs font-medium w-6 h-6 flex items-center justify-center shadow-sm"
+                        className="p-1 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-200/40 text-slate-650 rounded-lg transition-all text-xs font-medium w-8 h-8 flex items-center justify-center shadow-sm"
                         title="Diminuir Texto da IA"
+                        aria-label="Diminuir tamanho do texto da análise de IA"
                       >
                         -
                       </button>
-                      <span className="text-[10px] font-medium text-slate-700 px-0.5 w-6 text-center select-none uppercase">
+                      <span className="text-xs font-medium text-slate-700 px-0.5 w-6 text-center select-none uppercase">
                         {aiTextSize === 'sm' ? 'P' : aiTextSize === 'base' ? 'M' : aiTextSize === 'lg' ? 'G' : 'GG'}
                       </span>
                       <button
@@ -568,8 +566,9 @@ ${insights}`;
                           else if (aiTextSize === 'lg') setAiTextSize('xl');
                         }}
                         disabled={aiTextSize === 'xl'}
-                        className="p-1 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-200/40 text-slate-650 rounded-lg transition-all text-xs font-medium w-6 h-6 flex items-center justify-center shadow-sm"
+                        className="p-1 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-200/40 text-slate-650 rounded-lg transition-all text-xs font-medium w-8 h-8 flex items-center justify-center shadow-sm"
                         title="Aumentar Texto da IA"
+                        aria-label="Aumentar tamanho do texto da análise de IA"
                       >
                         +
                       </button>
@@ -644,7 +643,7 @@ ${insights}`;
                       <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
                       <div>
                         <h5 className="text-xs font-semibold text-slate-900 leading-none">Assistente de IA Nutricional</h5>
-                        <p className="text-[10px] text-indigo-500 font-medium uppercase tracking-wider mt-0.5">Gemini 1.5 Pro</p>
+                        <p className="text-xs text-indigo-500 font-medium uppercase tracking-wider mt-0.5">Gemini 1.5 Pro</p>
                       </div>
                     </div>
 
@@ -815,37 +814,19 @@ ${insights}`;
 
       </div>
 
-      {/* CUSTOM CONFIRM DELETE MODAL */}
-      {examToDelete && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-xl max-w-md w-full animate-in zoom-in-95 duration-200 text-center flex flex-col items-center">
-            <div className="h-14 w-14 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100 mb-4 animate-bounce">
-              <ShieldAlert className="w-7 h-7" />
-            </div>
-            
-            <h3 className="text-lg font-semibold text-slate-900">Excluir Exame Laboratorial?</h3>
-            
-            <p className="text-sm text-slate-500 mt-2.5 leading-relaxed">
-              Você tem certeza que deseja excluir o exame <span className="font-semibold text-slate-950">"{examToDelete.file_url.split('/').pop()?.substring(13) || 'Exame_Laboratorial.pdf'}"</span> permanentemente? Esta ação removerá o laudo original do storage e todos os biomarcadores analisados por IA de forma irreversível.
-            </p>
-            
-            <div className="grid grid-cols-2 gap-3 mt-6 w-full">
-              <button
-                onClick={() => setExamToDelete(null)}
-                className="px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-650 font-semibold text-sm rounded-xl transition-all shadow-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="px-4 py-3 bg-rose-600 hover:bg-rose-500 border border-rose-600 text-white font-semibold text-sm rounded-xl transition-all shadow-md"
-              >
-                Confirmar Exclusão
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* CONFIRM DELETE */}
+      <ConfirmDialog
+        open={!!examToDelete}
+        onCancel={() => setExamToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir exame laboratorial?"
+        confirmLabel="Confirmar exclusão"
+        message={
+          <>
+            Excluir o exame <span className="font-semibold text-slate-900">"{examToDelete?.file_url.split('/').pop()?.substring(13) || 'Exame_Laboratorial.pdf'}"</span> permanentemente? Isso remove o laudo original do storage e todos os biomarcadores analisados por IA — de forma irreversível.
+          </>
+        }
+      />
 
     </div>
   );

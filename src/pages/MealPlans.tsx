@@ -13,7 +13,6 @@ import {
   Printer, 
   Calendar,
   Eye,
-  X,
   ShieldAlert,
   Share2,
   Copy,
@@ -35,6 +34,7 @@ import { useDebouncedDraft } from '../hooks/useDebouncedDraft';
 import { logger } from '../lib/logger';
 import { pickOne } from '../types/clinical';
 import type { MealPlanRecord } from '../types/clinical';
+import { PageHeader, Modal, ConfirmDialog, Card, Button, Input, Select } from '../components/ui';
 
 export const MealPlans: React.FC = () => {
   const { clinic, isReadOnly, profile, userRole } = useAuth();
@@ -495,7 +495,7 @@ export const MealPlans: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[500px] p-6 animate-in fade-in duration-300">
         <div className="bg-white border border-slate-200 p-8 rounded-xl shadow-sm text-center max-w-lg flex flex-col items-center">
-          <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100 mb-4 animate-bounce">
+          <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100 mb-4 ia-settle">
             <ShieldAlert className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-semibold text-slate-900">Acesso Restrito a Nutricionistas</h2>
@@ -511,22 +511,17 @@ export const MealPlans: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col font-sans pb-12 print:!h-auto print:!block">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0 print:hidden">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            Construtor de Planos Alimentares
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Elabore planos alimentares enriquecidos automaticamente pelo histórico de consultas e análises de exames.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        className="print:hidden"
+        title="Construtor de Planos Alimentares"
+        description="Elabore planos alimentares enriquecidos automaticamente pelo histórico de consultas e análises de exames."
+      />
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 relative print:block print:w-full">
         
         {/* LEFT COLUMN: PARAMETERS CARD */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6.5 shadow-sm space-y-6 print:hidden">
+        <Card as="section" className="space-y-6 print:hidden">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
               <Brain className="w-5 h-5 text-primary-655" />
@@ -536,34 +531,31 @@ export const MealPlans: React.FC = () => {
           </div>
 
           {/* Patient dropdown */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-extrabold text-slate-550 uppercase tracking-wider">Paciente</label>
-            <select
-              value={selectedPatientId}
-              onChange={e => {
-                const val = e.target.value;
-                setSelectedPatientId(val);
-                if (val) {
-                  localStorage.setItem('nutri-ai:selected-patient-id', val);
-                } else {
-                  localStorage.removeItem('nutri-ai:selected-patient-id');
-                }
-              }}
-              className="block w-full rounded-2xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-4 py-3 border bg-white font-semibold text-slate-700 cursor-pointer"
-            >
-              <option value="">-- Selecione o Paciente --</option>
-              {patients.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Paciente"
+            value={selectedPatientId}
+            onChange={e => {
+              const val = e.target.value;
+              setSelectedPatientId(val);
+              if (val) {
+                localStorage.setItem('nutri-ai:selected-patient-id', val);
+              } else {
+                localStorage.removeItem('nutri-ai:selected-patient-id');
+              }
+            }}
+          >
+            <option value="">-- Selecione o Paciente --</option>
+            {patients.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </Select>
 
           {selectedPatientId && (
             <>
               {/* Contexto Clínico Detectado */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Contexto Clínico Detectado</span>
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-wider">Contexto Clínico Detectado</span>
                   {loadingContext && (
                     <RefreshCw className="w-3.5 h-3.5 text-primary-600 animate-spin" />
                   )}
@@ -592,7 +584,7 @@ export const MealPlans: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setShowConsultationModal(true)}
-                          className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100"
+                          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Visualizar</span>
@@ -601,7 +593,7 @@ export const MealPlans: React.FC = () => {
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                      <span className={`text-[10px] font-semibold ${latestConsultation ? 'text-slate-500' : 'text-slate-400'}`}>
+                      <span className={`text-xs font-semibold ${latestConsultation ? 'text-slate-500' : 'text-slate-400'}`}>
                         Usar como contexto para IA
                       </span>
                       <label className={`relative inline-flex items-center select-none ${latestConsultation ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
@@ -643,7 +635,7 @@ export const MealPlans: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setShowExamModal(true)}
-                          className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100"
+                          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Visualizar</span>
@@ -652,7 +644,7 @@ export const MealPlans: React.FC = () => {
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                      <span className={`text-[10px] font-semibold ${latestExam ? 'text-slate-500' : 'text-slate-400'}`}>
+                      <span className={`text-xs font-semibold ${latestExam ? 'text-slate-500' : 'text-slate-400'}`}>
                         Usar como contexto para IA
                       </span>
                       <label className={`relative inline-flex items-center select-none ${latestExam ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
@@ -679,7 +671,7 @@ export const MealPlans: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-extrabold text-slate-550 uppercase tracking-wider">Meta Calórica (kcal)</label>
-                    <label className="flex items-center gap-1 text-[11px] font-bold text-primary-750 cursor-pointer">
+                    <label className="flex items-center gap-1 text-xs font-bold text-primary-750 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={suggestKcalWithAI}
@@ -689,16 +681,16 @@ export const MealPlans: React.FC = () => {
                       Sugerir com IA
                     </label>
                   </div>
-                  <input
+                  <Input
+                    aria-label="Meta calórica em kcal"
                     type="number"
                     disabled={suggestKcalWithAI}
                     value={kcalTarget}
                     onChange={e => setKcalTarget(e.target.value)}
                     placeholder="Meta kcal..."
-                    className="block w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white font-semibold text-slate-700 disabled:opacity-50 disabled:bg-slate-50"
                   />
                   {suggestKcalWithAI && (
-                    <span className="text-[10px] font-semibold text-primary-600 flex items-center gap-1 mt-1 bg-primary-50/60 p-2 rounded-lg border border-primary-100/50">
+                    <span className="text-xs font-semibold text-primary-600 flex items-center gap-1 mt-1 bg-primary-50/60 p-2 rounded-lg border border-primary-100/50">
                       <Sparkles className="w-3.5 h-3.5 shrink-0" />
                       A IA sugerirá a meta baseada na clínica e exames.
                     </span>
@@ -710,7 +702,7 @@ export const MealPlans: React.FC = () => {
                   <label className="block text-xs font-extrabold text-slate-550 uppercase tracking-wider">Refeições a Incluir</label>
                   <div className="grid grid-cols-2 gap-2 bg-slate-50/50 border border-slate-100 p-3 rounded-2xl">
                     {Object.keys(MEAL_NAMES).map(mealKey => (
-                      <label key={mealKey} className="flex items-center gap-2 font-bold text-[11px] text-slate-655 cursor-pointer select-none">
+                      <label key={mealKey} className="flex items-center gap-2 font-bold text-xs text-slate-655 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={selectedMeals.includes(mealKey)}
@@ -726,38 +718,29 @@ export const MealPlans: React.FC = () => {
 
               {/* Botões de Ação */}
               <div className="flex flex-col gap-2.5 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
+                <Button
                   onClick={handleGenerateAIPlan}
                   disabled={generating || isReadOnly}
-                  className="w-full bg-primary-600 hover:bg-primary-550 text-white font-bold text-sm py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  loading={generating}
+                  leftIcon={<Sparkles className="w-4.5 h-4.5" />}
+                  fullWidth
                 >
-                  {generating ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Estruturando Dieta...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4.5 h-4.5" />
-                      Gerar Plano com IA
-                    </>
-                  )}
-                </button>
+                  {generating ? 'Estruturando Dieta...' : 'Gerar Plano com IA'}
+                </Button>
 
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => handleStartManualPlan()}
                   disabled={isReadOnly}
-                  className="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  leftIcon={<Edit className="w-4 h-4" />}
+                  fullWidth
                 >
-                  <Edit className="w-4 h-4" />
                   Criar Dieta Manualmente
-                </button>
+                </Button>
               </div>
             </>
           )}
-        </div>
+        </Card>
 
         {/* RIGHT COLUMN: MAIN PLAN VIEWER & HISTORY */}
         <div className="lg:col-span-2 flex flex-col flex-1 h-full min-h-[500px] print:!h-auto print:!block">
@@ -819,7 +802,7 @@ export const MealPlans: React.FC = () => {
                             <button
                               onClick={handleSaveMealPlan}
                               disabled={saving}
-                              className="bg-primary-600 hover:bg-primary-500 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm hover:shadow flex items-center gap-1.5 transition-all cursor-pointer"
+                              className="bg-[#5024fc] hover:bg-[#431cdb] text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm hover:shadow flex items-center gap-1.5 transition-all cursor-pointer"
                             >
                               {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                               Salvar Dieta
@@ -835,7 +818,7 @@ export const MealPlans: React.FC = () => {
                         
                         {!activePlan ? (
                           <div className="text-center py-20 flex flex-col items-center justify-center flex-1 min-h-[350px]">
-                            <Apple className="h-16 w-16 text-slate-355 stroke-[1.2] mb-3 animate-bounce" />
+                            <Apple className="h-16 w-16 text-slate-355 stroke-[1.2] mb-3 ia-settle" />
                             <h3 className="text-base font-bold text-slate-850">Montar Dieta para {selectedPatient?.name}</h3>
                             <p className="text-xs text-slate-400 max-w-xs mt-1 font-semibold">
                               Escolha uma opção no painel lateral para iniciar o cardápio: Gerar com Inteligência Artificial ou construir manualmente.
@@ -870,7 +853,7 @@ export const MealPlans: React.FC = () => {
                               
                               <div className="bg-gradient-to-br from-[#0b0f19] to-slate-800 border border-slate-700/30 rounded-2xl px-6 py-3.5 flex items-center gap-3 shrink-0 shadow-md">
                                 <div>
-                                  <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest block">Meta Estimada</span>
+                                  <span className="text-xs font-bold text-indigo-300 uppercase tracking-widest block">Meta Estimada</span>
                                   <span className="text-2xl font-black text-white tracking-tight">{activePlan.kcal} <span className="text-xs font-bold text-slate-300">kcal</span></span>
                                 </div>
                               </div>
@@ -910,7 +893,7 @@ export const MealPlans: React.FC = () => {
                                           <button
                                             key={optIdx}
                                             onClick={() => setOptionActiveTab(prev => ({ ...prev, [mealKey]: optIdx }))}
-                                            className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                                            className={`px-3 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
                                               activeOptionIdx === optIdx 
                                                 ? headerTheme.switcherActive 
                                                 : headerTheme.switcherInactive
@@ -927,7 +910,7 @@ export const MealPlans: React.FC = () => {
                                       
                                       {/* Meal description input */}
                                       <div className="space-y-1">
-                                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider print:hidden">
+                                        <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider print:hidden">
                                           Descrição da Opção {activeOptionIdx + 1}
                                         </label>
                                         <input
@@ -941,7 +924,7 @@ export const MealPlans: React.FC = () => {
 
                                       {/* Items list editor */}
                                       <div className="space-y-2">
-                                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider print:hidden">
+                                        <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider print:hidden">
                                           Alimentos / Componentes
                                         </label>
                                         <div className="space-y-2.5">
@@ -967,7 +950,7 @@ export const MealPlans: React.FC = () => {
                                           <button
                                             type="button"
                                             onClick={() => handleAddItem(mealKey, activeOptionIdx)}
-                                            className="inline-flex items-center gap-1 text-[10px] font-bold text-primary-655 hover:text-primary-500 pt-1.5 transition-colors print:hidden"
+                                            className="inline-flex items-center gap-1 text-xs font-bold text-primary-655 hover:text-primary-500 pt-1.5 transition-colors print:hidden"
                                           >
                                             <Plus className="w-3.5 h-3.5" />
                                             Adicionar Alimento
@@ -978,7 +961,7 @@ export const MealPlans: React.FC = () => {
                                       {/* Calorie input */}
                                       <div className="pt-3.5 border-t border-slate-100 flex items-center justify-between gap-4 print:pt-2">
                                         <div className="flex items-center gap-2">
-                                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-black">Calorias:</span>
+                                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider print:text-black">Calorias:</span>
                                           <div className="relative flex items-center">
                                             <input
                                               type="number"
@@ -1026,7 +1009,7 @@ export const MealPlans: React.FC = () => {
                                     <h4 className="text-sm font-extrabold text-slate-850">
                                       Plano Alimentar ({plan.kcal} kcal)
                                     </h4>
-                                    <p className="text-[11px] font-semibold text-slate-450 mt-1 flex items-center gap-1.5">
+                                    <p className="text-xs font-semibold text-slate-450 mt-1 flex items-center gap-1.5">
                                       <Calendar className="w-3.5 h-3.5" />
                                       Criado em: {new Date(plan.created_at).toLocaleDateString('pt-BR')} às {new Date(plan.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                     </p>
@@ -1073,160 +1056,76 @@ export const MealPlans: React.FC = () => {
         </div>
 
       {/* MODAL PARA VISUALIZAR CONSULTA */}
-      {showConsultationModal && latestConsultation && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden animate-in scale-in duration-300">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 p-5 shrink-0 bg-slate-50/50">
-              <div className="space-y-0.5">
-                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[10px] font-semibold px-2 py-0.5 flex items-center gap-1 w-fit uppercase tracking-wider">
-                  Histórico de Consulta
-                </span>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Consulta em {new Date(latestConsultation.created_at).toLocaleDateString('pt-BR')}
-                </h3>
-              </div>
-              <button 
-                onClick={() => setShowConsultationModal(false)} 
-                className="h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 border border-slate-200 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      <Modal
+        open={showConsultationModal && !!latestConsultation}
+        onClose={() => setShowConsultationModal(false)}
+        size="lg"
+        badge="Histórico de Consulta"
+        title={latestConsultation ? `Consulta em ${new Date(latestConsultation.created_at).toLocaleDateString('pt-BR')}` : ''}
+        footer={<button onClick={() => setShowConsultationModal(false)} className="px-5 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all">Fechar</button>}
+      >
+        {latestConsultation && (
+          <div className="space-y-4 text-left">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Anotações de Anamnese</h4>
+            <div className="bg-slate-50 border border-slate-200 p-4.5 rounded-2xl">
+              <p className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-line">
+                {latestConsultation.anamnese_notes || "Nenhuma anotação de anamnese registrada nesta consulta."}
+              </p>
             </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Anotações de Anamnese</h4>
-              <div className="bg-slate-50 border border-slate-200 p-4.5 rounded-2xl">
-                <p className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-line">
-                  {latestConsultation.anamnese_notes || "Nenhuma anotação de anamnese registrada nesta consulta."}
-                </p>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="border-t border-slate-100 p-4 shrink-0 bg-slate-50/50 flex justify-end">
-              <button 
-                onClick={() => setShowConsultationModal(false)} 
-                className="px-5 py-2 text-xs font-semibold text-slate-650 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none"
-              >
-                Fechar
-              </button>
-            </div>
-
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* MODAL PARA VISUALIZAR EXAME (PDF) */}
-      {showExamModal && latestExam && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden animate-in scale-in duration-300">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 p-5 shrink-0 bg-slate-50/50">
-              <div className="space-y-0.5">
-                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[10px] font-semibold px-2 py-0.5 flex items-center gap-1 w-fit uppercase tracking-wider">
-                  Laudo de Exame PDF
-                </span>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Exame em {new Date(latestExam.exam_date || latestExam.created_at).toLocaleDateString('pt-BR')}
-                </h3>
-              </div>
-              <button 
-                onClick={() => setShowExamModal(false)} 
-                className="h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-850 border border-slate-200 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      <Modal
+        open={showExamModal && !!latestExam}
+        onClose={() => setShowExamModal(false)}
+        size="xl"
+        badge="Laudo de Exame PDF"
+        title={latestExam ? `Exame em ${new Date(latestExam.exam_date || latestExam.created_at).toLocaleDateString('pt-BR')}` : ''}
+        footer={<button onClick={() => setShowExamModal(false)} className="px-5 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all">Fechar</button>}
+      >
+        <div className="h-[68vh]">
+          {loadingPdfUrl ? (
+            <div className="flex h-full flex-col items-center justify-center text-slate-500">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent mb-3" />
+              <p className="text-sm font-medium">Gerando link seguro de visualização do PDF...</p>
             </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-hidden p-6 bg-slate-50 flex flex-col">
-              {loadingPdfUrl ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-450">
-                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent mb-3" />
-                  <p className="text-sm font-medium">Gerando link seguro de visualização do PDF...</p>
-                </div>
-              ) : examPdfUrl ? (
-                <iframe 
-                  src={`${examPdfUrl}#toolbar=0`} 
-                  className="w-full h-full rounded-2xl border border-slate-250 shadow-sm"
-                  title="Visualizador de PDF do Exame"
-                />
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-                  <p className="text-sm font-semibold text-rose-600">Erro ao carregar documento PDF.</p>
-                </div>
-              )}
+          ) : examPdfUrl ? (
+            <iframe
+              src={`${examPdfUrl}#toolbar=0`}
+              className="w-full h-full rounded-2xl border border-slate-200 shadow-sm"
+              title="Visualizador de PDF do Exame"
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center">
+              <p className="text-sm font-semibold text-rose-600">Erro ao carregar documento PDF.</p>
             </div>
-
-            {/* Modal Footer */}
-            <div className="border-t border-slate-100 p-4 shrink-0 bg-slate-50/50 flex justify-end">
-              <button 
-                onClick={() => setShowExamModal(false)} 
-                className="px-5 py-2 text-xs font-semibold text-slate-650 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none"
-              >
-                Fechar
-              </button>
-            </div>
-
-          </div>
+          )}
         </div>
-      )}
+      </Modal>
 
       {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE PLANO */}
-      {deletePlanId && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
-          <div className="bg-[#f8fafc] border border-slate-200 rounded-xl shadow-xl max-w-md w-full flex flex-col overflow-hidden animate-in scale-in duration-300">
-            
-            {/* Modal Body */}
-            <div className="p-6 space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 font-semibold">
-                Excluir Plano Alimentar
-              </h3>
-              <p className="text-sm text-slate-500 leading-relaxed font-normal">
-                Deseja mesmo excluir este plano alimentar? Esta ação não poderá ser desfeita.
-              </p>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="border-t border-slate-100 p-4 bg-slate-50/50 flex justify-end gap-3 shrink-0">
-              <button 
-                type="button"
-                onClick={() => setDeletePlanId(null)} 
-                className="bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl py-2 px-4 font-medium text-xs transition-all cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button 
-                type="button"
-                onClick={() => handleDeletePastPlan(deletePlanId)} 
-                className="bg-rose-600 text-white font-medium rounded-xl py-2 px-4 hover:bg-rose-700 transition-all text-xs cursor-pointer"
-              >
-                Excluir
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deletePlanId}
+        onCancel={() => setDeletePlanId(null)}
+        onConfirm={() => deletePlanId && handleDeletePastPlan(deletePlanId)}
+        title="Excluir plano alimentar?"
+        confirmLabel="Excluir"
+        message="Deseja mesmo excluir este plano alimentar? Esta ação não poderá ser desfeita."
+      />
 
       {/* MODAL DE COMPARTILHAMENTO */}
-      {showShareModal && activePlan && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden animate-in scale-in duration-300">
-            <div className="p-6 text-center border-b border-slate-100">
-              <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Share2 className="w-7 h-7" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800">Compartilhar Plano</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                O plano será protegido pela data de nascimento de {selectedPatient?.name.split(' ')[0]}.
-              </p>
-            </div>
-            <div className="p-6 space-y-3 bg-slate-50/50">
+      {activePlan && (
+      <Modal
+        open={showShareModal && !!activePlan}
+        onClose={() => setShowShareModal(false)}
+        badge={<><Share2 className="w-3 h-3" /> Compartilhar</>}
+        title="Compartilhar Plano"
+        description={selectedPatient ? `O plano será protegido pela data de nascimento de ${selectedPatient.name.split(' ')[0]}.` : undefined}
+        footer={<button onClick={() => setShowShareModal(false)} className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Fechar</button>}
+      >
+            <div className="space-y-3">
               <button onClick={handleWhatsAppShare} className="w-full flex items-center gap-3 p-4 bg-white border border-slate-200 hover:border-green-500 hover:ring-1 hover:ring-green-500 rounded-xl transition-all shadow-sm group text-left">
                 <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
                   <Smartphone className="w-5 h-5" />
@@ -1257,13 +1156,7 @@ export const MealPlans: React.FC = () => {
                 </div>
               </button>
             </div>
-            <div className="p-4 border-t border-slate-100 flex justify-end bg-white">
-              <button onClick={() => setShowShareModal(false)} className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
+      </Modal>
       )}
     </div>
   );

@@ -26,9 +26,9 @@ interface Props {
 }
 
 const alertTitleSize = (t: AiTextSize) =>
-  t === 'sm' ? 'text-xs' : t === 'base' ? 'text-sm' : t === 'lg' ? 'text-base' : 'text-lg';
+  t === 'sm' ? 'text-sm' : t === 'base' ? 'text-sm' : t === 'lg' ? 'text-base' : 'text-lg';
 const alertRefSize = (t: AiTextSize) =>
-  t === 'sm' ? 'text-[9px]' : t === 'base' ? 'text-[11px]' : t === 'lg' ? 'text-xs' : 'text-sm';
+  t === 'sm' ? 'text-xs' : t === 'base' ? 'text-xs' : t === 'lg' ? 'text-sm' : 'text-sm';
 const insightsClass = (t: AiTextSize) =>
   t === 'sm' ? 'text-xs leading-normal'
     : t === 'base' ? 'text-sm leading-relaxed'
@@ -58,7 +58,7 @@ export const AiAnalysisPanel: React.FC<Props> = ({
   if (!alertas && !parecer && !biomarcadores) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-6 max-w-sm mx-auto space-y-4">
-        <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-indigo-50 to-primary-50 text-indigo-600 flex items-center justify-center shadow border border-indigo-100/50 animate-bounce">
+        <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-indigo-50 to-primary-50 text-indigo-600 flex items-center justify-center shadow border border-indigo-100/50 ia-settle">
           <Sparkles className="w-8 h-8" />
         </div>
         <div>
@@ -75,13 +75,13 @@ export const AiAnalysisPanel: React.FC<Props> = ({
         >
           {analyzing ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent animate-bounce" />
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
               <span>Analisando PDF...</span>
             </>
           ) : (
             <>
               <Sparkles className="w-4 h-4 text-indigo-200" />
-              <span>✨ Analisar Exame com IA</span>
+              <span>Analisar Exame com IA</span>
             </>
           )}
         </button>
@@ -114,7 +114,7 @@ export const AiAnalysisPanel: React.FC<Props> = ({
                 </div>
                 <div className="text-right">
                   <p className={`font-semibold text-slate-900 transition-all ${alertTitleSize(textSize)}`}>{alerta.valor}</p>
-                  <span className={`inline-block text-[10px] font-medium uppercase px-2.5 py-0.5 rounded-lg border mt-1 ${
+                  <span className={`inline-block text-xs font-medium uppercase px-2.5 py-0.5 rounded-lg border mt-1 ${
                     alerta.gravidade === 'alta'
                       ? 'bg-rose-50/50 border-rose-200 text-rose-600'
                       : 'bg-amber-50 border-amber-250 text-amber-700'
@@ -139,7 +139,7 @@ export const AiAnalysisPanel: React.FC<Props> = ({
           <span className="w-1.5 h-3.5 bg-emerald-500 rounded-sm" />
           Parecer Clínico Nutricional
         </h5>
-        <div className={`font-medium text-slate-700 border-l-4 border-emerald-500 bg-emerald-50/10 px-5 py-4 rounded-r-xl shadow-inner whitespace-pre-line transition-all duration-300 ${insightsClass(textSize)}`}>
+        <div className={`font-medium text-slate-700 bg-emerald-50/40 border border-emerald-100/70 px-5 py-4 rounded-xl whitespace-pre-line transition-all duration-300 ${insightsClass(textSize)}`}>
           {parecer}
         </div>
       </div>

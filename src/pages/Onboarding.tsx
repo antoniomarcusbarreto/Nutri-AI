@@ -380,7 +380,7 @@ export const Onboarding: React.FC = () => {
                   <div className="relative">
                     <div className="h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border-2 border-slate-200">
                       {avatarPreview ? (
-                        <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
+                        <img src={avatarPreview} alt="Prévia da foto de perfil" className="h-full w-full object-cover" />
                       ) : (
                         <User className="h-12 w-12 text-slate-400" />
                       )}

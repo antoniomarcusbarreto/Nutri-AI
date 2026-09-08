@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useClinicStats, useUpcomingAppointments, useReminders } from '../hooks/queries/useDashboard';
 import { useReminderMutations } from '../hooks/mutations/useReminderMutations';
 import { pickOne } from '../types/clinical';
+import { Button, Card, PageHeader, EmptyState } from '../components/ui';
 
 export const Dashboard: React.FC = () => {
   const { isReadOnly, clinic, profile } = useAuth();
@@ -83,28 +84,23 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Header Visão Geral */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 shrink-0">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-2">
-            Visão Geral
-          </h1>
-          <p className="text-sm font-normal text-slate-500 mt-1">
-            Acompanhe os resultados da sua clínica no período selecionado.
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-4 bg-white px-5 py-2.5 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-slate-300">
-          <button onClick={prevMonth} className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
-            <ChevronLeft className="w-5.5 h-5.5" />
-          </button>
-          <span className="min-w-[150px] text-center text-base font-medium text-slate-900 capitalize tracking-wide">
-            {formattedMonthName}
-          </span>
-          <button onClick={nextMonth} className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
-            <ChevronRight className="w-5.5 h-5.5" />
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Visão Geral"
+        description="Acompanhe os resultados da sua clínica no período selecionado."
+        actions={
+          <div className="flex items-center gap-4 bg-white px-5 py-2.5 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-slate-300">
+            <button type="button" onClick={prevMonth} aria-label="Mês anterior" className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
+              <ChevronLeft className="w-5.5 h-5.5" />
+            </button>
+            <span className="min-w-[150px] text-center text-base font-medium text-slate-900 capitalize tracking-wide">
+              {formattedMonthName}
+            </span>
+            <button type="button" onClick={nextMonth} aria-label="Próximo mês" className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
+              <ChevronRight className="w-5.5 h-5.5" />
+            </button>
+          </div>
+        }
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -134,10 +130,10 @@ export const Dashboard: React.FC = () => {
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
         
         {/* Upcoming appointments card */}
-        <div className="bg-white rounded-3xl p-6.5 shadow-sm border border-slate-200 flex flex-col max-h-[480px]">
+        <Card as="section" className="flex flex-col max-h-[480px]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 shrink-0">
             <h2 className="text-lg font-semibold text-slate-900">Próximos Agendamentos</h2>
-            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-2xl shrink-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-2xl">
               <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Status:</span>
               <span className="flex items-center gap-1.5 text-xs font-medium text-slate-650">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
@@ -155,11 +151,12 @@ export const Dashboard: React.FC = () => {
           </div>
           
           {upcomingAppointments.length === 0 ? (
-            <div className="text-slate-400 flex flex-col items-center justify-center flex-1 py-14 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50/10 min-h-[220px]">
-              <CalendarCheck className="w-10 h-10 text-slate-300 stroke-[1.4] mb-2.5" />
-              <p className="text-lg font-medium text-slate-900">Nenhum agendamento previsto</p>
-              <p className="text-sm font-normal text-slate-500 mt-1">Acesse a Agenda para marcar novas consultas.</p>
-            </div>
+            <EmptyState
+              className="flex-1"
+              icon={<CalendarCheck />}
+              title="Nenhum agendamento previsto"
+              description="Acesse a Agenda para marcar novas consultas."
+            />
           ) : (
             <div className="flex-1 overflow-y-auto pr-1.5 space-y-3.5 custom-scrollbar scrollbar-thin">
               {upcomingAppointments.map((apt) => {
@@ -234,10 +231,10 @@ export const Dashboard: React.FC = () => {
               })}
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Reminders Card */}
-        <div className="bg-white rounded-3xl p-6.5 shadow-sm border border-slate-200 flex flex-col max-h-[480px]">
+        <Card as="section" className="flex flex-col max-h-[480px]">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-semibold text-slate-900">Lembretes</h2>
             {isPastMonth() ? (
@@ -254,33 +251,31 @@ export const Dashboard: React.FC = () => {
           </div>
           
           {!isPastMonth() && !isReadOnly && (
-            <form onSubmit={addReminder} className="flex gap-2.5 mb-5 shrink-0">
-              <input 
-                type="text" 
-                placeholder="O que você precisa lembrar?" 
+            <form onSubmit={addReminder} className="flex flex-wrap sm:flex-nowrap gap-2.5 mb-5 shrink-0">
+              <input
+                type="text"
+                placeholder="O que você precisa lembrar?"
                 value={newReminderText}
                 onChange={e => setNewReminderText(e.target.value)}
-                className="flex-1 rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm font-normal px-4 py-2.5 border"
+                className="flex-1 min-w-0 basis-full sm:basis-auto rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm font-normal px-4 py-2.5 border"
                 required
               />
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={newReminderDate}
                 onChange={e => setNewReminderDate(e.target.value)}
-                className="w-40 rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm font-normal px-4 py-2.5 border"
+                className="flex-1 sm:flex-none sm:w-40 rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm font-normal px-4 py-2.5 border"
                 required
               />
-              <button type="submit" className="bg-indigo-600 text-white p-2.5 rounded-xl hover:bg-indigo-700 flex-shrink-0 transition-colors shadow-sm cursor-pointer">
+              <Button type="submit" size="icon" aria-label="Adicionar lembrete" className="shrink-0">
                 <Plus className="w-5.5 h-5.5" />
-              </button>
+              </Button>
             </form>
           )}
 
           <div className="flex-1 overflow-y-auto pr-1.5 space-y-3 custom-scrollbar scrollbar-thin">
             {reminders.length === 0 ? (
-              <div className="text-slate-500 flex items-center justify-center h-28 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50/10 text-sm font-normal">
-                Nenhum lembrete para este mês.
-              </div>
+              <EmptyState size="sm" title="Nenhum lembrete para este mês." />
             ) : (
               reminders.map(reminder => (
                 <div key={reminder.id} className={`flex items-start gap-4 p-4 rounded-2xl border transition-all duration-200 ${reminder.is_completed ? 'bg-slate-50 border-slate-150' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'}`}>
@@ -324,7 +319,7 @@ export const Dashboard: React.FC = () => {
               ))
             )}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

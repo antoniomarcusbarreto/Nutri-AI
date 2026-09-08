@@ -58,7 +58,7 @@ export const ExamHistoryList: React.FC<Props> = ({ exams, selectedExamId, onSele
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="text-xs text-slate-500 font-normal">{format(parsedDate, 'dd/MM/yyyy')}</span>
                   {hasAI && (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] font-medium uppercase text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-100">
+                    <span className="inline-flex items-center gap-0.5 text-xs font-medium uppercase text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-100">
                       IA
                     </span>
                   )}

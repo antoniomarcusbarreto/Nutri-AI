@@ -12,8 +12,7 @@ import {
   FileText,
   ClipboardList,
   Eye,
-  CalendarRange,
-  X
+  CalendarRange
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -43,6 +42,7 @@ import type {
   RechartsTooltipProps,
 } from '../types/clinical';
 import { pickOne } from '../types/clinical';
+import { PageHeader, Modal, Select } from '../components/ui';
 
 // Helper to parse dates in local timezone (avoiding UTC offset conversion bugs)
 const EMPTY: never[] = [];
@@ -490,7 +490,7 @@ export const Tracking: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[500px] p-6 animate-in fade-in duration-300">
         <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm text-center max-w-lg flex flex-col items-center">
-          <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100 mb-4 animate-bounce">
+          <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100 mb-4 ia-settle">
             <ShieldAlert className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-semibold text-slate-800">Acesso Restrito a Profissionais</h2>
@@ -506,20 +506,14 @@ export const Tracking: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500 flex flex-col h-full font-sans pb-12 text-left">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-2">
-            Acompanhamento Clínico & Evolução
-          </h1>
-          <p className="text-base font-medium text-slate-500 mt-1">
-            Monitore dinamicamente o progresso metabólico, curva de biomarcadores e indicadores de saúde dos seus pacientes.
-          </p>
-        </div>
-
-        {/* Patient Selection Dropdown */}
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="Acompanhamento Clínico & Evolução"
+        description="Monitore dinamicamente o progresso metabólico, curva de biomarcadores e indicadores de saúde dos seus pacientes."
+        actions={<>
+          {/* Patient Selection Dropdown */}
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wider shrink-0">Paciente:</span>
-          <select
+          <Select
+            aria-label="Selecionar paciente para acompanhamento"
             value={selectedPatientId}
             onChange={e => {
               const val = e.target.value;
@@ -531,7 +525,7 @@ export const Tracking: React.FC = () => {
               }
             }}
             disabled={loadingPatients}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 bg-white cursor-pointer shadow-sm hover:border-slate-350 transition-all min-w-[200px]"
+            wrapperClassName="min-w-[200px] shrink-0"
           >
             {loadingPatients ? (
               <option>Buscando pacientes...</option>
@@ -542,9 +536,9 @@ export const Tracking: React.FC = () => {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))
             )}
-          </select>
-        </div>
-      </div>
+          </Select>
+        </>}
+      />
 
       {!selectedPatientId ? (
         /* Empty State */
@@ -600,7 +594,7 @@ export const Tracking: React.FC = () => {
                   </div>
 
                   {/* Right block: Progress Indicator Dial */}
-                  <div className="w-full lg:w-80 shrink-0 bg-gradient-to-r from-indigo-600 to-violet-600 p-5 rounded-2xl flex flex-col justify-center space-y-4 shadow-md border-0 text-white">
+                  <div className="w-full lg:w-80 shrink-0 bg-white/10 border border-white/15 backdrop-blur-md p-5 rounded-2xl flex flex-col justify-center space-y-4 text-white">
                     <div className="flex justify-between items-center text-xs font-medium">
                       <span className="text-white/95 uppercase tracking-wider">
                         {prediction.isTreatmentActive ? "Tratamento Ativo" : "Aguardando Início"}
@@ -1087,31 +1081,21 @@ export const Tracking: React.FC = () => {
       )}
 
       {/* 4. MODAL DETALHES DO EXAME DA JORNADA */}
-      {selectedExamForModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in scale-in duration-300">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 p-5 shrink-0 bg-slate-50/50">
-              <div className="space-y-1">
-                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[10px] font-semibold px-2 py-0.5 flex items-center gap-1 w-fit uppercase tracking-wider">
-                  <Sparkles className="w-3 h-3 text-[#5024fc]" /> Análise de Exame Clínico
-                </span>
-                <h3 className="text-lg font-semibold text-slate-900 tracking-tight leading-snug">
-                  Detalhes do Laudo Anexado
-                </h3>
-              </div>
-              <button 
-                onClick={() => setSelectedExamForModal(null)} 
-                className="h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors border border-slate-200"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <Modal
+        open={!!selectedExamForModal}
+        onClose={() => setSelectedExamForModal(null)}
+        size="xl"
+        badge={<><Sparkles className="w-3 h-3 text-[#5024fc]" /> Análise de Exame Clínico</>}
+        title="Detalhes do Laudo Anexado"
+        footer={
+          <button onClick={() => setSelectedExamForModal(null)} className="px-5 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all">
+            Fechar Detalhes
+          </button>
+        }
+      >
+        {selectedExamForModal && (
+            <div className="space-y-6 text-left">
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              
               {/* SEÇÃO A: Documento Original PDF Storage */}
               <div className="bg-slate-50 border border-slate-200 p-4.5 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1224,50 +1208,28 @@ export const Tracking: React.FC = () => {
               </div>
 
             </div>
-
-            {/* Modal Footer */}
-            <div className="border-t border-slate-100 p-4 shrink-0 bg-slate-50/50 flex justify-end">
-              <button 
-                onClick={() => setSelectedExamForModal(null)} 
-                className="px-5 py-2 text-xs font-semibold text-slate-650 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none"
-              >
-                Fechar Detalhes
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* 5. MODAL RESUMO DO ATENDIMENTO (O QUE FOI FEITO) */}
       {selectedAptForModal && (() => {
         const consultation = pickOne(selectedAptForModal.consultations);
         const ant: AnthropometryJson = consultation?.anthropometry_json ?? {};
         return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 text-left">
-            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden animate-in scale-in duration-300">
-              
-              {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 p-5 shrink-0 bg-slate-50/50">
-                <div className="space-y-0.5">
-                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[10px] font-semibold px-2 py-0.5 flex items-center gap-1 w-fit">
-                    <ClipboardList className="w-3 h-3 text-[#5024fc]" /> Resumo do Atendimento
-                  </span>
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    {pickOne(selectedAptForModal.services)?.name || 'Consulta Geral'}
-                  </h3>
-                </div>
-                <button 
-                  onClick={() => setSelectedAptForModal(null)} 
-                  className="h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 border border-slate-200 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+          <Modal
+            open={!!selectedAptForModal}
+            onClose={() => setSelectedAptForModal(null)}
+            size="lg"
+            badge={<><ClipboardList className="w-3 h-3 text-[#5024fc]" /> Resumo do Atendimento</>}
+            title={pickOne(selectedAptForModal.services)?.name || 'Consulta Geral'}
+            footer={
+              <button onClick={() => setSelectedAptForModal(null)} className="px-5 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all">
+                Fechar Resumo
+              </button>
+            }
+          >
+              <div className="space-y-6 text-left">
 
-              {/* Modal Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                
                 {/* Section 1: Anamnese Notes */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-medium text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
@@ -1310,19 +1272,7 @@ export const Tracking: React.FC = () => {
                 )}
 
               </div>
-
-              {/* Modal Footer */}
-              <div className="border-t border-slate-100 p-4 shrink-0 bg-slate-50/50 flex justify-end">
-                <button 
-                  onClick={() => setSelectedAptForModal(null)} 
-                  className="px-5 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none"
-                >
-                  Fechar Resumo
-                </button>
-              </div>
-
-            </div>
-          </div>
+          </Modal>
         );
       })()}
 

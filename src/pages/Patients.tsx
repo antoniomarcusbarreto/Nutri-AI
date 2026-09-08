@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Mail, Phone, Lock, X, Edit, Power, PowerOff, Check, ClipboardList } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, Check, ClipboardList } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -8,6 +8,7 @@ import { usePatients } from '../hooks/queries/usePatients';
 import { qk } from '../lib/queryKeys';
 import { logger } from '../lib/logger';
 import type { PatientRow } from '../types/clinical';
+import { PageHeader, Modal } from '../components/ui';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
@@ -284,12 +285,10 @@ export const Patients: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">Pacientes</h1>
-          <p className="text-sm text-slate-500 mt-1">Gerencie seus pacientes e prontuários.</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <PageHeader
+        title="Pacientes"
+        description="Gerencie seus pacientes e prontuários."
+        actions={<>
           {isLimitReached && (
             <span className="text-sm text-red-600 bg-red-50 px-3 py-1 rounded-full font-medium">
               {isTrialActive ? 'Limite de 5 pacientes do Trial atingido' : 'Limite de 50 pacientes atingido'}
@@ -298,14 +297,14 @@ export const Patients: React.FC = () => {
           <button 
             disabled={isButtonDisabled}
             onClick={() => handleOpenModal()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#5024fc] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#431cdb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5024fc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={isLimitReached ? 'Faça upgrade para adicionar mais pacientes' : isReadOnly ? 'Sistema em modo somente leitura' : ''}
           >
             {isButtonDisabled ? <Lock className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
             Novo Paciente
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-200 bg-slate-50/50">
@@ -441,22 +440,17 @@ export const Patients: React.FC = () => {
         </div>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-auto animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h3 className="text-lg font-semibold text-slate-900">
-                {editingPatient ? 'Editar Paciente' : 'Novo Paciente'}
-              </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-500 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        size="lg"
+        title={editingPatient ? 'Editar Paciente' : 'Novo Paciente'}
+        footer={<>
+          <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer">Cancelar</button>
+          <button type="submit" form="patient-form" disabled={saving} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-[#5024fc] hover:bg-[#431cdb] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer">{saving ? 'Salvando...' : 'Salvar Paciente'}</button>
+        </>}
+      >
+            <form id="patient-form" onSubmit={handleSave} className="space-y-4">
               {error && (
                 <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm border border-red-100">
                   {error}
@@ -582,49 +576,22 @@ export const Patients: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-6 flex gap-3 justify-end border-t border-slate-100 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {saving ? 'Salvando...' : 'Salvar Paciente'}
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {isClinicalModalOpen && selectedClinicalPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-auto animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <div className="text-left">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Ficha Clínica / Anamnese
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Paciente: <span className="font-semibold text-slate-700">{selectedClinicalPatient.name}</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsClinicalModalOpen(false)}
-                className="text-slate-400 hover:text-slate-500 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSaveClinical} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-left">
+      {selectedClinicalPatient && (
+      <Modal
+        open={isClinicalModalOpen}
+        onClose={() => setIsClinicalModalOpen(false)}
+        size="lg"
+        title="Ficha Clínica / Anamnese"
+        description={`Paciente: ${selectedClinicalPatient.name}`}
+        footer={<>
+          <button type="button" onClick={() => setIsClinicalModalOpen(false)} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer">Cancelar</button>
+          <button type="submit" form="clinical-form" disabled={clinicalSaving} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-[#5024fc] hover:bg-[#431cdb] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer">{clinicalSaving ? 'Salvando...' : 'Salvar Ficha'}</button>
+        </>}
+      >
+            <form id="clinical-form" onSubmit={handleSaveClinical} className="space-y-4 text-left">
               {clinicalError && (
                 <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm border border-red-100">
                   {clinicalError}
@@ -731,25 +698,8 @@ export const Patients: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-6 flex gap-3 justify-end border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsClinicalModalOpen(false)}
-                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={clinicalSaving}
-                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {clinicalSaving ? 'Salvando...' : 'Salvar Ficha'}
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
     </div>
   );

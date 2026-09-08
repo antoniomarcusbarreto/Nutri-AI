@@ -123,7 +123,7 @@ export default function PublicPlanViewer() {
           <div className="mx-auto w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mb-6">
             <Lock className="w-8 h-8 text-primary-600" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso Seguro</h1>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Acesso Seguro</h2>
           <p className="text-sm text-slate-500 mb-8">
             Para visualizar seu plano alimentar, por favor confirme sua data de nascimento.
           </p>
@@ -204,7 +204,7 @@ export default function PublicPlanViewer() {
                 
                 {/* Printable header */}
                 <div className="hidden print:block border-b border-slate-300 pb-4 mb-4">
-                  <h1 className="text-xl font-bold text-black">{planData.patient?.name}</h1>
+                  <h2 className="text-xl font-bold text-black">{planData.patient?.name}</h2>
                   <p className="text-base text-slate-800 font-semibold mt-1">Plano Alimentar</p>
                 </div>
 

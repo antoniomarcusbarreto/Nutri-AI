@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Shield, Key, Calendar, Save, UserPlus, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { Modal } from '../components/ui';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Erro inesperado');
 
@@ -229,7 +230,7 @@ export const AdminDashboard: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-500">
                           {u.avatar_url ? (
-                            <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
+                            <img src={u.avatar_url} alt={`Foto de ${u.full_name || 'usuário'}`} loading="lazy" width={40} height={40} className="h-full w-full object-cover" />
                           ) : (
                             u.full_name?.substring(0, 2).toUpperCase() || 'US'
                           )}
@@ -378,111 +379,109 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Password Modal */}
-      {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Alterar Senha - {selectedUser?.full_name}</h3>
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Nova Senha</label>
-                <input
-                  type="password"
-                  required
-                  pattern="^(?=.*[A-Z])(?=.*\d).{8,}$"
-                  title="Mínimo 8 caracteres, 1 maiúscula e 1 número."
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsPasswordModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50">Cancelar</button>
-                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700">Salvar Nova Senha</button>
-              </div>
-            </form>
+      <Modal
+        open={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+        title={`Alterar senha — ${selectedUser?.full_name ?? ''}`}
+        footer={<>
+          <button type="button" onClick={() => setIsPasswordModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50">Cancelar</button>
+          <button type="submit" form="admin-password-form" className="px-4 py-2 text-sm font-medium text-white bg-[#5024fc] rounded-xl hover:bg-[#431cdb]">Salvar nova senha</button>
+        </>}
+      >
+        <form id="admin-password-form" onSubmit={handlePasswordChange} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700">Nova Senha</label>
+            <input
+              type="password"
+              required
+              pattern="^(?=.*[A-Z])(?=.*\d).{8,}$"
+              title="Mínimo 8 caracteres, 1 maiúscula e 1 número."
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+            />
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* Subscription Modal */}
-      {isSubModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Gerenciar Assinatura - {selectedClinic?.name}</h3>
-            <form onSubmit={handleSubUpdate} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Status</label>
-                <select
-                  value={subStatus}
-                  onChange={e => setSubStatus(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                >
-                  <option value="trial">Trial (Usa data de criação)</option>
-                  <option value="active">Ativo (Ilimitado ou até Data Fim)</option>
-                  <option value="inactive">Inativo (Bloqueado)</option>
-                </select>
-              </div>
-              {subStatus === 'active' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Data Fim (Deixe vazio para ilimitado)</label>
-                  <input
-                    type="date"
-                    value={subDate}
-                    onChange={e => setSubDate(e.target.value)}
-                    className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  />
-                </div>
-              )}
-              <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsSubModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50">Cancelar</button>
-                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 flex items-center gap-2"><Save className="w-4 h-4" /> Salvar</button>
-              </div>
-            </form>
+      <Modal
+        open={isSubModalOpen}
+        onClose={() => setIsSubModalOpen(false)}
+        title={`Gerenciar assinatura — ${selectedClinic?.name ?? ''}`}
+        footer={<>
+          <button type="button" onClick={() => setIsSubModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50">Cancelar</button>
+          <button type="submit" form="admin-sub-form" className="px-4 py-2 text-sm font-medium text-white bg-[#5024fc] rounded-xl hover:bg-[#431cdb] flex items-center gap-2"><Save className="w-4 h-4" /> Salvar</button>
+        </>}
+      >
+        <form id="admin-sub-form" onSubmit={handleSubUpdate} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700">Status</label>
+            <select
+              value={subStatus}
+              onChange={e => setSubStatus(e.target.value)}
+              className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+            >
+              <option value="trial">Trial (Usa data de criação)</option>
+              <option value="active">Ativo (Ilimitado ou até Data Fim)</option>
+              <option value="inactive">Inativo (Bloqueado)</option>
+            </select>
           </div>
-        </div>
-      )}
+          {subStatus === 'active' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Data Fim (Deixe vazio para ilimitado)</label>
+              <input
+                type="date"
+                value={subDate}
+                onChange={e => setSubDate(e.target.value)}
+                className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              />
+            </div>
+          )}
+        </form>
+      </Modal>
+
       {/* Allocation Modal */}
-      {isAllocateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-slate-200 animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Alocar Usuário à Clínica</h3>
-            <p className="text-xs text-slate-500 mb-4">Usuário: <span className="font-semibold text-slate-700">{selectedUser?.full_name}</span></p>
-            <form onSubmit={handleAllocateUser} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Selecione a Clínica</label>
-                <select
-                  required
-                  value={allocateClinicId}
-                  onChange={e => setAllocateClinicId(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-sm focus:ring-primary-500 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="" disabled>Selecione uma clínica...</option>
-                  {clinics.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.owner?.full_name || 'Sem proprietário'})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Função / Papel na Clínica</label>
-                <select
-                  required
-                  value={allocateRole}
-                  onChange={e => setAllocateRole(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-sm focus:ring-primary-500 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="owner">Proprietário (Titular)</option>
-                  <option value="nutritionist">Nutricionista</option>
-                  <option value="secretary">Secretária(o)</option>
-                </select>
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsAllocateModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 cursor-pointer">Cancelar</button>
-                <button type="submit" className="px-5 py-2 text-sm font-bold text-white bg-primary-600 rounded-xl hover:bg-primary-700 flex items-center gap-1.5 cursor-pointer"><Save className="w-4 h-4" /> Alocar Usuário</button>
-              </div>
-            </form>
+      <Modal
+        open={isAllocateModalOpen}
+        onClose={() => setIsAllocateModalOpen(false)}
+        title="Alocar usuário à clínica"
+        description={selectedUser?.full_name ? `Usuário: ${selectedUser.full_name}` : undefined}
+        footer={<>
+          <button type="button" onClick={() => setIsAllocateModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 cursor-pointer">Cancelar</button>
+          <button type="submit" form="admin-allocate-form" className="px-5 py-2 text-sm font-bold text-white bg-[#5024fc] rounded-xl hover:bg-[#431cdb] flex items-center gap-1.5 cursor-pointer"><Save className="w-4 h-4" /> Alocar Usuário</button>
+        </>}
+      >
+        <form id="admin-allocate-form" onSubmit={handleAllocateUser} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700">Selecione a Clínica</label>
+            <select
+              required
+              value={allocateClinicId}
+              onChange={e => setAllocateClinicId(e.target.value)}
+              className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-sm focus:ring-primary-500 focus:border-primary-500 focus:outline-none"
+            >
+              <option value="" disabled>Selecione uma clínica...</option>
+              {clinics.map(c => (
+                <option key={c.id} value={c.id}>{c.name} ({c.owner?.full_name || 'Sem proprietário'})</option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700">Função / Papel na Clínica</label>
+            <select
+              required
+              value={allocateRole}
+              onChange={e => setAllocateRole(e.target.value)}
+              className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-sm focus:ring-primary-500 focus:border-primary-500 focus:outline-none"
+            >
+              <option value="owner">Proprietário (Titular)</option>
+              <option value="nutritionist">Nutricionista</option>
+              <option value="secretary">Secretária(o)</option>
+            </select>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

@@ -20,9 +20,8 @@ import {
 } from 'lucide-react';
 import { 
   format, 
-  isSameDay, 
-  isToday, 
-  isSameMonth, 
+  isSameDay,
+  isToday,
   addMonths, 
   subMonths, 
   addWeeks, 
@@ -35,6 +34,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getDaysInMonth, getDaysInWeek } from '../utils/calendar';
 import { logger } from '../lib/logger';
+import { PageHeader, Modal, Input, Select, Textarea, Button } from '../components/ui';
+import { AgendaMonthGrid } from '../components/agenda/AgendaMonthGrid';
 
 interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
 interface AgendaServiceLink { id?: string; name?: string | null; duration_minutes?: number | null; price?: number | null }
@@ -581,42 +582,40 @@ export const Agenda: React.FC = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col font-sans">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            Agenda de Consultas
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1">
-            <p className="text-sm text-slate-500">Gerencie a escala da clínica, profissionais, serviços e agendamento dos pacientes.</p>
-            <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 px-3 py-1 rounded-xl shrink-0">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Status:</span>
-              <span className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
+      <PageHeader
+        title="Agenda de Consultas"
+        description={
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="max-w-2xl">Gerencie a escala da clínica, profissionais, serviços e agendamento dos pacientes.</span>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Status:</span>
+              <span className="flex items-center gap-1 text-xs font-bold text-slate-600">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 Confirmado
               </span>
-              <span className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
+              <span className="flex items-center gap-1 text-xs font-bold text-slate-600">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
                 Pendente
               </span>
-              <span className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
+              <span className="flex items-center gap-1 text-xs font-bold text-slate-600">
                 <span className="w-2 h-2 rounded-full bg-rose-500" />
                 Cancelado
               </span>
-              <span className="flex items-center gap-1 text-[11px] font-bold text-slate-605">
+              <span className="flex items-center gap-1 text-xs font-bold text-slate-600">
                 <span className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-amber-400/50 animate-pulse" />
                 Atenção
               </span>
             </div>
           </div>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3">
+        }
+        actions={<>
           {/* Professional Selector Dropdown */}
           <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm min-w-[220px]">
             <Filter className="w-4 h-4 text-slate-400 shrink-0" />
             <select
               value={selectedProfessionalId}
               onChange={e => setSelectedProfessionalId(e.target.value)}
+              aria-label="Filtrar agenda por nutricionista"
               className="text-sm font-semibold text-slate-700 bg-transparent border-0 focus:outline-none w-full cursor-pointer"
             >
               <option value="all">Todos os Nutricionistas</option>
@@ -626,22 +625,21 @@ export const Agenda: React.FC = () => {
             </select>
           </div>
 
-          <button 
+          <Button
             disabled={isReadOnly}
             onClick={() => handleDayClick(new Date())}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 hover:bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:shadow transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            leftIcon={isReadOnly ? <Lock className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
           >
-            {isReadOnly ? <Lock className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
             Novo Agendamento
-          </button>
-        </div>
-      </div>
+          </Button>
+        </>}
+      />
 
       {/* CALENDAR BODY */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 flex flex-col flex-1 overflow-hidden">
         
         {/* Navigation & Controls bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between border-b border-slate-200/80 px-6 py-4 bg-slate-50/50 gap-4 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-between border-b border-slate-200/80 px-4 sm:px-6 py-4 bg-slate-50/50 gap-4 shrink-0">
           
           {/* Left: View Mode Toggle */}
           <div className="flex p-1 bg-slate-100 rounded-xl">
@@ -666,9 +664,10 @@ export const Agenda: React.FC = () => {
               {getHeaderTitle()}
             </h2>
             <div className="flex items-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-              <button 
-                className="p-2 text-slate-400 hover:text-slate-600 border-r border-slate-100 hover:bg-slate-50 rounded-l-xl transition-colors"
+              <button
+                className="p-2.5 text-slate-400 hover:text-slate-600 border-r border-slate-100 hover:bg-slate-50 rounded-l-xl transition-colors"
                 onClick={handlePrevious}
+                aria-label="Período anterior"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -678,9 +677,10 @@ export const Agenda: React.FC = () => {
               >
                 Hoje
               </button>
-              <button 
-                className="p-2 text-slate-400 hover:text-slate-600 border-l border-slate-100 hover:bg-slate-50 rounded-r-xl transition-colors"
+              <button
+                className="p-2.5 text-slate-400 hover:text-slate-600 border-l border-slate-100 hover:bg-slate-50 rounded-r-xl transition-colors"
                 onClick={handleNext}
+                aria-label="Próximo período"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -695,7 +695,7 @@ export const Agenda: React.FC = () => {
         </div>
 
         {/* View Layout Renderer */}
-        <div className="flex-1 flex flex-col overflow-y-auto min-h-0 bg-slate-50/30">
+        <div className="flex-1 flex flex-col overflow-y-auto overflow-x-auto min-h-0 bg-slate-50/30">
           
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-400">
@@ -706,100 +706,15 @@ export const Agenda: React.FC = () => {
             <>
               {/* MONTH VIEW */}
               {viewMode === 'month' && (
-                <div className="flex-1 flex flex-col min-w-[700px]">
-                  {/* Days of Week Header */}
-                  <div className="grid grid-cols-7 border-b border-slate-200 text-center bg-white shrink-0">
-                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                      <div key={day} className="py-2.5 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Days Grid */}
-                  <div className="grid grid-cols-7 gap-px bg-slate-200/70 flex-1">
-                    {calendarDays.map((day, idx) => {
-                      const dayAppointments = getAppointmentsForDay(day);
-                      const isCurrentMonth = isSameMonth(day, selectedDate);
-                      const isTodayDay = isToday(day);
-                      const isSelected = isSameDay(day, selectedDate);
-
-                      return (
-                        <div 
-                          key={idx} 
-                          onClick={() => {
-                            setSelectedDate(day);
-                            handleDayClick(day);
-                          }}
-                          className={`bg-white min-h-[110px] p-2.5 flex flex-col justify-between group hover:bg-slate-50/80 transition-all duration-200 relative cursor-pointer ${
-                            !isCurrentMonth ? 'opacity-40 bg-slate-50/40 text-slate-300' : 'text-slate-700'
-                          } ${isSelected ? 'ring-2 ring-primary-500 ring-inset z-10' : ''}`}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className={`text-xs font-bold h-7.5 w-7.5 flex items-center justify-center rounded-full transition-transform group-hover:scale-105 ${
-                              isTodayDay ? 'bg-primary-600 text-white shadow-sm font-extrabold' : ''
-                            }`}>
-                              {format(day, 'd')}
-                            </span>
-                            {dayAppointments.length > 0 && (
-                              <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                                {dayAppointments.length} c.
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Inner appointments */}
-                          <div className="mt-2 space-y-1 overflow-y-auto flex-1 max-h-[72px] custom-scrollbar scrollbar-none pr-1">
-                            {dayAppointments.slice(0, 3).map(apt => {
-                              const prof = professionals.find(p => p.id === apt.nutritionist_id);
-                              const initials = prof
-                                ? (prof.full_name ?? '').split(' ').filter(Boolean).map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-                                : '';
-                              const attention = isAttention(apt);
-                              return (
-                                <div 
-                                  key={apt.id}
-                                  onClick={(e) => handleAppointmentClick(apt, e)}
-                                  title={attention 
-                                    ? `Atenção: Consulta pendente de prontuário com ${prof?.full_name || 'Nutricionista'}` 
-                                    : `Consulta com ${prof?.full_name || 'Nutricionista'}`}
-                                  className={`text-[10px] px-2 py-0.5 rounded-md border flex items-center justify-between gap-1 transition-all hover:translate-x-0.5 shadow-sm min-w-0 ${
-                                    attention ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold ring-1 ring-amber-500/25' :
-                                    apt.status === 'confirmado' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 
-                                    apt.status === 'pendente' ? 'bg-amber-50 border-amber-100 text-amber-800' : 
-                                    'bg-rose-50 border-rose-100 text-rose-800'
-                                  }`}
-                                >
-                                  <span className="truncate pr-0.5 flex items-center gap-0.5">
-                                    {attention && <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />}
-                                    <strong>{format(new Date(apt.date_time), 'HH:mm')}</strong> {apt.patients?.name || 'Paciente'}
-                                  </span>
-                                  {initials && (
-                                    <span 
-                                      className={`shrink-0 text-[8px] font-black px-1 py-px rounded-md border scale-90 ${
-                                        attention ? 'bg-amber-100/50 border-amber-250/50 text-amber-900' :
-                                        apt.status === 'confirmado' ? 'bg-emerald-100/50 border-emerald-200/50 text-emerald-900' : 
-                                        apt.status === 'pendente' ? 'bg-amber-100/50 border-amber-200/50 text-amber-900' : 
-                                        'bg-rose-100/50 border-rose-200/50 text-rose-900'
-                                      }`}
-                                    >
-                                      {initials}
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            {dayAppointments.length > 3 && (
-                              <div className="text-[10px] font-bold text-primary-600 pl-1">
-                                + {dayAppointments.length - 3} mais
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <AgendaMonthGrid
+                  days={calendarDays}
+                  selectedDate={selectedDate}
+                  getAppointmentsForDay={getAppointmentsForDay}
+                  professionals={professionals}
+                  isAttention={isAttention}
+                  onSelectDay={(day) => { setSelectedDate(day); handleDayClick(day); }}
+                  onAppointmentClick={handleAppointmentClick}
+                />
               )}
 
               {/* WEEK VIEW */}
@@ -825,7 +740,7 @@ export const Agenda: React.FC = () => {
                           className="border-b border-slate-100 pb-3 mb-4 flex items-center justify-between cursor-pointer group"
                         >
                           <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                               {format(day, 'EEEE', { locale: ptBR }).split('-')[0]}
                             </p>
                             <p className="text-xl font-extrabold text-slate-800 mt-0.5">
@@ -841,7 +756,7 @@ export const Agenda: React.FC = () => {
                           {dayAppointments.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-center py-12 text-slate-300">
                               <Clock className="w-6 h-6 stroke-[1.2] mb-1.5" />
-                              <span className="text-[10px] font-semibold">Sem consultas</span>
+                              <span className="text-xs font-semibold">Sem consultas</span>
                             </div>
                           ) : (
                             dayAppointments.map(apt => {
@@ -862,12 +777,12 @@ export const Agenda: React.FC = () => {
                                   }`}
                                 >
                                   <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[10px] font-bold flex items-center gap-1 text-slate-500">
+                                    <span className="text-xs font-bold flex items-center gap-1 text-slate-500">
                                       <Clock className="w-3.5 h-3.5" />
                                       {format(new Date(apt.date_time), 'HH:mm')}
                                     </span>
                                     {attention ? (
-                                      <span className="text-[9px] font-extrabold text-amber-700 flex items-center gap-0.5 bg-amber-100/60 px-1.5 py-0.5 rounded border border-amber-250 animate-pulse">
+                                      <span className="text-xs font-extrabold text-amber-700 flex items-center gap-0.5 bg-amber-100/60 px-1.5 py-0.5 rounded border border-amber-250 animate-pulse">
                                         <AlertCircle className="w-2.5 h-2.5 text-amber-600" />
                                         Atenção
                                       </span>
@@ -880,9 +795,9 @@ export const Agenda: React.FC = () => {
                                     )}
                                   </div>
                                   <p className="text-xs font-bold truncate">{apt.patients?.name || 'Paciente'}</p>
-                                  <p className="text-[10px] text-slate-500 truncate mt-0.5">{apt.services?.name || 'Serviço'}</p>
+                                  <p className="text-xs text-slate-500 truncate mt-0.5">{apt.services?.name || 'Serviço'}</p>
                                   {prof && (
-                                    <div className="mt-2 pt-1.5 border-t border-slate-100/50 flex items-center gap-1 text-[9px] font-semibold text-slate-400">
+                                    <div className="mt-2 pt-1.5 border-t border-slate-100/50 flex items-center gap-1 text-xs font-semibold text-slate-400">
                                       <span className="truncate">Nutri: {(prof.full_name ?? '').split(' ')[0]}</span>
                                     </div>
                                   )}
@@ -945,7 +860,7 @@ export const Agenda: React.FC = () => {
                                 <span className="text-2xl font-black text-slate-800">
                                   {format(new Date(apt.date_time), 'HH:mm')}
                                 </span>
-                                <span className="text-[10px] font-semibold text-slate-400 mt-1 flex items-center gap-1">
+                                <span className="text-xs font-semibold text-slate-400 mt-1 flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5" />
                                   {apt.services?.duration_minutes || 60} min
                                 </span>
@@ -956,7 +871,7 @@ export const Agenda: React.FC = () => {
                                   <h4 className="text-base font-extrabold text-slate-800 truncate">
                                     {apt.patients?.name || 'Paciente'}
                                   </h4>
-                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
                                     apt.status === 'confirmado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 
                                     apt.status === 'pendente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
                                     'bg-rose-50 text-rose-700 border border-rose-100'
@@ -964,7 +879,7 @@ export const Agenda: React.FC = () => {
                                     {apt.status === 'confirmado' ? 'Confirmado' : apt.status === 'pendente' ? 'Pendente' : 'Cancelado'}
                                   </span>
                                   {attention && (
-                                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm animate-pulse">
+                                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm animate-pulse">
                                       <AlertCircle className="w-3 h-3 text-amber-600" />
                                       Sem Anotações
                                     </span>
@@ -1050,27 +965,19 @@ export const Agenda: React.FC = () => {
       </div>
 
       {/* MODAL 1: NEW APPOINTMENT */}
-      {isNewModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full flex flex-col overflow-hidden max-h-[90vh]">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-primary-600" />
-                Agendar Nova Consulta
-              </h3>
-              <button 
-                onClick={() => setIsNewModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-slate-200/80 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <Modal
+        open={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        title="Agendar Nova Consulta"
+        footer={<>
+          <button type="button" onClick={() => setIsNewModalOpen(false)} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer">Cancelar</button>
+          <button type="submit" form="new-appointment-form" disabled={saving} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-[#5024fc] hover:bg-[#431cdb] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+            {saving ? (<><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Agendando...</>) : (<><Check className="w-4.5 h-4.5" />Agendar Consulta</>)}
+          </button>
+        </>}
+      >
+            <form id="new-appointment-form" onSubmit={handleCreateAppointment} className="space-y-4">
 
-            {/* Modal Form */}
-            <form onSubmit={handleCreateAppointment} className="flex-1 overflow-y-auto p-6 space-y-4">
-              
               {formError && (
                 <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 flex items-start gap-2.5 text-rose-800 text-xs font-bold animate-in fade-in duration-200 shrink-0">
                   <AlertCircle className="w-4.5 h-4.5 text-rose-600 shrink-0 mt-0.5" />
@@ -1080,98 +987,84 @@ export const Agenda: React.FC = () => {
               
               {/* Patient intelligent selector */}
               <div className="space-y-1">
-                <label className="text-slate-700 font-semibold text-sm mb-1 block">Paciente</label>
-                <div className="flex gap-2 mb-2">
-                  <input
+                <div className="flex gap-2 mb-2 items-end">
+                  <Input
+                    label="Paciente"
                     type="text"
+                    aria-label="Filtrar paciente por nome"
                     placeholder="🔎 Filtrar paciente por nome..."
                     value={patientSearch}
                     onChange={e => setPatientSearch(e.target.value)}
-                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                   />
                   {patientSearch && (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setPatientSearch('')}
-                      className="text-xs font-bold text-slate-400 hover:text-slate-600 px-2 border rounded-xl hover:bg-slate-50 cursor-pointer"
+                      className="shrink-0 text-xs font-bold text-slate-400 hover:text-slate-600 px-2 py-2 border rounded-xl hover:bg-slate-50 cursor-pointer"
                     >
                       Limpar
                     </button>
                   )}
                 </div>
-                <select
+                <Select
+                  aria-label="Selecione o paciente"
                   value={newAppointmentData.patient_id}
                   onChange={e => setNewAppointmentData(prev => ({ ...prev, patient_id: e.target.value }))}
                   required
-                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
                 >
                   <option value="">-- Selecione o Paciente --</option>
                   {filteredPatientsForSelect.map(p => (
                     <option key={p.id} value={p.id}>{p.name} {p.email ? `(${p.email})` : ''}</option>
                   ))}
-                </select>
+                </Select>
                 {filteredPatientsForSelect.length === 0 && (
                   <p className="text-xs text-rose-500 font-bold mt-1">Nenhum paciente encontrado com essa busca.</p>
                 )}
               </div>
 
-              {/* Service Select */}
-              <div className="space-y-1">
-                <label className="text-slate-700 font-semibold text-sm mb-1 block">Serviço / Procedimento</label>
-                <select
-                  value={newAppointmentData.service_id}
-                  onChange={e => setNewAppointmentData(prev => ({ ...prev, service_id: e.target.value }))}
-                  required
-                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
-                >
-                  <option value="">-- Selecione o Serviço --</option>
-                  {services.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.duration_minutes} min) • R$ {s.price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Serviço / Procedimento"
+                value={newAppointmentData.service_id}
+                onChange={e => setNewAppointmentData(prev => ({ ...prev, service_id: e.target.value }))}
+                required
+              >
+                <option value="">-- Selecione o Serviço --</option>
+                {services.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.duration_minutes} min) • R$ {s.price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </option>
+                ))}
+              </Select>
 
-              {/* Nutritionist Select */}
-              <div className="space-y-1">
-                <label className="text-slate-700 font-semibold text-sm mb-1 block">Nutricionista Responsável</label>
-                <select
-                  value={newAppointmentData.nutritionist_id}
-                  onChange={e => setNewAppointmentData(prev => ({ ...prev, nutritionist_id: e.target.value }))}
-                  required
-                  className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
-                >
-                  <option value="">-- Selecione o Profissional --</option>
-                  {professionals.map(p => (
-                    <option key={p.id} value={p.id}>{p.full_name}</option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Nutricionista Responsável"
+                value={newAppointmentData.nutritionist_id}
+                onChange={e => setNewAppointmentData(prev => ({ ...prev, nutritionist_id: e.target.value }))}
+                required
+              >
+                <option value="">-- Selecione o Profissional --</option>
+                {professionals.map(p => (
+                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                ))}
+              </Select>
 
               {/* Date & Time Selectors */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Data</label>
-                  <input
-                    type="date"
-                    value={newAppointmentData.date}
-                    onChange={e => setNewAppointmentData(prev => ({ ...prev, date: e.target.value }))}
-                    required
-                    min={format(new Date(), 'yyyy-MM-dd')}
-                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-slate-700 font-semibold text-sm mb-1 block">Hora</label>
-                  <input
-                    type="time"
-                    value={newAppointmentData.time}
-                    onChange={e => setNewAppointmentData(prev => ({ ...prev, time: e.target.value }))}
-                    required
-                    className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
-                  />
-                </div>
+                <Input
+                  label="Data"
+                  type="date"
+                  value={newAppointmentData.date}
+                  onChange={e => setNewAppointmentData(prev => ({ ...prev, date: e.target.value }))}
+                  required
+                  min={format(new Date(), 'yyyy-MM-dd')}
+                />
+                <Input
+                  label="Hora"
+                  type="time"
+                  value={newAppointmentData.time}
+                  onChange={e => setNewAppointmentData(prev => ({ ...prev, time: e.target.value }))}
+                  required
+                />
               </div>
 
               {/* Status Select */}
@@ -1198,70 +1091,24 @@ export const Agenda: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action buttons */}
-              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsNewModalOpen(false)}
-                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  {saving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                      Agendando...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4.5 h-4.5" />
-                      Agendar Consulta
-                    </>
-                  )}
-                </button>
-              </div>
-
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* MODAL 2: APPOINTMENT DETAILS & EDITING */}
       {selectedAppointment && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full flex flex-col overflow-hidden">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
-              <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
-                <Info className="w-5 h-5 text-indigo-500" />
-                Detalhes da Consulta
-              </h3>
-              <button 
-                onClick={() => {
-                  setSelectedAppointment(null);
-                  setDeletingId(null);
-                }}
-                className="p-1 rounded-lg hover:bg-slate-200/80 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <Modal
+        open={!!selectedAppointment}
+        onClose={() => { setSelectedAppointment(null); setDeletingId(null); }}
+        title="Detalhes da Consulta"
+      >
+            <div className="space-y-6 text-left">
 
-            {/* Content body */}
-            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
-              
               {isAttention(selectedAppointment) && (
                 <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4 flex gap-3 animate-in fade-in duration-300">
                   <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs font-extrabold text-amber-900">Atenção: Consulta pendente de prontuário</p>
-                    <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                    <p className="text-xs text-amber-800 mt-1 leading-relaxed">
                       Esta consulta ocorreu no passado mas está sem nenhuma anotação registrada. Acesse a tela de <strong>Consultas</strong> para realizar o atendimento e preencher o prontuário do paciente.
                     </p>
                   </div>
@@ -1277,7 +1124,7 @@ export const Agenda: React.FC = () => {
                 }`} />
                 
                 <div className="pl-1">
-                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                  <p className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-slate-500" /> Horário Marcado
                   </p>
                   <p className="text-2xl font-black text-slate-800 mt-1">
@@ -1292,8 +1139,8 @@ export const Agenda: React.FC = () => {
               {/* Copy Link Section */}
               <div className="bg-primary-50/50 border border-primary-100/80 rounded-2xl p-4 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-primary-800 uppercase tracking-wider">Link de Confirmação</span>
-                  <span className="text-[10px] text-primary-650 font-semibold">Envie por WhatsApp</span>
+                  <span className="text-xs font-bold text-primary-800 uppercase tracking-wider">Link de Confirmação</span>
+                  <span className="text-xs text-primary-650 font-semibold">Envie por WhatsApp</span>
                 </div>
                 <button
                   type="button"
@@ -1332,45 +1179,36 @@ export const Agenda: React.FC = () => {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-slate-600 font-semibold text-[11px] block">Nova Data</label>
-                        <input
-                          type="date"
-                          value={rescheduleData.date}
-                          onChange={e => setRescheduleData(prev => ({ ...prev, date: e.target.value }))}
-                          required
-                          min={format(new Date(), 'yyyy-MM-dd')}
-                          className="block w-full rounded-lg border border-slate-200 py-1.5 px-2 text-xs focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-slate-600 font-semibold text-[11px] block">Nova Hora</label>
-                        <input
-                          type="time"
-                          value={rescheduleData.time}
-                          onChange={e => setRescheduleData(prev => ({ ...prev, time: e.target.value }))}
-                          required
-                          className="block w-full rounded-lg border border-slate-200 py-1.5 px-2 text-xs focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-slate-600 font-semibold text-[11px] block">Motivo do Reagendamento</label>
-                      <textarea
-                        value={rescheduleData.reason}
-                        onChange={e => setRescheduleData(prev => ({ ...prev, reason: e.target.value }))}
+                      <Input
+                        label="Nova Data"
+                        type="date"
+                        value={rescheduleData.date}
+                        onChange={e => setRescheduleData(prev => ({ ...prev, date: e.target.value }))}
                         required
-                        rows={2}
-                        placeholder="Descreva o motivo pelo qual a consulta está sendo movida..."
-                        className="block w-full rounded-lg border border-slate-200 py-1.5 px-2.5 text-xs focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white text-slate-700 shadow-sm"
+                        min={format(new Date(), 'yyyy-MM-dd')}
+                      />
+                      <Input
+                        label="Nova Hora"
+                        type="time"
+                        value={rescheduleData.time}
+                        onChange={e => setRescheduleData(prev => ({ ...prev, time: e.target.value }))}
+                        required
                       />
                     </div>
+
+                    <Textarea
+                      label="Motivo do Reagendamento"
+                      value={rescheduleData.reason}
+                      onChange={e => setRescheduleData(prev => ({ ...prev, reason: e.target.value }))}
+                      required
+                      rows={2}
+                      placeholder="Descreva o motivo pelo qual a consulta está sendo movida..."
+                    />
 
                     <button
                       type="submit"
                       disabled={rescheduling}
-                      className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm disabled:opacity-55 cursor-pointer"
+                      className="w-full bg-[#5024fc] hover:bg-[#431cdb] text-white font-bold text-sm py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm disabled:opacity-55 cursor-pointer"
                     >
                       {rescheduling ? (
                         <>
@@ -1421,22 +1259,22 @@ export const Agenda: React.FC = () => {
 
                <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <h4 className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">Serviço</h4>
+                  <h4 className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Serviço</h4>
                   <div className="bg-slate-50/55 p-3 rounded-xl border border-slate-200">
                     <p className="text-xs font-bold text-slate-850 truncate">{selectedAppointment.services?.name || 'Excluído'}</p>
-                    <p className="text-[10px] text-slate-700 mt-0.5">
+                    <p className="text-xs text-slate-700 mt-0.5">
                       R$ {selectedAppointment.services?.price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                     </p>
                   </div>
                 </div>
                 
                 <div className="space-y-1.5">
-                  <h4 className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">Profissional</h4>
+                  <h4 className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Profissional</h4>
                   <div className="bg-slate-50/55 p-3 rounded-xl border border-slate-200">
                     <p className="text-xs font-bold text-slate-850 truncate">
                       {professionals.find(p => p.id === selectedAppointment.nutritionist_id)?.full_name || 'Não definido'}
                     </p>
-                    <p className="text-[10px] text-slate-700 mt-0.5">Nutricionista</p>
+                    <p className="text-xs text-slate-700 mt-0.5">Nutricionista</p>
                   </div>
                 </div>
               </div>
@@ -1459,7 +1297,7 @@ export const Agenda: React.FC = () => {
                   <div className="space-y-3 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                     {reschedules.map((r) => (
                       <div key={r.id} className="bg-slate-50/70 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 relative">
-                        <div className="flex items-center justify-between text-[10px] text-slate-600">
+                        <div className="flex items-center justify-between text-xs text-slate-600">
                           <span className="font-bold text-slate-700 truncate max-w-[150px]">
                             {r.profiles?.full_name || 'Usuário'}
                           </span>
@@ -1467,10 +1305,10 @@ export const Agenda: React.FC = () => {
                             {format(new Date(r.created_at), 'dd/MM/yyyy HH:mm')}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-800 bg-white border border-slate-200 p-2 rounded-lg italic font-medium leading-relaxed">
+                        <p className="text-xs text-slate-800 bg-white border border-slate-200 p-2 rounded-lg italic font-medium leading-relaxed">
                           "{r.reason}"
                         </p>
-                        <div className="flex items-center gap-1 text-[10px] text-slate-700 bg-slate-100/80 px-2 py-1 rounded w-fit font-semibold">
+                        <div className="flex items-center gap-1 text-xs text-slate-700 bg-slate-100/80 px-2 py-1 rounded w-fit font-semibold">
                           <span>De: {format(new Date(r.old_date_time), 'dd/MM/yy HH:mm')}</span>
                           <ChevronRightIcon className="w-3.5 h-3.5 text-slate-500" />
                           <span className="text-primary-700 font-extrabold">Para: {format(new Date(r.new_date_time), 'dd/MM/yy HH:mm')}</span>
@@ -1561,8 +1399,7 @@ export const Agenda: React.FC = () => {
               )}
 
             </div>
-          </div>
-        </div>
+      </Modal>
       )}
       {/* Toast Notification */}
       {toast && (

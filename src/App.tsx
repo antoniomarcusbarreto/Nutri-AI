@@ -7,6 +7,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Layout } from './components/layout/Layout';
 import { PageLoader } from './components/layout/PageLoader';
 import { ToastProvider } from './contexts/ToastContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Entradas não autenticadas: carregadas de imediato (sem flash na 1ª visita).
 import { Landing } from './pages/Landing';
@@ -35,6 +36,7 @@ const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(
 
 function App() {
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthProvider>
@@ -84,6 +86,7 @@ function App() {
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

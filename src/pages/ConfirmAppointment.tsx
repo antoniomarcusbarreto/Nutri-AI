@@ -143,7 +143,7 @@ export const ConfirmAppointment: React.FC = () => {
         
         {/* Card Header & Decorative Icon */}
         <div className="text-center relative">
-          <div className="absolute -top-3.5 -right-2 text-primary-500 opacity-60 animate-pulse">
+          <div className="absolute -top-3.5 -right-2 text-primary-500/60 ia-settle">
             <Sparkles className="w-5.5 h-5.5" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
@@ -224,7 +224,7 @@ export const ConfirmAppointment: React.FC = () => {
                 type="button"
                 onClick={() => handleUpdateStatus('cancelado')}
                 disabled={submitting}
-                className="w-full bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 disabled:opacity-55 disabled:cursor-not-allowed text-slate-500 hover:text-rose-650 text-sm font-bold py-3.5 px-6 rounded-2xl transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 disabled:opacity-55 disabled:cursor-not-allowed text-rose-600/90 hover:text-rose-700 text-sm font-bold py-3.5 px-6 rounded-2xl transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {submitting ? (
                   <Loader2 className="w-4.5 h-4.5 animate-spin" />
@@ -238,7 +238,7 @@ export const ConfirmAppointment: React.FC = () => {
 
           {appointment.status === 'confirmado' && (
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5.5 text-center flex flex-col items-center gap-3 animate-in zoom-in-95 duration-450">
-              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-150 animate-bounce">
+              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-150 ia-pop">
                 <CheckCircle2 className="w-6.5 h-6.5 stroke-[2.5]" />
               </div>
               <div>

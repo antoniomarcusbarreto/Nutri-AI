@@ -10,6 +10,7 @@ import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { useDebouncedDraft } from '../../hooks/useDebouncedDraft';
 import { logger } from '../../lib/logger';
 import type { ConsultationAppointment } from '../../types/clinical';
+import { Card } from '../ui';
 
 /**
  * Aba "Registrar Atendimento" (Onda 5.3 / PERF-11).
@@ -231,7 +232,7 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
       <form onSubmit={handleSaveConsultation} className="space-y-6 animate-in fade-in duration-200 max-w-5xl mx-auto">
 
         {/* Antropometria */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+        <Card as="section" padding="sm" radius="2xl" className="space-y-4 border-slate-200/80">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
             <Scale className="w-4 h-4 text-primary-600" />
             <h3 className="text-sm font-extrabold text-slate-800">Antropometria (Composição Corporal)</h3>
@@ -252,10 +253,10 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
         {/* Áudio + Anamnese */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+        <Card as="section" padding="sm" radius="2xl" className="space-y-4 border-slate-200/80">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
             <div className="flex items-center gap-2">
               <Clipboard className="w-4 h-4 text-primary-600" />
@@ -263,7 +264,7 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
             </div>
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-xl">
               <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-slate-300'}`} />
-              <span className="text-[10px] font-bold text-slate-500">
+              <span className="text-xs font-bold text-slate-500">
                 {isRecording ? 'Captura de áudio ativa' : 'Gravador pronto'}
               </span>
             </div>
@@ -286,10 +287,10 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
                 </button>
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 justify-center sm:justify-start">
-                    <Volume2 className={`w-4 h-4 ${isRecording ? 'text-red-400 animate-bounce' : 'text-slate-400'}`} />
+                    <Volume2 className={`w-4 h-4 ${isRecording ? 'text-red-400 animate-pulse' : 'text-slate-400'}`} />
                     {isRecording ? 'Ouvindo o atendimento...' : 'Registrar com Áudio'}
                   </h4>
-                  <p className="text-[11px] text-slate-300 mt-1 max-w-sm leading-relaxed">
+                  <p className="text-xs text-slate-300 mt-1 max-w-sm leading-relaxed">
                     {isRecording
                       ? 'Fale normalmente. As palavras ditadas são adicionadas instantaneamente abaixo.'
                       : 'Escreva livremente ou utilize nosso gravador de voz para ditar a anamnese do paciente.'}
@@ -298,12 +299,12 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
               </div>
               <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto z-10">
                 <div className="flex items-center bg-slate-800/80 px-2 py-1.5 rounded-xl border border-slate-700/60 justify-between gap-3">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider pl-1">Inserir:</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">Inserir:</span>
                   <div className="flex p-0.5 bg-slate-900 rounded-lg">
                     {(['append', 'replace'] as const).map((m) => (
                       <button
                         key={m} type="button" onClick={() => setRecordingMode(m)}
-                        className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all ${
+                        className={`px-2 py-0.5 rounded text-xs font-bold transition-all ${
                           recordingMode === m ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
                         }`}
                       >
@@ -314,7 +315,7 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
                 </div>
                 <button
                   type="button" onClick={handleOptimizeAI} disabled={optimizingAI}
-                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-[10px] px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow disabled:opacity-60"
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow disabled:opacity-60"
                 >
                   {optimizingAI ? (
                     <>
@@ -334,7 +335,7 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
 
           {isRecording && !isDone && (
             <div className="bg-slate-900/5 px-4 py-2 border border-slate-100 rounded-xl flex items-center justify-between gap-3 animate-in fade-in duration-300">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                 <Activity className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Nível de Voz
               </span>
               <div className="flex items-center gap-0.5 h-4 flex-1 max-w-[200px] justify-end">
@@ -360,13 +361,13 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
               className="block w-full rounded-xl border border-slate-300 px-5 py-4 text-base focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 font-normal leading-relaxed shadow-sm bg-slate-50/10 focus:bg-white transition-colors"
             />
           </div>
-        </div>
+        </Card>
 
         {/* Finalização */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm shrink-0">
+        <Card padding="sm" radius="2xl" className="flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 border-slate-200/80">
           <div className="flex items-start gap-2.5 text-left">
             <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-            <p className="text-[10px] text-slate-400 max-w-sm leading-relaxed">
+            <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
               {isDone
                 ? <span>Este atendimento já foi finalizado e os dados do prontuário estão salvos de forma definitiva.</span>
                 : <span>Ao finalizar, as anotações e medições físicas serão inseridas no prontuário definitivo deste paciente e o status deste agendamento passará para <strong>Concluído</strong>.</span>}
@@ -397,7 +398,7 @@ ${metas_pactuadas.length > 0 ? metas_pactuadas.map((m) => `- ${m}`).join('\n') :
               </button>
             </div>
           )}
-        </div>
+        </Card>
       </form>
     </div>
   );

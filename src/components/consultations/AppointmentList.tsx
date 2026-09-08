@@ -57,30 +57,30 @@ const AppointmentCardBase: React.FC<CardProps> = ({ apt, professionalName, isRes
           <h4 className="text-sm font-black text-slate-800 truncate group-hover:text-primary-600 transition-colors">
             {apt.patients?.name}
           </h4>
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 truncate">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5 truncate">
             {apt.services?.name || 'Consulta Geral'}
           </p>
-          <p className="text-[10px] text-slate-500 font-semibold mt-1 truncate">
+          <p className="text-xs text-slate-500 font-semibold mt-1 truncate">
             <span className="font-bold text-slate-400">Nutri:</span> {professionalName}
           </p>
         </div>
       </div>
 
       <div className="pt-3.5 border-t border-slate-100 flex items-center justify-between mt-auto">
-        <span className="text-[10px] font-bold text-slate-400">
+        <span className="text-xs font-bold text-slate-400">
           Objetivo: <span className="text-slate-600 truncate max-w-[120px] inline-block align-bottom">{apt.patients?.main_goal || 'Não informado'}</span>
         </span>
 
         {apt.status === 'concluido' ? (
-          <span className="text-[11px] font-extrabold text-emerald-600 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+          <span className="text-xs font-extrabold text-emerald-600 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
             Visualizar <ArrowRight className="w-3.5 h-3.5" />
           </span>
         ) : isResponsible ? (
-          <span className="text-[11px] font-extrabold text-primary-600 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+          <span className="text-xs font-extrabold text-primary-600 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
             Iniciar <ArrowRight className="w-3.5 h-3.5" />
           </span>
         ) : (
-          <span className="text-[11px] font-bold text-slate-400 flex items-center gap-0.5 cursor-not-allowed" title="Apenas o profissional responsável pode iniciar esta consulta">
+          <span className="text-xs font-bold text-slate-400 flex items-center gap-0.5 cursor-not-allowed" title="Apenas o profissional responsável pode iniciar esta consulta">
             Restrito
           </span>
         )}

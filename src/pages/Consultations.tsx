@@ -35,6 +35,7 @@ import { StatusBadge } from '../components/consultations/StatusBadge';
 import { ConsultationForm, type ConsultationFormHandle } from '../components/consultations/ConsultationForm';
 import { logger } from '../lib/logger';
 import { pickOne } from '../types/clinical';
+import { PageHeader, Card, Button, Input, Select, Textarea, FormActions } from '../components/ui';
 import type {
   ClinicProfessional,
   ConsultationAppointment,
@@ -617,20 +618,14 @@ ${insights}`;
     <div className="space-y-6 animate-in fade-in duration-500 flex flex-col h-full font-sans pb-10">
       
       {/* 1. TOP HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            Consultas & Prontuários
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Realize atendimentos diários, registre a composição corporal do paciente e utilize transcrição de áudio com inteligência artificial.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Consultas & Prontuários"
+        description="Realize atendimentos diários, registre a composição corporal do paciente e utilize transcrição de áudio com inteligência artificial."
+      />
 
       {/* 2. STATS & CONTROL ROW */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 shrink-0">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 hover:shadow transition-shadow">
+        <Card padding="xs" radius="2xl" interactive className="flex items-center gap-4">
           <div className="p-3 bg-primary-50 rounded-xl">
             <CalendarIcon className="w-6 h-6 text-primary-600" />
           </div>
@@ -638,9 +633,9 @@ ${insights}`;
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Agendas do Dia</p>
             <p className="text-2xl font-black text-slate-800">{stats.total}</p>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 hover:shadow transition-shadow">
+        <Card padding="xs" radius="2xl" interactive className="flex items-center gap-4">
           <div className="p-3 bg-emerald-50 rounded-xl">
             <CheckCircle2 className="w-6 h-6 text-emerald-600" />
           </div>
@@ -648,9 +643,9 @@ ${insights}`;
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Atendimentos Concluídos</p>
             <p className="text-2xl font-black text-emerald-600">{stats.concluded}</p>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 hover:shadow transition-shadow">
+        <Card padding="xs" radius="2xl" interactive className="flex items-center gap-4">
           <div className="p-3 bg-amber-50 rounded-xl">
             <Clock className="w-6 h-6 text-amber-600" />
           </div>
@@ -658,7 +653,7 @@ ${insights}`;
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pendentes / Confirmados</p>
             <p className="text-2xl font-black text-amber-600">{stats.pending}</p>
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* 3. MULTI-VIEW WORKSPACE: DASHBOARD OR DISTRACTION-FREE WORKSPACE */}
@@ -712,7 +707,7 @@ ${insights}`;
             <div className="space-y-4 pt-4 border-t border-slate-100">
               {/* Search */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Busca de Paciente</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Busca de Paciente</label>
                 <div className="relative">
                   <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
                   <input
@@ -727,7 +722,7 @@ ${insights}`;
 
               {/* Procedure Filter */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Procedimento</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Procedimento</label>
                 <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm">
                   <Filter className="w-4 h-4 text-slate-400 shrink-0" />
                   <select
@@ -746,7 +741,7 @@ ${insights}`;
             
             {/* Context/Info inside Sidebar */}
             <div className="p-4 bg-primary-50/50 rounded-2xl border border-primary-100/60 text-left">
-              <p className="text-[11px] font-semibold text-primary-800 leading-relaxed">
+              <p className="text-xs font-semibold text-primary-800 leading-relaxed">
                 Selecione uma consulta ao lado para acessar a ficha de anamnese completa, registrar métricas corporais ou iniciar a gravação de áudio com transcrição inteligente.
               </p>
             </div>
@@ -761,12 +756,12 @@ ${insights}`;
               <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
                 <ClipboardList className="w-4.5 h-4.5 text-primary-500" />
                 Atendimentos Clínicos Agendados
-                <span className="bg-primary-100 text-primary-800 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-primary-200">
+                <span className="bg-primary-100 text-primary-800 text-xs font-bold px-2 py-0.5 rounded-lg border border-primary-200">
                   {filteredAppointments.length} agendamento(s)
                 </span>
               </h2>
               
-              <span className="text-[10px] font-bold text-slate-400">
+              <span className="text-xs font-bold text-slate-400">
                 {isToday(selectedDate) ? 'Hoje' : format(selectedDate, "dd/MM/yyyy")}
               </span>
             </div>
@@ -889,7 +884,7 @@ ${insights}`;
                 <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                     <h3 className="text-sm font-extrabold text-slate-800 font-sans">Informações Cadastrais</h3>
-                    <span className="text-[10px] font-normal text-primary-700 bg-primary-50 border border-primary-100 rounded-lg px-2.5 py-0.5">
+                    <span className="text-xs font-normal text-primary-700 bg-primary-50 border border-primary-100 rounded-lg px-2.5 py-0.5">
                       {selectedAppointment.patients.main_goal || 'Reeducação Alimentar'}
                     </span>
                   </div>
@@ -974,7 +969,7 @@ ${insights}`;
                       <ClipboardList className="w-5 h-5 text-teal-600" />
                       <div>
                         <h3 className="text-sm font-extrabold text-slate-900">Ficha Clínica / Anamnese</h3>
-                        <p className="text-[10px] text-slate-500 mt-0.5">Gestão de dados clínicos, restrições e hábitos do paciente</p>
+                        <p className="text-xs text-slate-500 mt-0.5">Gestão de dados clínicos, restrições e hábitos do paciente</p>
                       </div>
                     </div>
 
@@ -1005,58 +1000,43 @@ ${insights}`;
                   {isEditingClinical ? (
                     /* PREMIUM FORM MATCHING THE ATTACHED IMAGE SCHEMA */
                     <form onSubmit={handleSaveClinicalData} className="space-y-6 animate-in fade-in duration-200">
-                      
+
                       {/* DADOS CLÍNICOS E RESTRIÇÕES */}
                       <div className="space-y-4">
                         <h4 className="text-xs font-black text-teal-600 uppercase tracking-wider flex items-center gap-1.5">
                           <span className="w-1.5 h-3.5 bg-teal-600 rounded-sm" />
                           Dados Clínicos e Restrições
                         </h4>
-                        
+
                         <div className="space-y-3.5">
-                          <div>
-                            <label className="block text-base font-bold text-slate-800 mb-1.5">Alergias e Intolerâncias Alimentares</label>
-                            <textarea
-                              rows={2}
-                              value={clinicalForm.allergies}
-                              onChange={e => setClinicalForm({...clinicalForm, allergies: e.target.value})}
-                              placeholder="Ex: Glúten, Lactose, Oleaginosas. Se não possuir, deixe em branco."
-                              className="block w-full rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-teal-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-base font-bold text-slate-800 mb-1.5">Restrições Culturais ou Opções Alimentares</label>
-                            <input
-                              type="text"
-                              value={clinicalForm.dietary_restrictions}
-                              onChange={e => setClinicalForm({...clinicalForm, dietary_restrictions: e.target.value})}
-                              placeholder="Ex: Vegano, Vegetariano, Kosher"
-                              className="block w-full rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-teal-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-base font-bold text-slate-800 mb-1.5">Patologias ou Doenças Crônicas</label>
-                            <textarea
-                              rows={2}
-                              value={clinicalForm.pathologies}
-                              onChange={e => setClinicalForm({...clinicalForm, pathologies: e.target.value})}
-                              placeholder="Ex: Diabetes Tipo 1/2, Hipertensão, Gastrite"
-                              className="block w-full rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-teal-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-base font-bold text-slate-800 mb-1.5">Uso de Medicamentos / Suplementos Atuais</label>
-                            <textarea
-                              rows={2}
-                              value={clinicalForm.medications}
-                              onChange={e => setClinicalForm({...clinicalForm, medications: e.target.value})}
-                              placeholder="Medicamentos e suplementos em uso"
-                              className="block w-full rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-teal-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
-                            />
-                          </div>
+                          <Textarea
+                            label="Alergias e Intolerâncias Alimentares"
+                            rows={2}
+                            value={clinicalForm.allergies}
+                            onChange={e => setClinicalForm({...clinicalForm, allergies: e.target.value})}
+                            placeholder="Ex: Glúten, Lactose, Oleaginosas. Se não possuir, deixe em branco."
+                          />
+                          <Input
+                            label="Restrições Culturais ou Opções Alimentares"
+                            type="text"
+                            value={clinicalForm.dietary_restrictions}
+                            onChange={e => setClinicalForm({...clinicalForm, dietary_restrictions: e.target.value})}
+                            placeholder="Ex: Vegano, Vegetariano, Kosher"
+                          />
+                          <Textarea
+                            label="Patologias ou Doenças Crônicas"
+                            rows={2}
+                            value={clinicalForm.pathologies}
+                            onChange={e => setClinicalForm({...clinicalForm, pathologies: e.target.value})}
+                            placeholder="Ex: Diabetes Tipo 1/2, Hipertensão, Gastrite"
+                          />
+                          <Textarea
+                            label="Uso de Medicamentos / Suplementos Atuais"
+                            rows={2}
+                            value={clinicalForm.medications}
+                            onChange={e => setClinicalForm({...clinicalForm, medications: e.target.value})}
+                            placeholder="Medicamentos e suplementos em uso"
+                          />
                         </div>
                       </div>
 
@@ -1068,73 +1048,53 @@ ${insights}`;
                         </h4>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="md:col-span-2">
-                            <label className="block text-base font-bold text-slate-800 mb-1.5">Nível de Atividade Física *</label>
-                            <select
-                              required
-                              value={clinicalForm.physical_activity_level}
-                              onChange={e => setClinicalForm({...clinicalForm, physical_activity_level: e.target.value})}
-                              className="block w-full rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-teal-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all cursor-pointer"
-                            >
-                              <option value="" disabled>Selecione...</option>
-                              <option value="Sedentário">Sedentário (Nenhuma atividade física)</option>
-                              <option value="Levemente Ativo">Levemente Ativo (Exercício leve 1-3 dias/semana)</option>
-                              <option value="Moderadamente Ativo">Moderadamente Ativo (Exercício moderado 3-5 dias/semana)</option>
-                              <option value="Muito Ativo">Muito Ativo (Exercício intenso 6-7 dias/semana)</option>
-                            </select>
-                          </div>
+                          <Select
+                            wrapperClassName="md:col-span-2"
+                            label="Nível de Atividade Física"
+                            required
+                            value={clinicalForm.physical_activity_level}
+                            onChange={e => setClinicalForm({...clinicalForm, physical_activity_level: e.target.value})}
+                          >
+                            <option value="" disabled>Selecione...</option>
+                            <option value="Sedentário">Sedentário (Nenhuma atividade física)</option>
+                            <option value="Levemente Ativo">Levemente Ativo (Exercício leve 1-3 dias/semana)</option>
+                            <option value="Moderadamente Ativo">Moderadamente Ativo (Exercício moderado 3-5 dias/semana)</option>
+                            <option value="Muito Ativo">Muito Ativo (Exercício intenso 6-7 dias/semana)</option>
+                          </Select>
 
-                          <div>
-                            <label className="block text-base font-bold text-slate-800 mb-1.5">Profissão / Rotina de Trabalho *</label>
-                            <input
-                              type="text"
-                              required
-                              value={clinicalForm.profession}
-                              onChange={e => setClinicalForm({...clinicalForm, profession: e.target.value})}
-                              placeholder="Ex: Fica muito tempo sentado, em pé"
-                              className="block w-full rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-teal-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-base font-bold text-slate-800 mb-1.5">Qualidade do Sono *</label>
-                            <input
-                              type="text"
-                              required
-                              value={clinicalForm.sleep_quality}
-                              onChange={e => setClinicalForm({...clinicalForm, sleep_quality: e.target.value})}
-                              placeholder="Ex: 8h por noite, sono reparador"
-                              className="block w-full rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-teal-500/20 hover:border-slate-300 px-4 py-3 text-base font-normal text-slate-700 bg-slate-50/30 focus:bg-white focus:outline-none focus:ring-2 shadow-sm transition-all"
-                            />
-                          </div>
+                          <Input
+                            label="Profissão / Rotina de Trabalho"
+                            type="text"
+                            required
+                            value={clinicalForm.profession}
+                            onChange={e => setClinicalForm({...clinicalForm, profession: e.target.value})}
+                            placeholder="Ex: Fica muito tempo sentado, em pé"
+                          />
+                          <Input
+                            label="Qualidade do Sono"
+                            type="text"
+                            required
+                            value={clinicalForm.sleep_quality}
+                            onChange={e => setClinicalForm({...clinicalForm, sleep_quality: e.target.value})}
+                            placeholder="Ex: 8h por noite, sono reparador"
+                          />
                         </div>
                       </div>
 
                       {/* Form action buttons */}
-                      <div className="pt-4 flex gap-3 justify-end border-t border-slate-100 mt-6 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingClinical(false)}
-                          className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors"
-                        >
+                      <FormActions className="shrink-0">
+                        <Button variant="secondary" onClick={() => setIsEditingClinical(false)}>
                           Cancelar
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="submit"
                           disabled={savingClinical || isReadOnly}
-                          className="px-5 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-1.5"
+                          loading={savingClinical}
+                          leftIcon={<Save className="w-4 h-4" />}
                         >
-                          {savingClinical ? (
-                            <>
-                              <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" /> Salvando...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4" /> Salvar Ficha Clínica
-                            </>
-                          )}
-                        </button>
-                      </div>
+                          {savingClinical ? 'Salvando...' : 'Salvar Ficha Clínica'}
+                        </Button>
+                      </FormActions>
 
                     </form>
                   ) : (
@@ -1311,7 +1271,7 @@ ${insights}`;
                     <h4 className="text-sm font-bold text-slate-800">Nenhum atendimento clínico registrado para este paciente.</h4>
                     <button
                       onClick={() => setActiveTab('form')}
-                      className="mt-4 bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow transition-colors"
+                      className="mt-4 bg-[#5024fc] hover:bg-[#431cdb] text-white font-bold text-sm px-4 py-2 rounded-xl shadow transition-colors"
                     >
                       Iniciar Novo Atendimento
                     </button>
@@ -1339,11 +1299,11 @@ ${insights}`;
                                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
                                   Atendimento Clínico
                                 </h4>
-                                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                                <p className="text-xs font-semibold text-slate-400 mt-0.5">
                                   Realizado em: {formattedDate}
                                 </p>
                               </div>
-                              <span className="text-[10px] font-normal text-primary-700 bg-primary-50 border border-primary-100 rounded-lg px-2 py-0.5 w-fit">
+                              <span className="text-xs font-normal text-primary-700 bg-primary-50 border border-primary-100 rounded-lg px-2 py-0.5 w-fit">
                                 {pickOne(consultation.appointments?.services)?.name || 'Consulta Geral'}
                               </span>
                             </div>
@@ -1353,25 +1313,25 @@ ${insights}`;
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/50">
                                 {ant.weight && (
                                   <div>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Peso</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Peso</p>
                                     <p className="text-xs font-normal text-slate-700">{ant.weight} kg</p>
                                   </div>
                                 )}
                                 {ant.height && (
                                   <div className="border-l border-slate-200/60 pl-2">
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Altura</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Altura</p>
                                     <p className="text-xs font-normal text-slate-700">{ant.height} m</p>
                                   </div>
                                 )}
                                 {ant.body_fat && (
                                   <div className="border-l border-slate-200/60 pl-2">
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">% Gordura</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">% Gordura</p>
                                     <p className="text-xs font-normal text-slate-700">{ant.body_fat}%</p>
                                   </div>
                                 )}
                                 {ant.muscle_mass && (
                                   <div className="border-l border-slate-200/60 pl-2">
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">% Músculo</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">% Músculo</p>
                                     <p className="text-xs font-normal text-slate-700">{ant.muscle_mass}%</p>
                                   </div>
                                 )}
@@ -1380,7 +1340,7 @@ ${insights}`;
 
                             {/* Anamnese details */}
                             <div className="space-y-1">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                                 <FileText className="w-3.5 h-3.5 text-slate-400" />
                                 Notas da Consulta
                               </p>
@@ -1433,7 +1393,7 @@ ${insights}`;
                             <h4 className="text-sm font-extrabold text-slate-800 truncate max-w-[200px] sm:max-w-[320px]">
                               {selectedExam.file_url.split('/').pop()?.substring(13) || 'Exame de Sangue'}
                             </h4>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">
                               Enviado em: {format(new Date(selectedExam.created_at), 'dd/MM/yyyy')}
                             </p>
                           </div>
@@ -1443,7 +1403,7 @@ ${insights}`;
                           href={selectedExamSignedUrl || '#'}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-extrabold text-teal-600 bg-teal-50 hover:bg-teal-100 border border-teal-100 px-3 py-1.5 rounded-xl transition-all"
+                          className="inline-flex items-center gap-1 text-xs font-extrabold text-teal-600 bg-teal-50 hover:bg-teal-100 border border-teal-100 px-3 py-1.5 rounded-xl transition-all"
                         >
                           <Eye className="w-3.5 h-3.5" /> Abrir Nova Guia
                         </a>
@@ -1473,7 +1433,7 @@ ${insights}`;
                           <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
                           <div>
                             <h4 className="text-sm font-extrabold text-slate-900">Assistente de IA Nutricional</h4>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Análise por Gemini 1.5 Pro</p>
+                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">Análise por Gemini 1.5 Pro</p>
                           </div>
                         </div>
 
@@ -1571,9 +1531,9 @@ ${insights}`;
                       <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl flex items-center justify-between shrink-0">
                         <div>
                           <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Histórico de Exames</h4>
-                          <p className="text-[10px] text-slate-400 font-bold mt-0.5">Análises de exames anteriores</p>
+                          <p className="text-xs text-slate-400 font-bold mt-0.5">Análises de exames anteriores</p>
                         </div>
-                        <span className="text-[10px] font-extrabold text-slate-600 bg-slate-100 border border-slate-200/60 rounded-xl px-2 py-0.5">
+                        <span className="text-xs font-extrabold text-slate-600 bg-slate-100 border border-slate-200/60 rounded-xl px-2 py-0.5">
                           {exams.length} {exams.length === 1 ? 'exame' : 'exames'}
                         </span>
                       </div>
@@ -1582,7 +1542,7 @@ ${insights}`;
                         {loadingExams ? (
                           <div className="flex flex-col items-center justify-center py-10 text-slate-400">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-400 border-t-transparent mb-2" />
-                            <p className="text-[11px] font-bold">Buscando exames no banco...</p>
+                            <p className="text-xs font-bold">Buscando exames no banco...</p>
                           </div>
                         ) : (
                           <ExamHistoryList
@@ -1594,7 +1554,7 @@ ${insights}`;
                               <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center">
                                 <ClipboardList className="w-10 h-10 text-slate-200 stroke-[1.2] mb-2" />
                                 <p className="text-xs font-extrabold text-slate-600">Nenhum exame enviado</p>
-                                <p className="text-[10px] text-slate-400 max-w-[160px] leading-normal mt-1 mx-auto">
+                                <p className="text-xs text-slate-400 max-w-[160px] leading-normal mt-1 mx-auto">
                                   Os relatórios de exames em PDF enviados ficarão arquivados aqui.
                                 </p>
                               </div>

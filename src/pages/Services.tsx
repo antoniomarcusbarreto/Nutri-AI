@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Clock, DollarSign, Lock } from 'lucide-react';
+import { Plus, Edit2, Trash2, Clock, DollarSign, Lock, Briefcase } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { ServiceRow } from '../types/clinical';
+import { PageHeader, Card, Button, EmptyState } from '../components/ui';
 
 export const Services: React.FC = () => {
   const { clinic, userRole, isReadOnly } = useAuth();
@@ -19,7 +20,7 @@ export const Services: React.FC = () => {
         .select('*')
         .eq('clinic_id', clinic.id)
         .order('name');
-        
+
       if (!error && data) {
         setServices(data as ServiceRow[]);
       }
@@ -34,20 +35,19 @@ export const Services: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Serviços e Procedimentos</h1>
-          <p className="text-sm text-slate-500 mt-1">Gerencie os tipos de consultas e serviços oferecidos.</p>
-        </div>
-        <button 
-          disabled={isButtonDisabled}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={!canManageServices ? 'Secretárias não podem criar serviços' : isReadOnly ? 'Sistema em modo somente leitura' : ''}
-        >
-          {isButtonDisabled ? <Lock className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
-          Novo Serviço
-        </button>
-      </div>
+      <PageHeader
+        title="Serviços e Procedimentos"
+        description="Gerencie os tipos de consultas e serviços oferecidos."
+        actions={
+          <Button
+            disabled={isButtonDisabled}
+            leftIcon={isButtonDisabled ? <Lock className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
+            title={!canManageServices ? 'Secretárias não podem criar serviços' : isReadOnly ? 'Sistema em modo somente leitura' : ''}
+          >
+            Novo Serviço
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
@@ -55,12 +55,22 @@ export const Services: React.FC = () => {
             Carregando serviços...
           </div>
         ) : services.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-sm text-slate-500">
-            Nenhum serviço cadastrado.
-          </div>
+          <EmptyState
+            className="col-span-full"
+            icon={<Briefcase />}
+            title="Nenhum serviço cadastrado"
+            description="Cadastre os tipos de consulta e procedimentos que a clínica oferece."
+          />
         ) : (
           services.map((service) => (
-            <div key={service.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
+            <Card
+              key={service.id}
+              as="article"
+              padding="none"
+              radius="2xl"
+              interactive
+              className="overflow-hidden group"
+            >
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-lg font-semibold text-slate-900 leading-tight">{service.name}</h3>
@@ -81,16 +91,24 @@ export const Services: React.FC = () => {
               </div>
               {/* Only show actions if user has permission */}
               {canManageServices && !isReadOnly && (
-                <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="text-slate-400 hover:text-primary-600 transition-colors">
+                <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  <button
+                    type="button"
+                    aria-label={`Editar serviço ${service.name}`}
+                    className="p-2 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-white transition-colors"
+                  >
                     <Edit2 className="h-4 w-4" />
                   </button>
-                  <button className="text-slate-400 hover:text-red-600 transition-colors">
+                  <button
+                    type="button"
+                    aria-label={`Excluir serviço ${service.name}`}
+                    className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-white transition-colors"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               )}
-            </div>
+            </Card>
           ))
         )}
       </div>
