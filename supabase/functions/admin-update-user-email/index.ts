@@ -15,11 +15,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const ALLOWED_ORIGINS = [
+const BASE_ORIGINS = [
+  "https://nutri-ai.io",
+  "https://www.nutri-ai.io",
   "https://dtkoegdmmhnxsrrxmoiq.supabase.co",
   "http://localhost:5173",
   "http://localhost:4173",
 ];
+const EXTRA_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = [...BASE_ORIGINS, ...EXTRA_ORIGINS];
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
