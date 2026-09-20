@@ -27,7 +27,7 @@ const Wordmark: React.FC<{ light?: boolean }> = ({ light = false }) => (
       N
     </span>
     <span className={`text-xl font-bold tracking-tight ${light ? 'text-white' : 'text-slate-900'}`}>
-      Nutri<span className={light ? 'text-teal-400' : 'text-teal-600'}>AI</span>
+      Nutri<span className={light ? 'text-teal-400' : 'text-teal-600'}>-AI</span>
     </span>
   </span>
 );
@@ -472,7 +472,7 @@ export const Landing: React.FC = () => {
       <section className="bg-gradient-to-b from-[#c1c9d2] to-[#f8fafc] py-24 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl rounded-3xl bg-gradient-to-br from-teal-800 via-teal-700 to-teal-900 px-6 py-14 text-center shadow-2xl sm:px-12 sm:py-16">
           <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-            Sua próxima consulta pode já estar no NutriAI
+            Sua próxima consulta pode já estar no Nutri-AI
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-base sm:text-lg leading-relaxed text-teal-100">
             Criar a conta leva apenas dois minutos. 14 dias de teste grátis, sem cartão de crédito.
@@ -497,7 +497,7 @@ export const Landing: React.FC = () => {
             <span>Dados de saúde protegidos, isolados por clínica e sob a LGPD.</span>
           </div>
           <p className="text-sm text-slate-600">
-            &copy; {new Date().getFullYear()} NutriAI. Todos os direitos reservados.
+            &copy; {new Date().getFullYear()} Nutri-AI. Todos os direitos reservados.
           </p>
         </div>
       </footer>
