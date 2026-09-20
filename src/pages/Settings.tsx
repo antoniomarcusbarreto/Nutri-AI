@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Palette, Check, RefreshCw, Lock, Unlock, Key, Search, UserCheck, Info, AlertTriangle } from 'lucide-react';
+import { Palette, Check, RefreshCw, Lock, Unlock, Key, Search, UserCheck, Info, AlertTriangle, LifeBuoy, Send } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { logger } from '../lib/logger';
-import { PageHeader, Modal, Card, Button, Input, Select, FormActions } from '../components/ui';
+import { PageHeader, Modal, Card, Button, Input, Select, Textarea, FormActions } from '../components/ui';
+import { reportToSupport, type SupportRequestType } from '../lib/support';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
@@ -50,7 +51,7 @@ export const Settings: React.FC = () => {
   const currentColor = profile?.theme_color || 'white';
   
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'clinic' | 'team' | 'services' | 'patient_access'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'clinic' | 'team' | 'services' | 'patient_access' | 'support'>('profile');
   const [services, setServices] = useState<{ id?: string, name: string; duration_minutes: number; price: number; modality: string }[]>([]);
   const [newService, setNewService] = useState({ name: '', duration_minutes: 60, price: 150, modality: 'presencial' });
   const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
@@ -79,6 +80,42 @@ export const Settings: React.FC = () => {
     password: ''
   });
   const [teamError, setTeamError] = useState<string | null>(null);
+
+  // Suporte states
+  const [supportType, setSupportType] = useState<SupportRequestType>('duvida');
+  const [supportEmail, setSupportEmail] = useState('');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportSending, setSupportSending] = useState(false);
+
+  useEffect(() => {
+    if (user?.email) setSupportEmail(user.email);
+  }, [user?.email]);
+
+  const handleSendSupportMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (supportMessage.trim().length < 10) {
+      showToast('Descreva com um pouco mais de detalhe (mínimo 10 caracteres).', 'error');
+      return;
+    }
+    setSupportSending(true);
+    try {
+      const enviado = await reportToSupport({
+        type: supportType,
+        message: supportMessage.trim(),
+        userId: user?.id,
+        userName: profile?.full_name,
+        userEmail: supportEmail.trim(),
+      });
+      if (enviado) {
+        showToast('Mensagem enviada! Em breve você recebe uma resposta por e-mail.', 'success');
+        setSupportMessage('');
+      } else {
+        showToast('Não foi possível enviar sua mensagem agora. Tente novamente em instantes.', 'error');
+      }
+    } finally {
+      setSupportSending(false);
+    }
+  };
 
   // Profile states
   const [profileFormData, setProfileFormData] = useState({
@@ -547,6 +584,12 @@ export const Settings: React.FC = () => {
             className={`${activeTab === 'patient_access' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
           >
             Acesso dos Pacientes
+          </button>
+          <button
+            onClick={() => setActiveTab('support')}
+            className={`${activeTab === 'support' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Suporte
           </button>
         </nav>
       </div>
@@ -1097,6 +1140,62 @@ export const Settings: React.FC = () => {
                 </div>
               );
             })()}
+          </div>
+        </Card>
+      )}
+
+      {activeTab === 'support' && (
+        <Card as="section" padding="none" radius="2xl" className="overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+          <div className="p-6 border-b border-slate-100">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+              <LifeBuoy className="h-5 w-5 text-primary-600" />
+              Suporte
+            </h2>
+            <p className="text-sm text-slate-500">
+              Tire uma dúvida ou relate um problema. Nossa IA tenta responder na hora; se não conseguir, a equipe é avisada e você recebe uma resposta por e-mail.
+            </p>
+          </div>
+          <div className="p-6">
+            <form onSubmit={handleSendSupportMessage} className="space-y-4">
+              <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-6">
+                <Select
+                  wrapperClassName="sm:col-span-3"
+                  label="O que você precisa?"
+                  value={supportType}
+                  onChange={e => setSupportType(e.target.value as SupportRequestType)}
+                >
+                  <option value="duvida">Tenho uma dúvida</option>
+                  <option value="problema">Encontrei um problema</option>
+                </Select>
+                <Input
+                  wrapperClassName="sm:col-span-3"
+                  label="Seu e-mail"
+                  type="email"
+                  required
+                  value={supportEmail}
+                  onChange={e => setSupportEmail(e.target.value)}
+                />
+                <Textarea
+                  wrapperClassName="sm:col-span-6"
+                  label={supportType === 'problema' ? 'Descreva o problema encontrado' : 'Descreva sua dúvida'}
+                  required
+                  rows={5}
+                  minLength={10}
+                  placeholder={
+                    supportType === 'problema'
+                      ? 'O que você estava tentando fazer e o que aconteceu de errado?'
+                      : 'Escreva sua dúvida com o máximo de detalhes possível.'
+                  }
+                  value={supportMessage}
+                  onChange={e => setSupportMessage(e.target.value)}
+                />
+              </div>
+              <FormActions>
+                <Button type="submit" disabled={supportSending} leftIcon={<Send className="h-4 w-4" />}>
+                  {supportSending ? 'Enviando...' : 'Enviar mensagem'}
+                </Button>
+              </FormActions>
+            </form>
           </div>
         </Card>
       )}

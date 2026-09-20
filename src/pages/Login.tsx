@@ -3,6 +3,24 @@ import { supabase } from '../lib/supabase';
 import { Apple } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Input, Button } from '../components/ui';
+
+const SENHA_HINT = 'Mínimo 8 caracteres, uma letra maiúscula e um número';
+const RECOVERY_COOLDOWN_MS = 60_000;
+
+/** supabase-js: FunctionsHttpError (não-2xx) traz `.context: Response` com o corpo `{ error }`. */
+async function extractFnErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const ctx = (error as { context?: Response })?.context;
+  if (ctx && typeof ctx.status === 'number') {
+    try {
+      const body = await ctx.clone().json();
+      if (body?.error) return body.error as string;
+    } catch {
+      // corpo não-JSON
+    }
+  }
+  return fallback;
+}
 
 export const Login: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -20,6 +38,92 @@ export const Login: React.FC = () => {
   const isSignUp = manualIsSignUp ?? urlWantsSignUp;
 
   const [justSignedUp, setJustSignedUp] = useState(false);
+
+  // Recuperação de senha (código de 6 dígitos por e-mail via Resend — ver
+  // supabase/functions/send-password-reset-code e reset-password-with-code).
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryStep, setRecoveryStep] = useState<'email' | 'code' | 'success'>('email');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryNewPassword, setRecoveryNewPassword] = useState('');
+  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [cooldownUntil]);
+
+  const cooldownRemaining = cooldownUntil ? Math.max(0, Math.ceil((cooldownUntil - nowTick) / 1000)) : 0;
+
+  const openRecovery = () => {
+    setRecoveryEmail(email);
+    setShowRecovery(true);
+    setRecoveryStep('email');
+    setRecoveryError(null);
+  };
+
+  const closeRecovery = () => {
+    setShowRecovery(false);
+    setRecoveryStep('email');
+    setRecoveryEmail('');
+    setRecoveryCode('');
+    setRecoveryNewPassword('');
+    setRecoveryConfirmPassword('');
+    setRecoveryError(null);
+    setCooldownUntil(null);
+  };
+
+  const requestRecoveryCode = async () => {
+    setRecoveryLoading(true);
+    setRecoveryError(null);
+    try {
+      const { error } = await supabase.functions.invoke('send-password-reset-code', {
+        body: { email: recoveryEmail },
+      });
+      if (error) {
+        throw new Error(await extractFnErrorMessage(error, 'Não foi possível enviar o código. Tente novamente.'));
+      }
+      setCooldownUntil(Date.now() + RECOVERY_COOLDOWN_MS);
+      setRecoveryStep('code');
+    } catch (err) {
+      setRecoveryError((err instanceof Error && err.message) || 'Não foi possível enviar o código. Tente novamente.');
+    } finally {
+      setRecoveryLoading(false);
+    }
+  };
+
+  const handleRequestCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await requestRecoveryCode();
+  };
+
+  const handleConfirmReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoveryError(null);
+    if (recoveryNewPassword !== recoveryConfirmPassword) {
+      setRecoveryError('As senhas não coincidem.');
+      return;
+    }
+    setRecoveryLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke('reset-password-with-code', {
+        body: { email: recoveryEmail, code: recoveryCode, newPassword: recoveryNewPassword },
+      });
+      if (error) {
+        throw new Error(await extractFnErrorMessage(error, 'Não foi possível redefinir a senha. Tente novamente.'));
+      }
+      setRecoveryStep('success');
+    } catch (err) {
+      setRecoveryError((err instanceof Error && err.message) || 'Não foi possível redefinir a senha. Tente novamente.');
+    } finally {
+      setRecoveryLoading(false);
+    }
+  };
 
   useEffect(() => {
     // We only want to navigate if the session is fully loaded by AuthContext
@@ -100,6 +204,123 @@ export const Login: React.FC = () => {
       setLoading(false);
     }
   };
+
+  if (showRecovery) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="flex justify-center">
+            <div className="h-16 w-16 bg-primary-100 rounded-full flex items-center justify-center">
+              <Apple className="h-8 w-8 text-primary-600" />
+            </div>
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900 tracking-tight">
+            {recoveryStep === 'success' ? 'Senha redefinida' : 'Recuperar senha'}
+          </h2>
+          {recoveryStep !== 'success' && (
+            <p className="mt-2 text-center text-sm text-slate-600">
+              {recoveryStep === 'email'
+                ? 'Informe o e-mail cadastrado para receber um código de verificação.'
+                : 'Digite o código recebido por e-mail e defina sua nova senha.'}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow-sm border border-slate-200 sm:rounded-2xl sm:px-10">
+            {recoveryError && (
+              <div className="mb-6 bg-red-50 border border-red-200 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {recoveryError}
+              </div>
+            )}
+
+            {recoveryStep === 'email' && (
+              <form className="space-y-6" onSubmit={handleRequestCode}>
+                <Input
+                  type="email"
+                  label="Email"
+                  required
+                  value={recoveryEmail}
+                  onChange={(e) => setRecoveryEmail(e.target.value)}
+                />
+                <Button type="submit" variant="primary" fullWidth loading={recoveryLoading}>
+                  Enviar código
+                </Button>
+              </form>
+            )}
+
+            {recoveryStep === 'code' && (
+              <form className="space-y-6" onSubmit={handleConfirmReset}>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  label="Código de 6 dígitos"
+                  required
+                  value={recoveryCode}
+                  onChange={(e) => setRecoveryCode(e.target.value.replace(/\D/g, ''))}
+                />
+                <Input
+                  type="password"
+                  label="Nova senha"
+                  required
+                  pattern="^(?=.*[A-Z])(?=.*\d).{8,}$"
+                  hint={SENHA_HINT}
+                  value={recoveryNewPassword}
+                  onChange={(e) => setRecoveryNewPassword(e.target.value)}
+                />
+                <Input
+                  type="password"
+                  label="Confirmar nova senha"
+                  required
+                  value={recoveryConfirmPassword}
+                  onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
+                />
+                <Button type="submit" variant="primary" fullWidth loading={recoveryLoading}>
+                  Redefinir senha
+                </Button>
+                <button
+                  type="button"
+                  onClick={requestRecoveryCode}
+                  disabled={cooldownRemaining > 0 || recoveryLoading}
+                  className="w-full text-center text-xs font-medium text-primary-600 hover:text-primary-500 transition-colors disabled:text-slate-400 disabled:cursor-not-allowed"
+                >
+                  {cooldownRemaining > 0 ? `Reenviar código (${cooldownRemaining}s)` : 'Reenviar código'}
+                </button>
+              </form>
+            )}
+
+            {recoveryStep === 'success' && (
+              <div className="space-y-6 text-center">
+                <p className="text-sm text-slate-600">
+                  Sua senha foi redefinida. Você já pode entrar com a nova senha.
+                </p>
+                <Button type="button" variant="primary" fullWidth onClick={closeRecovery}>
+                  Voltar para o login
+                </Button>
+              </div>
+            )}
+
+            {recoveryStep !== 'success' && (
+              <div className="mt-6 text-center">
+                <button
+                  type="button"
+                  onClick={closeRecovery}
+                  className="text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors"
+                >
+                  Voltar para o login
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
@@ -188,8 +409,19 @@ export const Login: React.FC = () => {
               </div>
               {isSignUp && (
                 <p className="mt-1.5 text-xs text-slate-400">
-                  Mínimo 8 caracteres, uma letra maiúscula e um número
+                  {SENHA_HINT}
                 </p>
+              )}
+              {!isSignUp && (
+                <div className="mt-1.5 text-right">
+                  <button
+                    type="button"
+                    onClick={openRecovery}
+                    className="text-xs font-medium text-primary-600 hover:text-primary-500 transition-colors"
+                  >
+                    Esqueceu sua senha?
+                  </button>
+                </div>
               )}
             </div>
 

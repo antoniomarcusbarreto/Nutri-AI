@@ -1,11 +1,15 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { logger } from '../lib/logger';
+import { supabase } from '../lib/supabase';
+import { reportToSupport } from '../lib/support';
 
 interface Props {
   children: ReactNode;
 }
 interface State {
   error: Error | null;
+  errorInfo: ErrorInfo | null;
+  reportStatus: 'idle' | 'sending' | 'sent' | 'failed';
 }
 
 /**
@@ -19,15 +23,47 @@ interface State {
  * Supabase — e recarrega.
  */
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, errorInfo: null, reportStatus: 'idle' };
 
   static getDerivedStateFromError(error: Error): State {
-    return { error };
+    return { error, errorInfo: null, reportStatus: 'idle' };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     logger.error('Erro de renderização capturado pelo ErrorBoundary:', error, info.componentStack);
+    this.setState({ errorInfo: info });
   }
+
+  private handleReportError = async () => {
+    const { error, errorInfo } = this.state;
+    if (!error) return;
+    this.setState({ reportStatus: 'sending' });
+
+    // Sem contexto de auth aqui (ErrorBoundary fica acima do AuthProvider) —
+    // tenta obter a sessão atual só como melhor esforço, pra anexar e-mail/id.
+    let userId: string | null = null;
+    let userEmail: string | null = null;
+    try {
+      const { data } = await supabase.auth.getUser();
+      userId = data.user?.id ?? null;
+      userEmail = data.user?.email ?? null;
+    } catch {
+      /* segue sem identificar o usuário */
+    }
+
+    const enviado = await reportToSupport({
+      type: 'erro',
+      message: error.message || 'Erro de renderização sem mensagem.',
+      userId,
+      userEmail,
+      extra: {
+        stack: error.stack,
+        componentStack: errorInfo?.componentStack,
+      },
+    });
+
+    this.setState({ reportStatus: enviado ? 'sent' : 'failed' });
+  };
 
   private handleRetry = () => {
     try {
@@ -62,6 +98,23 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             Tentar novamente
           </button>
+
+          {this.state.reportStatus === 'sent' ? (
+            <p className="mt-4 text-sm font-medium text-emerald-600">Erro reportado. Obrigado!</p>
+          ) : (
+            <button
+              type="button"
+              onClick={this.handleReportError}
+              disabled={this.state.reportStatus === 'sending'}
+              className="mt-4 block w-full text-sm font-semibold text-slate-500 underline decoration-dotted underline-offset-4 transition-colors hover:text-slate-700 disabled:opacity-50"
+            >
+              {this.state.reportStatus === 'sending' ? 'Enviando...' : 'Reportar este erro'}
+            </button>
+          )}
+          {this.state.reportStatus === 'failed' && (
+            <p className="mt-2 text-xs text-rose-500">Não foi possível enviar o relato agora. Tente novamente.</p>
+          )}
+
           <p className="mt-4 text-xs text-slate-400">
             Se o problema continuar, entre em contato com o suporte.
           </p>
