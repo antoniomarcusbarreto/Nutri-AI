@@ -59,6 +59,14 @@ comportamento esperado.
 - Se a assinatura estiver marcada como ativa, o acesso completo continua liberado
   (com data de expiração, se houver).
 
+### Limite de pacientes cadastrados
+
+- **Durante o trial de 14 dias:** limite de **5 pacientes** cadastrados.
+- **No plano pago Starter** (único plano comercial disponível hoje): limite de
+  **50 pacientes** cadastrados.
+- Ao atingir o limite, o botão de cadastrar novo paciente fica desabilitado até
+  o usuário fazer upgrade de plano (ou o trial ainda estar dentro da cota).
+
 ## 4. Agenda e Consultas
 
 - A Agenda mostra os horários marcados por profissional/clínica.
@@ -107,14 +115,25 @@ comportamento esperado.
   retornos), cadastrados em Ajustes → Serviços Prestados, e o lançamento
   financeiro correspondente por atendimento.
 
-## 9. Onboarding e primeiros passos
+## 9. Notificações e lembretes
+
+- O Nutri-AI **não envia notificações automáticas** (push, SMS, WhatsApp) para
+  pacientes nem profissionais.
+- Existe uma lista de **lembretes** interna (visível na Agenda/Dashboard), que
+  funciona como uma to-do list do profissional dentro do painel — não dispara
+  e-mail, push ou mensagem para ninguém, é só um controle manual de tarefas.
+- Os únicos e-mails automáticos que o sistema envia hoje são: código de
+  recuperação de senha, confirmação de troca de e-mail de login, e as respostas
+  do fluxo de Suporte (Seção 11).
+
+## 10. Onboarding e primeiros passos
 
 - Ao criar a conta, a clínica passa por um fluxo de Onboarding para configurar
   dados iniciais (nome da clínica, primeiro profissional, etc.) antes de cair no
   Dashboard.
 - O Dashboard reúne uma visão geral rápida do dia/semana (agenda, pendências).
 
-## 10. Suporte — como funciona
+## 11. Suporte — como funciona
 
 - Em **Ajustes → Suporte**, o usuário escolhe entre "Tenho uma dúvida" ou
   "Encontrei um problema", descreve a situação e envia. Uma IA tenta responder
@@ -125,7 +144,7 @@ comportamento esperado.
   "Reportar este erro" que já envia os detalhes técnicos do problema sem o
   usuário precisar digitar nada.
 
-## 11. Perguntas frequentes
+## 12. Perguntas frequentes
 
 **"Por que não consigo cadastrar/editar nada?"**
 Provavelmente o período de teste de 14 dias expirou e a clínica está em modo
@@ -154,3 +173,24 @@ laudo específico.
 **"Consigo usar o Nutri-AI em outro idioma?"**
 Não; o produto é 100% em português do Brasil, voltado ao contexto clínico e
 regulatório brasileiro.
+
+**"Meu acesso está liberado para todas as funcionalidades?"**
+Depende de dois fatores: (1) seu papel na clínica — proprietário tem acesso
+total, nutricionista tem acesso clínico e financeiro do seu escopo, secretária
+tem acesso mais administrativo (agenda/cadastro) — e (2) o status da assinatura:
+durante o trial de 14 dias e com assinatura ativa o acesso é completo; se o
+trial expirar sem assinatura, o sistema entra em modo somente leitura (consulta
+tudo, mas não cadastra/edita nada novo).
+
+**"Quantos pacientes eu posso cadastrar?"**
+No período de teste (trial), até 5 pacientes. No plano pago Starter, até 50
+pacientes. Ao atingir o limite, o botão de novo cadastro fica bloqueado até
+fazer upgrade de plano.
+
+**"Existe envio de notificações (push, SMS, WhatsApp) para pacientes ou
+profissionais?"**
+Não. O Nutri-AI não dispara notificações automáticas externas. Existe apenas
+uma lista de lembretes interna ao painel (uma to-do list manual do
+profissional), e os poucos e-mails automáticos do sistema são transacionais:
+recuperação de senha, confirmação de troca de e-mail e as respostas do fluxo
+de Suporte.

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calendar,
@@ -12,29 +12,55 @@ import {
   ArrowRight,
   ShieldCheck,
   Lock,
-  Clock,
-  Sparkles,
 } from 'lucide-react';
+import { Button } from '../components/ui';
 
 const CTA_LABEL = 'Começar teste grátis';
 
 const ctaBase =
   'inline-flex items-center justify-center gap-2 rounded-full bg-primary-600 font-semibold text-white shadow-sm shadow-primary-600/20 transition-[background-color,box-shadow,transform] duration-200 hover:bg-primary-500 hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2';
-const ctaPrimary = `${ctaBase} px-6 py-3 text-sm`;
 const ctaCompact = `${ctaBase} px-4 py-2 text-sm`;
 
-const eyebrow = 'text-xs font-semibold uppercase tracking-[0.08em] text-primary-700';
-
-const Wordmark: React.FC = () => (
+const Wordmark: React.FC<{ light?: boolean }> = ({ light = false }) => (
   <span className="inline-flex items-center gap-2.5">
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-600 text-lg font-bold leading-none text-white shadow-sm">
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-600 text-lg font-bold leading-none text-white shadow-sm shadow-teal-500/30">
       N
     </span>
-    <span className="text-xl font-bold tracking-tight text-slate-900">
-      Nutri<span className="text-primary-600">AI</span>
+    <span className={`text-xl font-bold tracking-tight ${light ? 'text-white' : 'text-slate-900'}`}>
+      Nutri<span className={light ? 'text-teal-400' : 'text-teal-600'}>AI</span>
     </span>
   </span>
 );
+
+const HERO_PANELS = [
+  {
+    eyebrow: 'Gestão de Consultório',
+    title: 'Construído para escala.',
+    subtitle:
+      'Agenda inteligente, prontuário eletrônico completo e controle financeiro integrados em um fluxo contínuo para você focar no paciente.',
+    cta: 'Explorar recursos',
+    to: '#recursos',
+    isAnchor: true,
+  },
+  {
+    eyebrow: 'Inteligência Clínica',
+    title: 'Sua IA residente.',
+    subtitle:
+      'Leitura automatizada de laudos de exames em PDF, interpretação de biomarcadores e pareceres clínicos estruturados em poucos segundos.',
+    cta: 'Ver os planos',
+    to: '#pricing',
+    isAnchor: true,
+  },
+  {
+    eyebrow: 'Engajamento',
+    title: 'Conexão direta com o paciente.',
+    subtitle:
+      'Portal web e mobile exclusivo, ficha de pré-consulta digital e planos alimentares interativos com substituições na palma da mão.',
+    cta: 'Começar agora',
+    to: '/login?mode=signup',
+    isAnchor: false,
+  },
+];
 
 const flow = [
   { icon: Calendar, label: 'Agenda', note: 'Confirmação por link' },
@@ -43,8 +69,6 @@ const flow = [
   { icon: FlaskConical, label: 'Exames', note: 'Laudo lido pela IA' },
   { icon: RefreshCw, label: 'Retorno', note: 'Evolução acompanhada' },
 ];
-
-const chips = ['Sem instalação', 'Suporte em português', 'Dados sob a LGPD'];
 
 const trustStrip = [
   'Isolado por clínica',
@@ -84,92 +108,13 @@ const features = [
       'Serviços, recebimentos e a visão do mês sem precisar abrir a planilha de novo.',
     icon: Wallet,
   },
-];
-
-const trust = [
   {
-    icon: ShieldCheck,
-    title: 'Isolado por clínica',
-    body: 'Cada clínica só enxerga os próprios pacientes. Erro de permissão é falha visível — nunca vazamento silencioso entre contas.',
-  },
-  {
+    name: 'LGPD',
+    description:
+      'Consentimento registrado e exclusão real dos dados do paciente quando ele pede. Dado sensível de saúde tratado como tal.',
     icon: Lock,
-    title: 'LGPD de verdade',
-    body: 'Consentimento registrado e exclusão real dos dados do paciente quando ele pede. Dado sensível de saúde tratado como tal.',
-  },
-  {
-    icon: Clock,
-    title: 'Sem pegadinha no 15º dia',
-    body: 'Avisamos antes de o teste acabar. Você decide continuar — nada é cobrado sem o seu aval e sem cartão cadastrado.',
   },
 ];
-
-const biomarkers = [
-  { name: 'TSH', value: '5,8', unit: 'µUI/mL', ref: '0,4–4,0', status: 'Alto', tone: 'critical' },
-  { name: 'Ferritina', value: '14', unit: 'ng/mL', ref: '15–150', status: 'Baixa', tone: 'critical' },
-  { name: 'Vitamina D', value: '22', unit: 'ng/mL', ref: '30–100', status: 'Insuficiente', tone: 'warning' },
-];
-
-const biomarkersSample = [
-  { name: 'Hemoglobina', value: '11,8', unit: 'g/dL', ref: '12,0–15,5', status: 'Baixa', tone: 'critical' },
-  { name: 'Colesterol LDL', value: '162', unit: 'mg/dL', ref: '< 130', status: 'Alto', tone: 'critical' },
-  { name: 'Vitamina B12', value: '210', unit: 'pg/mL', ref: '200–900', status: 'Limítrofe', tone: 'warning' },
-  { name: 'HbA1c', value: '5,4', unit: '%', ref: '< 5,7', status: 'Normal', tone: 'ok' },
-];
-
-const toneClass: Record<string, string> = {
-  critical: 'bg-rose-100 text-rose-700 ring-rose-200',
-  warning: 'bg-amber-100 text-amber-800 ring-amber-200',
-  ok: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-};
-
-const ExamAIMock: React.FC = () => (
-  <figure className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-900/10">
-    <figcaption className="flex items-center gap-2.5 border-b border-slate-100 px-5 py-3.5">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-500">
-        <Sparkles className="h-4 w-4" aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold leading-tight text-slate-900">
-          Assistente de IA Nutricional
-        </span>
-        <span className="block text-xs leading-tight text-slate-500">Parecer gerado a partir do laudo</span>
-      </span>
-      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-slate-600">
-        Exemplo
-      </span>
-    </figcaption>
-
-    <div className="divide-y divide-slate-100">
-      {biomarkers.map((b) => (
-        <div key={b.name} className="flex items-center gap-3 px-5 py-3">
-          <span className="flex-1">
-            <span className="block text-sm font-medium text-slate-900">{b.name}</span>
-            <span className="block text-xs text-slate-500">
-              {b.value} {b.unit} · ref. {b.ref}
-            </span>
-          </span>
-          <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${toneClass[b.tone]}`}
-          >
-            {b.status}
-          </span>
-        </div>
-      ))}
-    </div>
-
-    <div className="space-y-1.5 border-t border-slate-100 bg-slate-50/60 px-5 py-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Prioridade clínica</p>
-      <p className="text-sm leading-6 text-slate-700">
-        Eixo tireoidiano primeiro: investigar anti-TPO, reforçar iodo e selênio. Repor ferro junto de
-        vitamina C; expor ao sol e considerar suplementação de vitamina D.
-      </p>
-      <p className="pt-1 text-xs text-slate-500">
-        Extraído do laudo · comparado com a referência · nunca estimado
-      </p>
-    </div>
-  </figure>
-);
 
 const plans = [
   {
@@ -200,36 +145,45 @@ const plans = [
 ];
 
 export const Landing: React.FC = () => {
+  const [activePanel, setActivePanel] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActivePanel((prev) => (prev + 1) % HERO_PANELS.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-white font-sans selection:bg-primary-100 selection:text-primary-900">
+    <div className="min-h-screen bg-slate-950 font-sans selection:bg-teal-500/20 selection:text-teal-400">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/60 backdrop-blur-md">
         <nav
           className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8"
           aria-label="Navegação principal"
         >
           <Link
             to="/"
-            className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2"
+            className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2"
           >
-            <Wordmark />
+            <Wordmark light />
           </Link>
           <div className="flex items-center gap-1 sm:gap-2">
             <a
               href="#recursos"
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 sm:inline-block"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:text-white sm:inline-block"
             >
               Recursos
             </a>
             <a
               href="#pricing"
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 sm:inline-block"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:text-white sm:inline-block"
             >
               Planos
             </a>
             <Link
               to="/login"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:text-white"
             >
               Entrar
             </Link>
@@ -240,345 +194,309 @@ export const Landing: React.FC = () => {
         </nav>
       </header>
 
-      <div role="main">
-        {/* Hero */}
-        <section className="relative isolate overflow-hidden px-6 pb-16 pt-16 sm:pb-20 sm:pt-20 lg:px-8">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute right-[-10rem] top-[-10rem] h-[38rem] w-[45rem] rounded-full bg-[radial-gradient(closest-side,rgba(45,212,191,0.28),rgba(45,212,191,0))] blur-2xl" />
-            <div className="absolute inset-0 [background-image:radial-gradient(circle_at_center,rgba(13,148,136,0.08)_1px,transparent_1.6px)] [background-size:28px_28px] [mask-image:radial-gradient(40rem_28rem_at_30%_5rem,#000,transparent)]" />
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary-300/60 to-transparent" />
-          </div>
+      {/* Hero Full Screen com Vídeo de Fundo e Painéis Cinemáticos (Preservado) */}
+      <section className="relative h-screen w-full min-h-[620px] overflow-hidden flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8">
+        {/* Vídeo de fundo */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+        >
+          <source
+            src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/45567745-d826-44a2-a5ce-7ef670944e60.mp4"
+            type="video/mp4"
+          />
+        </video>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/85 via-slate-950/65 to-slate-900"
+        />
 
-          <div className="mx-auto grid max-w-7xl items-center gap-x-14 gap-y-14 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-            <div className="mx-auto max-w-xl landing-rise lg:mx-0">
-              <span className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.04em] text-primary-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary-500" aria-hidden="true" />
-                Consultório de nutrição
-              </span>
-              <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-5xl xl:text-6xl">
-                Todo o consultório{' '}
-                <span className="bg-gradient-to-r from-primary-800 to-primary-600 bg-clip-text text-transparent">
-                  num só fluxo de trabalho
-                </span>
-              </h1>
-              <p className="mt-6 max-w-lg text-lg leading-8 text-slate-600">
-                Agenda, prontuário, planos alimentares, análise de exames por IA e financeiro
-                conversando entre si — em português, sem costurar planilha com WhatsApp.
-              </p>
-              <div className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                <Link to="/login?mode=signup" className={`${ctaPrimary} w-full sm:w-auto`}>
-                  {CTA_LABEL}
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-                <a
-                  href="#recursos"
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-semibold text-slate-700 transition-colors hover:text-primary-700"
+        {/* Vinheta radial sutil */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.3)_100%)]"
+        />
+
+        {/* Container dos Painéis Rotativos */}
+        <div className="relative z-10 mx-auto w-full max-w-5xl text-center">
+          <div className="relative flex min-h-[380px] sm:min-h-[340px] md:min-h-[300px] items-center justify-center">
+            {HERO_PANELS.map((panel, index) => {
+              const isActive = activePanel === index;
+              return (
+                <div
+                  key={panel.eyebrow}
+                  className={`flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
+                    isActive
+                      ? 'relative z-10 translate-y-0 opacity-100'
+                      : 'pointer-events-none absolute inset-0 z-0 translate-y-4 opacity-0'
+                  }`}
                 >
-                  Ver todos os recursos <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </a>
-              </div>
-              <p className="mt-4 text-xs text-slate-500">
-                14 dias grátis · sem cartão de crédito · cancele quando quiser
-              </p>
-              <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-slate-500">
-                {chips.map((chip) => (
-                  <li key={chip} className="flex items-center gap-1.5">
-                    <span className="h-1 w-1 rounded-full bg-primary-500" aria-hidden="true" />
-                    {chip}
-                  </li>
-                ))}
-              </ul>
-            </div>
+                  {/* Eyebrow em teal uppercase */}
+                  <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-950/50 px-3.5 py-1.5 text-xs sm:text-sm font-semibold uppercase tracking-[0.12em] text-teal-400 shadow-md backdrop-blur-md">
+                    <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse" aria-hidden="true" />
+                    {panel.eyebrow}
+                  </div>
 
-            <div className="relative mx-auto max-w-md landing-rise landing-rise-late lg:mx-0">
-              <div
-                aria-hidden="true"
-                className="absolute -bottom-4 -right-3 left-7 top-8 rounded-3xl border border-slate-200/70 bg-white shadow-xl shadow-slate-900/5"
-              />
-              <ExamAIMock />
-              <p className="relative mt-3 text-center text-xs text-slate-500">
-                Um laudo lido pela IA em segundos — exemplo ilustrativo.
-              </p>
-            </div>
+                  {/* Título Display */}
+                  <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-white sm:text-6xl md:text-7xl leading-[1.08] drop-shadow-sm">
+                    {panel.title}
+                  </h1>
+
+                  {/* Subtítulo */}
+                  <p className="mt-6 max-w-2xl text-base sm:text-lg md:text-xl text-slate-200 leading-relaxed font-normal">
+                    {panel.subtitle}
+                  </p>
+
+                  {/* Botões reutilizando o primitivo Button */}
+                  <div className="mt-8 flex flex-wrap items-center justify-center gap-4 sm:mt-10">
+                    {panel.isAnchor ? (
+                      <a href={panel.to}>
+                        <Button
+                          size="md"
+                          className="!rounded-full !bg-teal-600 px-7 py-3.5 text-sm sm:text-base font-semibold !text-white shadow-lg shadow-teal-950/50 transition-all duration-200 hover:scale-105 hover:!bg-teal-500"
+                        >
+                          {panel.cta}
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </a>
+                    ) : (
+                      <Link to={panel.to}>
+                        <Button
+                          size="md"
+                          className="!rounded-full !bg-teal-600 px-7 py-3.5 text-sm sm:text-base font-semibold !text-white shadow-lg shadow-teal-950/50 transition-all duration-200 hover:scale-105 hover:!bg-teal-500"
+                        >
+                          {panel.cta}
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </Link>
+                    )}
+
+                    <Link
+                      to="/login?mode=signup"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-3 text-sm sm:text-base font-semibold text-white backdrop-blur-md transition-all duration-200 hover:border-white/30 hover:bg-white/20 hover:-translate-y-0.5"
+                    >
+                      {CTA_LABEL}
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </section>
 
-        {/* Faixa de confiança */}
-        <div className="border-y border-slate-200/60 bg-slate-50">
-          <ul className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-2 px-6 py-4 text-sm font-medium text-slate-500 lg:px-8">
-            {trustStrip.map((item) => (
-              <li key={item} className="flex items-center gap-2">
-                <span className="h-1 w-1 rounded-full bg-primary-500" aria-hidden="true" />
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Fluxo + recursos */}
-        <section id="recursos" className="scroll-mt-24 py-20 sm:py-28">
-          <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="max-w-2xl">
-              <p className={eyebrow}>O ciclo clínico completo</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                Do agendamento ao retorno, sem trocar de ferramenta
-              </h2>
-              <p className="mt-4 text-lg leading-8 text-slate-600">
-                Não é um CRM genérico adaptado nem seis assinaturas separadas. É o ciclo inteiro — e
-                em volta dele, o financeiro e o portal do paciente andam junto.
-              </p>
-            </div>
-
-            {/* trilha */}
-            <ol className="relative mt-14 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
-              <div
-                aria-hidden="true"
-                className="absolute left-[10%] right-[10%] top-6 hidden h-px bg-slate-200 lg:block"
+          {/* Indicadores de painel com controle interativo */}
+          <div className="mt-10 flex items-center justify-center gap-3">
+            {HERO_PANELS.map((p, idx) => (
+              <button
+                key={p.eyebrow}
+                type="button"
+                onClick={() => setActivePanel(idx)}
+                className={`group relative h-2.5 rounded-full transition-all duration-500 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
+                  activePanel === idx
+                    ? 'w-10 bg-teal-400 shadow-md shadow-teal-400/50'
+                    : 'w-2.5 bg-white/30 hover:bg-white/60'
+                }`}
+                aria-label={`Ir para painel ${idx + 1}: ${p.eyebrow}`}
+                aria-current={activePanel === idx ? 'true' : 'false'}
               />
-              {flow.map((step, i) => (
-                <li key={step.label} className="relative flex flex-col items-start gap-2.5">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl border border-primary-100 bg-white text-primary-600 shadow-sm">
+            ))}
+          </div>
+
+          <p className="mt-5 text-xs font-medium text-slate-300">
+            14 dias grátis · sem cartão de crédito · cancele quando quiser
+          </p>
+        </div>
+      </section>
+
+      {/* Seção 1: Recursos (bg-gradient-to-b from-slate-900 to-[#606f84]) */}
+      <section id="recursos" className="scroll-mt-20 bg-gradient-to-b from-slate-900 to-[#606f84] py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          {/* Faixa de Confiança */}
+          <div className="mb-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 backdrop-blur-md">
+            {trustStrip.map((item) => (
+              <div key={item} className="flex items-center gap-2 text-sm font-medium text-slate-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-teal-400" aria-hidden="true" />
+                {item}
+              </div>
+            ))}
+          </div>
+
+          {/* Cabeçalho de Recursos */}
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-950/50 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-teal-400">
+              O ciclo clínico completo
+            </span>
+            <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl">
+              Do agendamento ao retorno, em uma única plataforma
+            </h2>
+            <p className="mt-4 text-base sm:text-lg leading-relaxed text-slate-300">
+              Sem ferramentas fragmentadas ou planilhas improvisadas. Prontuário, exames com IA,
+              planos alimentares e financeiro conectados no mesmo lugar.
+            </p>
+          </div>
+
+          {/* Trilha do Ciclo Clínico */}
+          <div className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {flow.map((step, i) => (
+              <div
+                key={step.label}
+                className="group relative flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm transition-all duration-200 hover:border-teal-500/40 hover:bg-white/10"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-500/10 text-teal-400">
                     <step.icon className="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="text-xs font-bold text-teal-400/80">
                     {String(i + 1).padStart(2, '0')}
                   </span>
-                  <span className="text-sm font-semibold text-slate-900">{step.label}</span>
-                  <span className="text-xs leading-5 text-slate-500">{step.note}</span>
-                </li>
-              ))}
-            </ol>
-
-            {/* módulos em grade bento */}
-            <div className="mt-16 grid gap-5 lg:auto-rows-fr lg:grid-cols-3">
-              <article className="flex flex-col gap-4 rounded-3xl border border-primary-200 bg-gradient-to-b from-primary-50 to-white p-7 lg:col-span-2 lg:row-span-2">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary-100 text-primary-700">
-                    <FlaskConical className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <span className="rounded-full bg-primary-900 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                    Análise por IA
-                  </span>
                 </div>
+                <span className="mt-1 text-sm font-semibold text-white">{step.label}</span>
+                <span className="text-xs leading-relaxed text-slate-300">{step.note}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Grade de Recursos (6 Cards - Retângulo 2x3) */}
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature) => (
+              <article
+                key={feature.name}
+                className="flex flex-col justify-between rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md transition-all duration-200 hover:border-teal-500/30 hover:bg-white/10"
+              >
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-900">Análise de exames por IA</h3>
-                  <p className="mt-2 max-w-md text-base leading-7 text-slate-600">
-                    O laudo em PDF ou foto vira biomarcadores extraídos, comparados com a referência e
-                    um parecer de conduta — nunca estimados.
-                  </p>
-                </div>
-                <ul className="mt-1 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-primary-100 bg-white">
-                  {biomarkersSample.map((b) => (
-                    <li key={b.name} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                      <span className="min-w-0 text-sm">
-                        <span className="font-medium text-slate-900">{b.name}</span>
-                        <span className="ml-2 text-xs text-slate-500">
-                          {b.value} {b.unit} · ref. {b.ref}
-                        </span>
-                      </span>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${toneClass[b.tone]}`}
-                      >
-                        {b.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-
-              {features.map((feature) => (
-                <article
-                  key={feature.name}
-                  className="flex flex-col gap-3 rounded-3xl border border-slate-200/70 bg-white p-6 transition-[border-color,box-shadow] duration-200 hover:border-primary-200 hover:shadow-lg"
-                >
-                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary-50 text-primary-600">
+                  <span className="inline-flex items-center gap-2 rounded-xl bg-white/10 p-2.5 text-teal-400">
                     <feature.icon className="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <h3 className="text-base font-semibold text-slate-900">{feature.name}</h3>
-                  <p className="text-sm leading-6 text-slate-500">{feature.description}</p>
-                </article>
-              ))}
-
-              <article className="flex flex-col justify-center gap-2 rounded-3xl border border-dashed border-primary-200 bg-primary-50/60 p-7 lg:col-span-3">
-                <h3 className="text-base font-semibold text-primary-800">
-                  O paciente tem portal próprio
-                </h3>
-                <p className="max-w-3xl text-sm leading-6 text-primary-800/90">
-                  Preenche a ficha de pré-consulta pelo link que você envia e acompanha o plano
-                  alimentar — sem nunca acessar o seu painel clínico.
-                </p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        {/* Confiança */}
-        <section className="border-y border-slate-200/60 bg-slate-50 py-20 sm:py-24">
-          <div className="mx-auto max-w-5xl px-6 lg:px-8">
-            <div className="max-w-2xl">
-              <p className={eyebrow}>Dados sensíveis de saúde</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                Prontuário e exame não são planilha
-              </h2>
-              <p className="mt-4 text-lg leading-8 text-slate-600">
-                O produto trata isso como obrigação, não como recurso opcional.
-              </p>
-            </div>
-            <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-3">
-              {trust.map((item) => (
-                <div
-                  key={item.title}
-                  className="flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-white p-6"
-                >
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-50 text-primary-600">
-                    <item.icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <h3 className="text-base font-semibold text-slate-900">{item.title}</h3>
-                  <p className="text-sm leading-6 text-slate-500">{item.body}</p>
+                  <h3 className="mt-4 text-lg font-bold text-white">{feature.name}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-300">{feature.description}</p>
                 </div>
-              ))}
-            </div>
+              </article>
+            ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Pricing */}
-        <section id="pricing" className="scroll-mt-24 py-20 sm:py-28">
-          <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl text-center">
-              <p className={eyebrow}>Planos</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                Um preço simples para cada fase da carreira
-              </h2>
-              <p className="mt-4 text-lg leading-8 text-slate-600">
-                Teste gratuitamente por 14 dias, sem compromisso.
-              </p>
-            </div>
+      {/* Seção 2: Planos / Preços (bg-gradient-to-b from-[#606f84] to-[#c1c9d2]) */}
+      <section id="pricing" className="scroll-mt-20 bg-gradient-to-b from-[#606f84] to-[#c1c9d2] py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/60 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-teal-300 backdrop-blur-md">
+              Planos Transparentes
+            </span>
+            <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl">
+              Um preço simples para cada fase da sua carreira
+            </h2>
+            <p className="mt-4 text-base sm:text-lg text-slate-300">
+              Teste gratuitamente por 14 dias. Sem fidelidade e sem necessidade de cartão de crédito.
+            </p>
+          </div>
 
-            <div className="mx-auto mt-14 grid max-w-md grid-cols-1 items-start gap-6 lg:max-w-4xl lg:grid-cols-2">
-              {plans.map((plan) => (
-                <div
-                  key={plan.name}
-                  className={
-                    'relative flex flex-col rounded-3xl p-8 xl:p-10 ' +
-                    (plan.highlighted
-                      ? 'bg-primary-900 text-white shadow-xl shadow-primary-900/30 ring-1 ring-primary-700'
-                      : 'border border-slate-200 bg-white')
-                  }
-                >
+          <div className="mx-auto mt-14 grid max-w-md grid-cols-1 items-stretch gap-8 lg:max-w-4xl lg:grid-cols-2">
+            {plans.map((plan) => (
+              <div
+                key={plan.name}
+                className={
+                  'relative flex flex-col justify-between rounded-3xl bg-slate-900 p-8 sm:p-10 shadow-2xl transition-all duration-200 text-white ' +
+                  (plan.highlighted
+                    ? 'border-2 border-teal-500/50 ring-2 ring-teal-400/50 shadow-teal-500/10'
+                    : 'border border-slate-700 hover:border-slate-600')
+                }
+              >
+                <div>
                   <div className="flex items-center justify-between gap-x-3">
-                    <h3
-                      className={
-                        'text-lg font-semibold ' + (plan.highlighted ? 'text-white' : 'text-slate-900')
-                      }
-                    >
+                    <h3 className="text-xl font-bold text-white">
                       {plan.name}
                     </h3>
                     {plan.highlighted && (
-                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-primary-900">
+                      <span className="rounded-full bg-teal-400 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-950 shadow-sm">
                         Recomendado
                       </span>
                     )}
                   </div>
-                  <p
-                    className={
-                      'mt-3 text-sm leading-6 ' + (plan.highlighted ? 'text-primary-100' : 'text-slate-600')
-                    }
-                  >
+                  <p className="mt-3 text-sm leading-relaxed text-slate-300">
                     {plan.audience}
                   </p>
                   <p className="mt-6 flex items-baseline gap-x-1">
-                    <span
-                      className={
-                        'text-4xl font-bold tracking-tight ' +
-                        (plan.highlighted ? 'text-white' : 'text-slate-900')
-                      }
-                    >
+                    <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">
                       {plan.price}
                     </span>
-                    <span
-                      className={
-                        'text-sm font-semibold ' + (plan.highlighted ? 'text-primary-100' : 'text-slate-500')
-                      }
-                    >
+                    <span className="text-sm font-semibold text-slate-400">
                       /mês
                     </span>
                   </p>
+
                   <Link
                     to={plan.to}
                     className={
-                      'mt-6 block rounded-full px-3 py-2.5 text-center text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+                      'mt-8 block rounded-full py-3.5 text-center text-sm sm:text-base font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
                       (plan.highlighted
-                        ? 'bg-white text-primary-900 hover:bg-primary-50 focus-visible:ring-white focus-visible:ring-offset-primary-900'
-                        : 'bg-primary-600 text-white hover:bg-primary-500 focus-visible:ring-primary-600')
+                        ? 'bg-teal-400 text-slate-950 hover:bg-teal-300 shadow-lg shadow-teal-400/20 focus-visible:ring-teal-400'
+                        : 'bg-teal-600 text-white hover:bg-teal-500 shadow-md shadow-teal-900/40 focus-visible:ring-teal-600')
                     }
                   >
                     {CTA_LABEL}
                   </Link>
-                  <ul
-                    className={
-                      'mt-8 space-y-3 text-sm leading-6 ' +
-                      (plan.highlighted ? 'text-primary-50' : 'text-slate-600')
-                    }
-                  >
+
+                  <ul className="mt-8 space-y-3.5 text-sm leading-6 text-slate-300">
                     {plan.features.map((item) => (
-                      <li key={item} className="flex gap-x-3">
+                      <li key={item} className="flex items-start gap-3">
                         <CheckCircle2
-                          className={
-                            'h-5 w-5 flex-none ' + (plan.highlighted ? 'text-white' : 'text-primary-600')
-                          }
+                          className="h-5 w-5 shrink-0 text-teal-400"
                           aria-hidden="true"
                         />
-                        {item}
+                        <span>{item}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
-              ))}
-            </div>
-
-            <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-slate-500">
-              Mais de 3 profissionais?{' '}
-              <Link
-                to="/login?mode=signup&plan=pro"
-                className="font-semibold text-primary-700 hover:text-primary-600"
-              >
-                Fale com a gente
-              </Link>{' '}
-              — montamos o plano da sua clínica. Cobrança mensal, sem fidelidade.
-            </p>
+              </div>
+            ))}
           </div>
-        </section>
 
-        {/* Closing CTA */}
-        <section className="px-6 py-20 lg:px-8">
-          <div className="mx-auto max-w-4xl rounded-3xl bg-gradient-to-br from-primary-800 via-primary-600 to-primary-700 px-6 py-14 text-center sm:px-12 sm:py-16">
-            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              Sua próxima consulta pode já estar no NutriAI
-            </h2>
-            <p className="mx-auto mt-4 max-w-lg text-lg leading-8 text-primary-50">
-              Criar a conta leva dois minutos. 14 dias grátis, sem cartão de crédito.
-            </p>
-            <div className="mt-8 flex justify-center">
-              <Link
-                to="/login?mode=signup"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-primary-800 shadow-sm transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:bg-primary-50 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary-700"
-              >
-                Criar minha conta <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </div>
+          <p className="mx-auto mt-12 max-w-2xl text-center text-sm text-slate-900 font-medium">
+            Mais de 3 profissionais na sua equipe?{' '}
+            <Link
+              to="/login?mode=signup&plan=pro"
+              className="font-semibold text-teal-700 underline underline-offset-4 hover:text-teal-800"
+            >
+              Fale com a gente
+            </Link>{' '}
+              — montamos o plano ideal para a sua clínica.
+          </p>
+        </div>
+      </section>
+
+      {/* Seção 3: CTA (bg-gradient-to-b from-[#c1c9d2] to-[#f8fafc]) */}
+      <section className="bg-gradient-to-b from-[#c1c9d2] to-[#f8fafc] py-24 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl rounded-3xl bg-gradient-to-br from-teal-800 via-teal-700 to-teal-900 px-6 py-14 text-center shadow-2xl sm:px-12 sm:py-16">
+          <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+            Sua próxima consulta pode já estar no NutriAI
+          </h2>
+          <p className="mx-auto mt-4 max-w-lg text-base sm:text-lg leading-relaxed text-teal-100">
+            Criar a conta leva apenas dois minutos. 14 dias de teste grátis, sem cartão de crédito.
+          </p>
+          <div className="mt-8 flex justify-center">
+            <Link
+              to="/login?mode=signup"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3.5 text-sm sm:text-base font-semibold text-teal-950 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-50 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-teal-800"
+            >
+              Criar minha conta <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-12">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+      {/* Footer (bg-[#f8fafc]) */}
+      <footer className="border-t border-slate-200 bg-[#f8fafc] py-12">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 md:flex-row md:items-center md:justify-between sm:px-6 lg:px-8">
           <Wordmark />
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <ShieldCheck className="h-4 w-4 flex-none text-primary-600" aria-hidden="true" />
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <ShieldCheck className="h-4 w-4 flex-none text-teal-600" aria-hidden="true" />
             <span>Dados de saúde protegidos, isolados por clínica e sob a LGPD.</span>
           </div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-600">
             &copy; {new Date().getFullYear()} NutriAI. Todos os direitos reservados.
           </p>
         </div>
@@ -586,3 +504,4 @@ export const Landing: React.FC = () => {
     </div>
   );
 };
+
