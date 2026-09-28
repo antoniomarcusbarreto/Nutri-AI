@@ -22,7 +22,7 @@ export function useConsultations(patientId: string | undefined) {
           anamnese_notes,
           anthropometry_json,
           created_at,
-          appointments ( status, services ( name ) )
+          appointments ( status, date_time, services ( name ) )
         `)
         .eq('patient_id', patientId!)
         .order('created_at', { ascending: false });

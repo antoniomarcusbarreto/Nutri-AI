@@ -59,6 +59,7 @@ export interface AnthropometryJson {
 /** Vínculo mínimo de agendamento embutido numa consulta. */
 export interface AppointmentLink {
   status?: string | null;
+  date_time?: string | null;
 }
 
 export interface ConsultationRecord {
@@ -158,6 +159,8 @@ export interface RechartsTooltipEntry {
   value?: number | string;
   color?: string;
   dataKey?: string | number;
+  /** Linha de dados completa do ponto (a mesma do array `data` do gráfico). */
+  payload?: Record<string, unknown>;
 }
 
 export interface RechartsTooltipProps {

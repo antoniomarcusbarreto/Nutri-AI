@@ -659,6 +659,38 @@ html[data-theme="blue"] {
   border-color: #333333;
 }
 
+/* Texto de status/domínio no escuro: os tons -600…-800 do tema claro somem sobre
+   o grafite (e vencem a cor herdada do fundo -50 acima). Remapeia para os mesmos
+   tons claros de status do DESIGN.md. */
+.theme-dark .text-emerald-600,
+.theme-dark .text-emerald-700,
+.theme-dark .text-emerald-800 {
+  color: #34d399;
+}
+.theme-dark .text-rose-600,
+.theme-dark .text-rose-700,
+.theme-dark .text-rose-800 {
+  color: #f87171;
+}
+.theme-dark .text-amber-700,
+.theme-dark .text-amber-800 {
+  color: #fbbf24;
+}
+.theme-dark .text-teal-700,
+.theme-dark .text-teal-800 {
+  color: #2dd4bf;
+}
+.theme-dark .text-blue-700,
+.theme-dark .text-blue-800,
+.theme-dark .text-indigo-700,
+.theme-dark .text-indigo-800 {
+  color: #818cf8;
+}
+.theme-dark :is(.border-emerald-100, .border-emerald-200, .border-rose-100, .border-amber-100, .border-amber-200,
+  .border-teal-100, .border-teal-200, .border-blue-100, .border-blue-200, .border-indigo-100, .border-indigo-200) {
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
 /* Hover adjustments in main area */
 .theme-dark .hover\:bg-slate-50:hover,
 .theme-dark .hover\:bg-slate-100:hover {
