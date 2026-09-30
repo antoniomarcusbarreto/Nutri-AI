@@ -36,6 +36,9 @@ import { getDaysInMonth, getDaysInWeek } from '../utils/calendar';
 import { logger } from '../lib/logger';
 import { PageHeader, Modal, Input, Select, Textarea, Button } from '../components/ui';
 import { AgendaMonthGrid } from '../components/agenda/AgendaMonthGrid';
+import { AppointmentPaymentBlock } from '../components/financial/AppointmentPaymentBlock';
+import { useQueryClient } from '@tanstack/react-query';
+import { qk } from '../lib/queryKeys';
 
 interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
 interface AgendaServiceLink { id?: string; name?: string | null; duration_minutes?: number | null; price?: number | null }
@@ -76,6 +79,12 @@ interface AgendaReschedule {
 
 export const Agenda: React.FC = () => {
   const { clinic, isReadOnly, profile } = useAuth();
+  const queryClient = useQueryClient();
+  // Criar/remarcar/cancelar/excluir consulta mexe na cobrança via trigger (migration 0026).
+  const refreshFinance = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: qk.finance.all }),
+    [queryClient],
+  );
   
   // Date and Calendar states
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -443,6 +452,7 @@ export const Agenda: React.FC = () => {
       
       setIsNewModalOpen(false);
       fetchAppointments(); // Refresh grid
+      refreshFinance();
       showToast('Consulta agendada com sucesso!', 'success');
     } catch (err) {
       logger.error('Erro ao agendar consulta:', err);
@@ -473,6 +483,7 @@ export const Agenda: React.FC = () => {
       // Update local state
       setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, status: newStatus } : a));
       setSelectedAppointment((prev) => prev ? { ...prev, status: newStatus } : null);
+      refreshFinance();
       showToast('Status da consulta atualizado com sucesso!', 'success');
     } catch (err) {
       logger.error('Erro ao atualizar status da consulta:', err);
@@ -537,6 +548,7 @@ export const Agenda: React.FC = () => {
       
       // Refresh the reschedules list
       fetchReschedules(selectedAppointment.id);
+      refreshFinance();
     } catch (err) {
       logger.error('Erro ao reagendar consulta:', err);
       showToast('Ocorreu um erro ao salvar o reagendamento no servidor.', 'error');
@@ -561,6 +573,7 @@ export const Agenda: React.FC = () => {
       setAppointments(prev => prev.filter(a => a.id !== selectedAppointment.id));
       setSelectedAppointment(null);
       setDeletingId(null);
+      refreshFinance();
       showToast('Consulta excluída com sucesso!', 'success');
     } catch (err) {
       logger.error('Erro ao excluir consulta:', err);
@@ -1277,6 +1290,11 @@ export const Agenda: React.FC = () => {
                     <p className="text-xs text-slate-700 mt-0.5">Nutricionista</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Pagamento</h4>
+                <AppointmentPaymentBlock appointmentId={selectedAppointment.id} readOnly={isReadOnly} />
               </div>
 
               {/* Reschedule History (Auditoria) */}

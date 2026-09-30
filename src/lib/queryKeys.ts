@@ -41,6 +41,14 @@ export const qk = {
   mealPlans: {
     byPatient: (patientId: string) => ['meal_plans', patientId] as const,
   },
+  finance: {
+    all: ['finance'] as const,
+    payments: (clinicId: string, monthKey: string) => ['finance', 'payments', clinicId, monthKey] as const,
+    overdue: (clinicId: string, today: string) => ['finance', 'overdue', clinicId, today] as const,
+    expenses: (clinicId: string, monthKey: string) => ['finance', 'expenses', clinicId, monthKey] as const,
+    history: (clinicId: string, monthKey: string) => ['finance', 'history', clinicId, monthKey] as const,
+    byAppointment: (appointmentId: string) => ['finance', 'appointment', appointmentId] as const,
+  },
 } as const;
 
 /** Chave de mês estável para caching (ex.: "2026-09"). */
