@@ -711,6 +711,33 @@ html[data-theme="blue"] {
   border-color: #333333;
 }
 
+/* 🛡️ Painel Master: mesma base escura do tema grafite, mas com a paleta da
+   landing (slate-950/900/800 + bordas white/10). Só o Master sem clínica usa;
+   `.theme-master.theme-dark …` (0,3,0) vence as regras grafite acima. */
+.theme-master.theme-dark,
+.theme-master.theme-dark main {
+  background-color: #020617; /* slate-950 */
+}
+.theme-master.theme-dark :is(.bg-white, .bg-card, .bg-card-premium) {
+  background-color: #0f172a; /* slate-900 */
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.theme-master.theme-dark :is(.bg-slate-50, .bg-slate-50\/70, .bg-slate-50\/50, .bg-slate-100, .bg-slate-100\/50, .bg-slate-150) {
+  background-color: #111c33; /* entre slate-900 e slate-800 */
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.theme-master.theme-dark :is(input[type="text"], input[type="number"], input[type="email"], input[type="password"], select, textarea) {
+  background-color: #020617;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.theme-master.theme-dark :is(.border-slate-100, .border-slate-150, .border-slate-200, .border-slate-300\/50, .divide-slate-100, .divide-slate-200),
+.theme-master.theme-dark :is(.divide-slate-100, .divide-slate-200) > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.theme-master.theme-dark :is(.hover\:bg-slate-50, .hover\:bg-slate-100):hover {
+  background-color: #1e293b; /* slate-800 */
+}
+
 /* 🌙 Cobertura complementar do tema escuro
    ──────────────────────────────────────────────────────────────────────────
    O tema grafite funciona por *tradução* de utilitários claros. Tudo que não

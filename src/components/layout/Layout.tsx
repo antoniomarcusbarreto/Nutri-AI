@@ -9,13 +9,26 @@ import { useToast } from '../../contexts/ToastContext';
 import { logger } from '../../lib/logger';
 
 export const Layout: React.FC = () => {
-  const { profile, updateProfile } = useAuth();
+  const { profile, clinic, updateProfile } = useAuth();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const themeColor = profile?.theme_color || 'white';
+  // Master sem clínica não escolhe tema: o Painel Master usa a identidade da
+  // landing (slate-950 + teal), via `.theme-master` em index.css.
+  const isMasterOnly = !!profile?.is_superadmin && !clinic;
+  const themeColor = isMasterOnly ? 'master' : profile?.theme_color || 'white';
+  const isDarkShell = themeColor === 'dark' || themeColor === 'master';
+  const shellBg = themeColor === 'master' ? 'bg-slate-950' : themeColor === 'dark' ? 'bg-sidebar-graphite' : 'bg-slate-200';
   const location = useLocation();
+
+  // A cor escolhida vale só dentro do app logado: aplica no <html> enquanto o
+  // shell está montado e remove ao sair (login/landing/portal ficam na marca).
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', themeColor);
+    return () => root.removeAttribute('data-theme');
+  }, [themeColor]);
 
   // Fecha o drawer ao trocar de rota e trava o scroll do body enquanto aberto.
   useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
@@ -49,6 +62,7 @@ export const Layout: React.FC = () => {
     }
   };
   const getHeaderTheme = () => {
+    if (themeColor === 'master') return 'bg-slate-950 border-b border-white/10 text-white';
     if (themeColor === 'dark') return 'bg-sidebar-graphite-raised border-b border-sidebar-hairline text-[#f5f5f5]';
     if (themeColor === 'teal') return 'bg-sidebar-teal border-b border-teal-700/20 text-white';
     if (themeColor === 'blue') return 'bg-sidebar-navy border-b border-white/10 text-white';
@@ -56,12 +70,12 @@ export const Layout: React.FC = () => {
   };
 
   const getTextColor = () => {
-    if (themeColor === 'blue' || themeColor === 'teal' || themeColor === 'dark') return 'text-slate-100';
+    if (themeColor === 'blue' || themeColor === 'teal' || isDarkShell) return 'text-slate-100';
     return 'text-slate-700';
   };
 
   return (
-    <div className={`flex h-screen overflow-hidden print:h-auto print:block print:overflow-visible ${themeColor === 'dark' ? 'bg-sidebar-graphite theme-dark' : 'bg-slate-200'} font-sans transition-colors duration-200 print:!bg-white`}>
+    <div className={`flex h-screen overflow-hidden print:h-auto print:block print:overflow-visible ${shellBg} ${isDarkShell ? 'theme-dark' : ''} ${themeColor === 'master' ? 'theme-master' : ''} font-sans transition-colors duration-200 print:!bg-white`}>
       <a
         href="#conteudo"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-900 focus:shadow-lg focus:outline focus:outline-2 focus:outline-[#5024fc]"
@@ -99,7 +113,7 @@ export const Layout: React.FC = () => {
         </button>
       </div>
 
-      <main className={`flex-1 min-w-0 flex flex-col overflow-y-auto overflow-x-hidden print:overflow-visible print:block print:!bg-white ${themeColor === 'dark' ? 'bg-sidebar-graphite' : 'bg-slate-200'} antialiased transition-colors duration-200`}>
+      <main className={`flex-1 min-w-0 flex flex-col overflow-y-auto overflow-x-hidden print:overflow-visible print:block print:!bg-white ${shellBg} antialiased transition-colors duration-200`}>
         {/* Header Superior Simples */}
         <header className={`print:hidden ${getHeaderTheme()} h-16 shrink-0 flex items-center gap-3 px-4 sm:px-6 lg:px-8 shadow-sm transition-colors duration-200`}>
           <button

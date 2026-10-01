@@ -131,11 +131,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [clinic],
   );
 
-  const applyTheme = useCallback((_mode: string, color: string) => {
-    const root = document.documentElement;
-    root.setAttribute('data-theme', color);
-  }, []);
-
+  // O `data-theme` no <html> é aplicado pelo Layout (shell logado), não aqui —
+  // senão a cor do usuário vaza para login/landing. Ver Layout.tsx.
   const updateTheme = useCallback(async (mode: string, color: string) => {
     if (!profile) return;
     try {
@@ -147,11 +144,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       
       setProfile(prev => (prev ? { ...prev, theme_mode: mode, theme_color: color } : prev));
-      applyTheme(mode, color);
     } catch (error) {
       logger.error('Error updating theme:', error);
     }
-  }, [profile, applyTheme]);
+  }, [profile]);
 
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     if (!profile) return;
@@ -204,7 +200,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         setProfile(profileData);
-        applyTheme(profileData.theme_mode || 'light', profileData.theme_color || 'white');
       }
 
       const { data: memberData } = await supabase
@@ -266,8 +261,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => subscription.unsubscribe();
     // Montagem única: assina onAuthStateChange e faz o bootstrap da sessão.
-    // `fetchUserData` só usa setters estáveis + applyTheme; não entra nas deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signOut = useCallback(async () => {

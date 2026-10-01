@@ -19,10 +19,11 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If superadmin without a clinic tries to access anything other than /admin or /settings, redirect them
+  // Master sem clínica só usa o Painel Master (sem Configurações: tema e dados
+  // de clínica não se aplicam a ele).
   const isSuperadminWithoutClinic = profile?.is_superadmin && !clinic;
-  
-  if (isSuperadminWithoutClinic && !location.pathname.startsWith('/admin') && !location.pathname.startsWith('/settings')) {
+
+  if (isSuperadminWithoutClinic && !location.pathname.startsWith('/admin')) {
     return <Navigate to="/admin" replace />;
   }
 

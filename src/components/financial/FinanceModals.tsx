@@ -11,7 +11,7 @@ import {
   useUpdateCharge,
   useUpdateExpense,
 } from '../../hooks/queries/useFinance';
-import { Button, Input, Modal, Select, Textarea } from '../ui';
+import { Button, DateInput, Input, Modal, Select, Textarea } from '../ui';
 import {
   brl,
   CATEGORY_LABEL,
@@ -86,7 +86,7 @@ export const RegisterPaymentModal: React.FC<{ payment: PaymentRecord | null; onC
           <Select label="Forma de pagamento" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} required>
             {METHODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </Select>
-          <Input label="Data do pagamento" type="date" value={paidAt} max={todayISO()} onChange={(e) => setPaidAt(e.target.value)} required />
+          <DateInput label="Data do pagamento" value={paidAt} max={todayISO()} onChange={setPaidAt} required />
         </div>
         <Input
           label="Desconto (R$)"
@@ -163,7 +163,7 @@ export const EditChargeModal: React.FC<{ payment: PaymentRecord | null; onClose:
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Input label="Valor (R$)" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} error={amountError} required />
           <Input label="Desconto (R$)" inputMode="decimal" placeholder="0,00" value={discount} onChange={(e) => setDiscount(e.target.value)} error={discountError} />
-          <Input label="Vencimento" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+          <DateInput label="Vencimento" value={dueDate} onChange={setDueDate} required />
         </div>
         {payment.appointment_id && (
           <p className="text-xs text-slate-500">
@@ -274,7 +274,7 @@ export const NewChargeModal: React.FC<{ open: boolean; onClose: () => void }> = 
           <Input label="Valor (R$)" inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value)} error={amountError} required />
         </div>
         <Input label="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Retorno, bioimpedância" required />
-        <Input label={alreadyPaid ? 'Data' : 'Vencimento'} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+        <DateInput label={alreadyPaid ? 'Data' : 'Vencimento'} value={dueDate} onChange={setDueDate} required />
 
         <label className="flex items-center gap-2.5 text-sm text-slate-700">
           <input type="checkbox" checked={alreadyPaid} onChange={(e) => setAlreadyPaid(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-[#5024fc] focus:ring-[#5024fc]" />
@@ -360,7 +360,7 @@ export const ExpenseModal: React.FC<{ open: boolean; expense?: ExpenseRecord | n
           </Select>
           <Input label="Valor (R$)" inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value)} error={amountError} required />
         </div>
-        <Input label="Vencimento" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+        <DateInput label="Vencimento" value={dueDate} onChange={setDueDate} required />
 
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <label className="flex items-center gap-2.5 text-sm text-slate-700">
@@ -368,7 +368,7 @@ export const ExpenseModal: React.FC<{ open: boolean; expense?: ExpenseRecord | n
             Já foi paga
           </label>
           {paid && (
-            <Input label="Data do pagamento" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} required />
+            <DateInput label="Data do pagamento" value={paidAt} onChange={setPaidAt} required />
           )}
           {!editing && (
             <>

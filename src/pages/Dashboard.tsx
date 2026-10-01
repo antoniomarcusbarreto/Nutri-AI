@@ -6,7 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useClinicStats, useUpcomingAppointments, useReminders } from '../hooks/queries/useDashboard';
 import { useReminderMutations } from '../hooks/mutations/useReminderMutations';
 import { pickOne } from '../types/clinical';
-import { Button, Card, PageHeader, EmptyState } from '../components/ui';
+import { Button, Card, DateInput, PageHeader, EmptyState } from '../components/ui';
 
 export const Dashboard: React.FC = () => {
   const { isReadOnly, clinic, profile } = useAuth();
@@ -260,11 +260,11 @@ export const Dashboard: React.FC = () => {
                 className="flex-1 min-w-0 basis-full sm:basis-auto rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm font-normal px-4 py-2.5 border"
                 required
               />
-              <input
-                type="date"
+              <DateInput
                 value={newReminderDate}
-                onChange={e => setNewReminderDate(e.target.value)}
-                className="flex-1 sm:flex-none sm:w-40 rounded-xl border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm font-normal px-4 py-2.5 border"
+                onChange={setNewReminderDate}
+                wrapperClassName="flex-1 sm:flex-none sm:w-40"
+                className="rounded-xl border-slate-300 py-2.5"
                 required
               />
               <Button type="submit" size="icon" aria-label="Adicionar lembrete" className="shrink-0">

@@ -34,8 +34,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     return classes.filter(Boolean).join(' ');
   };
 
+  // Master sem clínica: shell fixo na identidade da landing, sem Configurações.
+  const isMasterOnly = !!profile?.is_superadmin && !clinic;
+
   const getSidebarTheme = () => {
-    const themeColor = profile?.theme_color || 'white';
+    const themeColor = isMasterOnly ? 'master' : profile?.theme_color || 'white';
+
+    if (themeColor === 'master') {
+      return {
+        container: 'bg-slate-950 border-r border-white/10 text-slate-100',
+        border: 'border-b border-white/10',
+        logoText: 'text-white font-bold',
+        logoIcon: 'text-teal-400',
+        activeItem: 'bg-white/5 text-teal-400 font-semibold',
+        inactiveItem: 'text-slate-300 hover:bg-white/5 hover:text-white transition-all',
+        itemIconActive: 'text-teal-400',
+        itemIconInactive: 'text-slate-400 group-hover:text-white transition-all'
+      };
+    }
 
     if (themeColor === 'blue') {
       return {
@@ -156,6 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
 
         {/* Bottom navigation items */}
         <ul role="list" className="space-y-1 mt-auto border-t pt-4 border-slate-200/20">
+            {!isMasterOnly && (
             <li>
               <Link
                 to="/settings"
@@ -173,6 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
                 Configurações
               </Link>
             </li>
+            )}
             <li>
               <button
                 onClick={() => { onNavigate?.(); signOut(); }}

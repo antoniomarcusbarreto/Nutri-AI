@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Shield, Key, Calendar, Save, UserPlus, Trash2 } from 'lucide-react';
+import { Shield, Key, Calendar, Save, UserPlus, Trash2, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Modal } from '../components/ui';
+import { DateInput, Modal } from '../components/ui';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Erro inesperado');
 
@@ -36,6 +36,54 @@ interface AdminClinic {
   created_at: string;
 }
 
+const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
+const DAY_MS = 1000 * 3600 * 24;
+
+/**
+ * Status efetivo da assinatura. A coluna `subscription_status` não muda sozinha
+ * quando a data passa, então "active"/"trial" vencidos viram "expired" aqui —
+ * mesma regra do calculateTrial em AuthContext (que é o que trava a clínica).
+ */
+function clinicSubscription(c: AdminClinic): { status: 'trial' | 'active' | 'expired' | 'inactive'; endsAt: Date | null; endsLabel: string } {
+  const raw = c.subscription_status || 'trial';
+  if (raw === 'inactive') return { status: 'inactive', endsAt: null, endsLabel: 'N/A' };
+  const endsAt = raw === 'trial'
+    ? new Date(new Date(c.created_at).getTime() + TRIAL_MS)
+    : c.subscription_end_date ? new Date(c.subscription_end_date) : null;
+  const expired = !!endsAt && Math.ceil((endsAt.getTime() - Date.now()) / DAY_MS) < 0;
+  // A Data Fim é uma data de calendário salva como meia-noite UTC (o modal grava
+  // `new Date('yyyy-MM-dd')`); exibir no fuso local mostraria o dia anterior.
+  const endsLabel = !endsAt ? 'Ilimitado'
+    : endsAt.toLocaleDateString('pt-BR', raw === 'trial' ? undefined : { timeZone: 'UTC' });
+  return { status: expired ? 'expired' : raw === 'trial' ? 'trial' : 'active', endsAt, endsLabel };
+}
+
+const SUB_BADGE: Record<ReturnType<typeof clinicSubscription>['status'], { label: string; cls: string }> = {
+  active: { label: 'ATIVA', cls: 'bg-green-50 text-green-700 ring-green-600/20' },
+  trial: { label: 'TRIAL', cls: 'bg-blue-50 text-blue-700 ring-blue-600/20' },
+  expired: { label: 'VENCIDA', cls: 'bg-amber-50 text-amber-800 ring-amber-600/30' },
+  inactive: { label: 'INATIVA', cls: 'bg-red-50 text-red-700 ring-red-600/20' },
+};
+
+type UserProfileKind = 'master' | 'owner' | 'nutritionist' | 'secretary' | 'patient' | 'user';
+
+const PROFILE_LABEL: Record<UserProfileKind, string> = {
+  master: 'Master',
+  owner: 'Nutricionista (Titular)',
+  nutritionist: 'Nutricionista',
+  secretary: 'Secretária',
+  patient: 'Paciente',
+  user: 'Usuário',
+};
+
+function userProfileKind(u: AdminUser): UserProfileKind {
+  if (u.is_superadmin) return 'master';
+  const role = u.clinic_members?.[0]?.role;
+  if (role === 'owner' || role === 'nutritionist' || role === 'secretary') return role;
+  if (u.patients && u.patients.length > 0) return 'patient';
+  return 'user';
+}
+
 async function fetchAdminData(): Promise<{ users: AdminUser[]; clinics: AdminClinic[] }> {
   const [usersRes, clinicsRes] = await Promise.all([
     supabase.from('profiles').select('*, clinic_members(role, clinic_id, clinics(name)), patients(clinic_id, clinics(name))').order('created_at', { ascending: false }),
@@ -59,6 +107,10 @@ export const AdminDashboard: React.FC = () => {
   const users = data?.users ?? [];
   const clinics = data?.clinics ?? [];
   const fetchData = () => { void refetch(); };
+  // Se só existe um Master, ele não pode ser alterado nem removido pelo painel
+  // (regra também garantida no banco — migration 0027 — e na edge function).
+  const masterCount = users.filter(u => u.is_superadmin).length;
+  const isProtectedMaster = (u: AdminUser) => !!u.is_superadmin && masterCount <= 1;
 
   // Modal states
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -224,7 +276,10 @@ export const AdminDashboard: React.FC = () => {
               {loading ? (
                 <tr><td colSpan={6} className="py-8 text-center text-slate-500">Carregando...</td></tr>
               ) : (
-                users.map(u => (
+                users.map(u => {
+                  const kind = userProfileKind(u);
+                  const isNutritionist = kind === 'owner' || kind === 'nutritionist';
+                  return (
                   <tr key={u.id}>
                     <td className="whitespace-nowrap py-4 pl-6 pr-3">
                       <div className="flex items-center gap-3">
@@ -237,20 +292,14 @@ export const AdminDashboard: React.FC = () => {
                         </div>
                         <div>
                           <div className="font-medium text-slate-900">{u.full_name}</div>
-                          <div className="text-sm text-slate-500">{u.crn || 'Sem CRN'}</div>
+                          {isNutritionist && (
+                            <div className="text-sm text-slate-500">{u.crn || 'CRN não informado'}</div>
+                          )}
                         </div>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
-                      {(() => {
-                        if (u.is_superadmin) return 'Master';
-                        const role = u.clinic_members?.[0]?.role;
-                        if (role === 'owner') return 'Nutricionista (Titular)';
-                        if (role === 'nutritionist') return 'Nutricionista';
-                        if (role === 'secretary') return 'Secretária';
-                        if (u.patients && u.patients.length > 0) return 'Paciente';
-                        return 'Usuário';
-                      })()}
+                      {PROFILE_LABEL[kind]}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
                       {u.clinic_members?.[0]?.clinics?.name || u.patients?.[0]?.clinics?.name || 'Sem Clínica'}
@@ -266,8 +315,16 @@ export const AdminDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium">
+                      {isProtectedMaster(u) ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-slate-500"
+                          title="Único usuário Master da plataforma: não pode ser alterado nem removido."
+                        >
+                          <Lock className="h-4 w-4" /> Protegido
+                        </span>
+                      ) : (
                       <div className="flex items-center justify-end gap-3.5">
-                        <button 
+                        <button
                           onClick={() => {
                             setSelectedUser(u);
                             setAllocateClinicId(u.clinic_members?.[0]?.clinic_id || '');
@@ -301,9 +358,11 @@ export const AdminDashboard: React.FC = () => {
                           </button>
                         )}
                       </div>
+                      )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -322,7 +381,7 @@ export const AdminDashboard: React.FC = () => {
                 <th scope="col" className="py-3.5 pl-6 pr-3 text-left text-sm font-semibold text-slate-900">Clínica</th>
                 <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Dono</th>
                 <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Status</th>
-                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Fim (Over)</th>
+                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Vencimento</th>
                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Ações</th>
               </tr>
             </thead>
@@ -330,32 +389,20 @@ export const AdminDashboard: React.FC = () => {
               {loading ? (
                 <tr><td colSpan={5} className="py-8 text-center text-slate-500">Carregando...</td></tr>
               ) : (
-                clinics.map(c => (
+                clinics.map(c => {
+                  const sub = clinicSubscription(c);
+                  const badge = SUB_BADGE[sub.status];
+                  return (
                   <tr key={c.id}>
                     <td className="whitespace-nowrap py-4 pl-6 pr-3 font-medium text-slate-900">{c.name}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">{c.owner?.full_name}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                        (c.subscription_status || 'trial') === 'active' ? 'bg-green-50 text-green-700 ring-green-600/20' : 
-                        (c.subscription_status || 'trial') === 'trial' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
-                        'bg-red-50 text-red-700 ring-red-600/20'
-                      }`}>
-                        {(c.subscription_status || 'trial').toUpperCase()}
+                      <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${badge.cls}`}>
+                        {badge.label}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
-                      {(() => {
-                        const status = c.subscription_status || 'trial';
-                        if (status === 'trial') {
-                          const createdAt = new Date(c.created_at);
-                          const expiresAt = new Date(createdAt.getTime() + 14 * 24 * 60 * 60 * 1000);
-                          return expiresAt.toLocaleDateString('pt-BR');
-                        }
-                        if (status === 'active') {
-                          return c.subscription_end_date ? new Date(c.subscription_end_date).toLocaleDateString('pt-BR') : 'Ilimitado';
-                        }
-                        return 'N/A';
-                      })()}
+                    <td className={`whitespace-nowrap px-3 py-4 text-sm ${sub.status === 'expired' ? 'text-amber-800 font-medium' : 'text-slate-500'}`}>
+                      {sub.endsLabel}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium">
                       <button 
@@ -365,13 +412,14 @@ export const AdminDashboard: React.FC = () => {
                           setSubDate(c.subscription_end_date ? new Date(c.subscription_end_date).toISOString().split('T')[0] : '');
                           setIsSubModalOpen(true);
                         }}
-                        className="text-primary-600 hover:text-primary-900 flex items-center justify-end gap-1"
+                        className="ml-auto text-primary-600 hover:text-primary-900 flex items-center gap-1"
                       >
                         <Calendar className="h-4 w-4" /> Gerenciar
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -428,15 +476,11 @@ export const AdminDashboard: React.FC = () => {
             </select>
           </div>
           {subStatus === 'active' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Data Fim (Deixe vazio para ilimitado)</label>
-              <input
-                type="date"
-                value={subDate}
-                onChange={e => setSubDate(e.target.value)}
-                className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-              />
-            </div>
+            <DateInput
+              label="Data Fim (Deixe vazio para ilimitado)"
+              value={subDate}
+              onChange={setSubDate}
+            />
           )}
         </form>
       </Modal>

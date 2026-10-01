@@ -11,6 +11,8 @@ export { Card } from './Card';
 export type { CardProps, CardPadding, CardRadius } from './Card';
 export { Input, INPUT_BASE, FIELD_LABEL } from './Input';
 export type { InputProps } from './Input';
+export { DateInput } from './DateInput';
+export type { DateInputProps } from './DateInput';
 export { Select } from './Select';
 export type { SelectProps } from './Select';
 export { Textarea } from './Textarea';

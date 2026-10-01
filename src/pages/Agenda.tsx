@@ -34,7 +34,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getDaysInMonth, getDaysInWeek } from '../utils/calendar';
 import { logger } from '../lib/logger';
-import { PageHeader, Modal, Input, Select, Textarea, Button } from '../components/ui';
+import { PageHeader, Modal, Input, DateInput, Select, Textarea, Button } from '../components/ui';
 import { AgendaMonthGrid } from '../components/agenda/AgendaMonthGrid';
 import { AppointmentPaymentBlock } from '../components/financial/AppointmentPaymentBlock';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1063,11 +1063,10 @@ export const Agenda: React.FC = () => {
 
               {/* Date & Time Selectors */}
               <div className="grid grid-cols-2 gap-4">
-                <Input
+                <DateInput
                   label="Data"
-                  type="date"
                   value={newAppointmentData.date}
-                  onChange={e => setNewAppointmentData(prev => ({ ...prev, date: e.target.value }))}
+                  onChange={date => setNewAppointmentData(prev => ({ ...prev, date }))}
                   required
                   min={format(new Date(), 'yyyy-MM-dd')}
                 />
@@ -1192,11 +1191,10 @@ export const Agenda: React.FC = () => {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
-                      <Input
+                      <DateInput
                         label="Nova Data"
-                        type="date"
                         value={rescheduleData.date}
-                        onChange={e => setRescheduleData(prev => ({ ...prev, date: e.target.value }))}
+                        onChange={date => setRescheduleData(prev => ({ ...prev, date }))}
                         required
                         min={format(new Date(), 'yyyy-MM-dd')}
                       />

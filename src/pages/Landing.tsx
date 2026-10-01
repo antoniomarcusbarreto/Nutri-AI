@@ -14,23 +14,14 @@ import {
   Lock,
 } from 'lucide-react';
 import { Button } from '../components/ui';
+import { Wordmark } from '../components/brand/Wordmark';
+import { HERO_VIDEO_URL } from '../components/brand/media';
 
 const CTA_LABEL = 'Começar teste grátis';
 
 const ctaBase =
   'inline-flex items-center justify-center gap-2 rounded-full bg-primary-600 font-semibold text-white shadow-sm shadow-primary-600/20 transition-[background-color,box-shadow,transform] duration-200 hover:bg-primary-500 hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2';
 const ctaCompact = `${ctaBase} px-4 py-2 text-sm`;
-
-const Wordmark: React.FC<{ light?: boolean }> = ({ light = false }) => (
-  <span className="inline-flex items-center gap-2.5">
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-600 text-lg font-bold leading-none text-white shadow-sm shadow-teal-500/30">
-      N
-    </span>
-    <span className={`text-xl font-bold tracking-tight ${light ? 'text-white' : 'text-slate-900'}`}>
-      Nutri<span className={light ? 'text-teal-400' : 'text-teal-600'}>-AI</span>
-    </span>
-  </span>
-);
 
 const HERO_PANELS = [
   {
@@ -205,7 +196,7 @@ export const Landing: React.FC = () => {
           className="absolute inset-0 h-full w-full object-cover"
         >
           <source
-            src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/45567745-d826-44a2-a5ce-7ef670944e60.mp4"
+            src={HERO_VIDEO_URL}
             type="video/mp4"
           />
         </video>

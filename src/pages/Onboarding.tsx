@@ -407,7 +407,7 @@ export const Onboarding: React.FC = () => {
                     <input type="text" placeholder="(00) 00000-0000" maxLength={15} value={profileData.phone} onChange={handlePhoneChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-base font-bold text-slate-700 mb-1">CRN / CRM</label>
+                    <label className="block text-base font-bold text-slate-700 mb-1">CRN</label>
                     <input type="text" placeholder="Ex: CRN-3 123456" maxLength={15} value={profileData.crn} onChange={handleCrnChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base px-4 py-2.5 border" />
                   </div>
                 </div>
