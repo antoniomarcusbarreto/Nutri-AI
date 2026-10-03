@@ -63,6 +63,9 @@ function kindFromStatus(status: number): GeminiErrorKind {
 
 export type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 
+/** Tarefa de IA; o gemini-proxy escolhe o modelo a partir dela (o cliente nunca escolhe modelo). */
+export type GeminiTask = 'exam' | 'meal_plan' | 'soap';
+
 function stripJsonFences(text: string): string {
   return text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
 }
@@ -73,11 +76,13 @@ function stripJsonFences(text: string): string {
  * falha (quota, permissão, upstream, parse…).
  */
 export async function callGemini<T>(opts: {
+  task: GeminiTask;
   instruction: string;
   parts: GeminiPart[];
 }): Promise<T> {
   const { data, error } = await supabase.functions.invoke('gemini-proxy', {
     body: {
+      task: opts.task,
       contents: [{ role: 'user', parts: opts.parts }],
       systemInstruction: { role: 'system', parts: [{ text: opts.instruction }] },
       generationConfig: { responseMimeType: 'application/json' },
@@ -131,6 +136,7 @@ export interface ExamAnalysis {
 /** Analisa um PDF de exame (base64, sem o prefixo data:) e retorna o laudo estruturado. */
 export function analyzeExamPdf(base64Pdf: string): Promise<ExamAnalysis> {
   return callGemini<ExamAnalysis>({
+    task: 'exam',
     instruction: EXAM_ANALYSIS_INSTRUCTION,
     parts: [
       { inlineData: { mimeType: 'application/pdf', data: base64Pdf } },
@@ -149,6 +155,7 @@ export interface SoapNotes {
 /** Estrutura a transcrição bruta de uma consulta em prontuário S.O.A.P. */
 export async function structureConsultationNotes(transcript: string): Promise<SoapNotes> {
   const raw = await callGemini<Partial<SoapNotes>>({
+    task: 'soap',
     instruction: SOAP_STRUCTURE_INSTRUCTION,
     parts: [{
       text: `Aqui está a transcrição bruta da consulta para processar:\n\n${transcript}\n\nPor favor, analise a transcrição com cuidado e retorne o JSON estrito conforme as instruções.`,
@@ -165,6 +172,7 @@ export async function structureConsultationNotes(transcript: string): Promise<So
 /** Gera um plano alimentar a partir do prompt de contexto já montado pela tela. */
 export function generateMealPlan(contextPrompt: string): Promise<MealPlanData> {
   return callGemini<MealPlanData>({
+    task: 'meal_plan',
     instruction: MEAL_PLAN_INSTRUCTION,
     parts: [{ text: `Gere a dieta personalizada baseada neste histórico:\n\n${contextPrompt}` }],
   });

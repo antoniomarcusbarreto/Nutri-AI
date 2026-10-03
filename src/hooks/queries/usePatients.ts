@@ -1,15 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { qk } from '../../lib/queryKeys';
-import type { PatientRow, PatientPickFromAppointments } from '../../types/clinical';
+import { PATIENT_SELECT, withHealth, type PatientRow, type PatientPickFromAppointments } from '../../types/clinical';
 
 /**
- * Lista de pacientes de uma clínica (Onda 4 / PERF-03).
+ * Pacientes visíveis ao usuário numa clínica (Onda 4 / PERF-03).
  *
- * Compartilhada por Pacientes, Exames, Acompanhamento, Planos e Consultas —
- * todos leem a MESMA entrada de cache `['patients','list',clinicId]`, então
- * alternar entre esses módulos não redispara a busca enquanto o dado estiver
- * fresco (staleTime 60s).
+ * O RLS (migration 0029) já recorta: o nutricionista recebe os pacientes de
+ * que é responsável, os concedidos e — só o cadastro — os que têm consulta
+ * agendada com ele; a secretária recebe o cadastro de todos. A ficha de saúde
+ * vem embutida e achatada só quando há acesso clínico (`has_clinical_access`).
+ *
+ * Compartilhada por Pacientes, Exames, Acompanhamento e Financeiro — todos
+ * leem a MESMA entrada de cache `['patients','list',clinicId]`.
  */
 export function usePatients(clinicId: string | undefined, options?: { enabled?: boolean }) {
   return useQuery({
@@ -18,18 +21,18 @@ export function usePatients(clinicId: string | undefined, options?: { enabled?: 
     queryFn: async (): Promise<PatientRow[]> => {
       const { data, error } = await supabase
         .from('patients')
-        .select('*')
+        .select(PATIENT_SELECT)
         .eq('clinic_id', clinicId!)
         .order('name');
       if (error) throw error;
-      return (data ?? []) as PatientRow[];
+      return (data ?? []).map((p) => withHealth(p)) as PatientRow[];
     },
   });
 }
 
 /**
- * Pacientes ATIVOS que já tiveram agendamento com um nutricionista específico
- * (usado em Planos Alimentares — a lista é escopada ao profissional logado).
+ * Pacientes ATIVOS com acesso clínico do profissional logado (os seus e os
+ * concedidos) — usado em Planos Alimentares, que grava dado clínico.
  */
 export function useNutritionistPatients(nutritionistId: string | undefined, options?: { enabled?: boolean }) {
   return useQuery({
@@ -37,20 +40,13 @@ export function useNutritionistPatients(nutritionistId: string | undefined, opti
     enabled: !!nutritionistId && (options?.enabled ?? true),
     queryFn: async (): Promise<PatientPickFromAppointments[]> => {
       const { data, error } = await supabase
-        .from('appointments')
-        .select('patient_id, date_time, patients ( id, name, email, phone, birth_date, biological_sex, main_goal, status )')
-        .eq('nutritionist_id', nutritionistId!)
-        .neq('status', 'cancelado')
-        .neq('status', 'Cancelado')
-        .order('date_time', { ascending: false });
+        .from('patients')
+        .select('id, name, email, phone, birth_date, biological_sex, main_goal, status')
+        .eq('status', 'ativo')
+        .eq('has_clinical_access', true)
+        .order('name');
       if (error) throw error;
-      const rows = (data ?? []) as { patients: PatientPickFromAppointments | PatientPickFromAppointments[] | null }[];
-      const map = new Map<string, PatientPickFromAppointments>();
-      rows.forEach((appt) => {
-        const p = Array.isArray(appt.patients) ? appt.patients[0] : appt.patients;
-        if (p && p.status === 'ativo' && !map.has(p.id)) map.set(p.id, p);
-      });
-      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+      return (data ?? []) as PatientPickFromAppointments[];
     },
   });
 }

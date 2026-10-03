@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Variáveis de ambiente (segredos nunca vão para o repo; só o exemplo)
+.env
+.env.*
+!.env.example
+
 # Supabase CLI local state
 supabase/.temp
 

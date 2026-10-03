@@ -21,9 +21,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
 
   const navigation: NavItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Acompanhamento', href: '/acompanhamento', icon: Activity },
+    { name: 'Acompanhamento', href: '/acompanhamento', icon: Activity, roles: ['owner', 'nutritionist'] },
     { name: 'Agenda', href: '/agenda', icon: Calendar },
-    { name: 'Consultas', href: '/consultas', icon: FileText },
+    { name: 'Consultas', href: '/consultas', icon: FileText, roles: ['owner', 'nutritionist'] },
     { name: 'Exames', href: '/exames', icon: ClipboardList, roles: ['owner', 'nutritionist'] },
     { name: 'Financeiro', href: '/financeiro', icon: DollarSign },
     { name: 'Pacientes', href: '/pacientes', icon: Users },

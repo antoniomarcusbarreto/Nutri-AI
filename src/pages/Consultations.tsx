@@ -34,7 +34,7 @@ import { AppointmentList } from '../components/consultations/AppointmentList';
 import { StatusBadge } from '../components/consultations/StatusBadge';
 import { ConsultationForm, type ConsultationFormHandle } from '../components/consultations/ConsultationForm';
 import { logger } from '../lib/logger';
-import { pickOne } from '../types/clinical';
+import { pickOne, withHealth } from '../types/clinical';
 import { PageHeader, Card, Button, Input, Select, Textarea, FormActions } from '../components/ui';
 import type {
   ClinicProfessional,
@@ -142,13 +142,8 @@ export const Consultations: React.FC = () => {
             birth_date, 
             biological_sex, 
             main_goal,
-            allergies,
-            dietary_restrictions,
-            pathologies,
-            medications,
-            physical_activity_level,
-            profession,
-            sleep_quality
+            has_clinical_access,
+            patient_health ( * )
           ),
           services ( id, name, duration_minutes, price )
         `)
@@ -156,7 +151,13 @@ export const Consultations: React.FC = () => {
         .order('date_time', { ascending: true });
 
       if (error) throw error;
-      setAppointments((data ?? []) as unknown as ConsultationAppointment[]);
+      // Ficha de saúde vem em `patient_health` (migration 0029) e só para quem
+      // tem acesso clínico; achata nos campos do paciente que a tela já usa.
+      const rows = (data ?? []) as unknown as (ConsultationAppointment & { patients?: Parameters<typeof withHealth>[0] | null })[];
+      setAppointments(rows.map((apt) => ({
+        ...apt,
+        patients: apt.patients ? (withHealth(apt.patients) as ConsultationAppointment['patients']) : apt.patients,
+      })));
     } catch (err) {
       logger.error('Erro ao buscar agendamentos:', err);
       showToast('Falha ao carregar agendamentos do banco de dados.', 'error');
@@ -501,6 +502,12 @@ ${insights}`;
       showToast('Apenas o profissional responsável por esta consulta pode iniciá-la.', 'error');
       return;
     }
+    // Consulta agendada com paciente de outro nutricionista: o prontuário só
+    // abre com concessão do responsável (ou do Master) — migration 0029.
+    if (apt.patients && apt.patients.has_clinical_access === false) {
+      showToast('Este paciente é acompanhado por outro nutricionista. Peça acesso em Configurações › Compartilhamento.', 'error');
+      return;
+    }
     setSelectedAppointment(apt);
   };
 
@@ -525,17 +532,18 @@ ${insights}`;
     setSavingClinical(true);
     try {
       const { error } = await supabase
-        .from('patients')
-        .update({
+        .from('patient_health')
+        .upsert({
+          patient_id: targetPatientId,
           allergies: clinicalForm.allergies,
           dietary_restrictions: clinicalForm.dietary_restrictions,
           pathologies: clinicalForm.pathologies,
           medications: clinicalForm.medications,
           physical_activity_level: clinicalForm.physical_activity_level,
           profession: clinicalForm.profession,
-          sleep_quality: clinicalForm.sleep_quality
-        })
-        .eq('id', targetPatientId);
+          sleep_quality: clinicalForm.sleep_quality,
+          updated_at: new Date().toISOString(),
+        });
 
       if (error) throw error;
 
@@ -1433,7 +1441,7 @@ ${insights}`;
                           <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
                           <div>
                             <h4 className="text-sm font-extrabold text-slate-900">Assistente de IA Nutricional</h4>
-                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">Análise por Gemini 1.5 Pro</p>
+                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">Análise por IA · Gemini</p>
                           </div>
                         </div>
 

@@ -78,7 +78,7 @@ interface AgendaReschedule {
 }
 
 export const Agenda: React.FC = () => {
-  const { clinic, isReadOnly, profile } = useAuth();
+  const { clinic, isReadOnly, profile, userRole } = useAuth();
   const queryClient = useQueryClient();
   // Criar/remarcar/cancelar/excluir consulta mexe na cobrança via trigger (migration 0026).
   const refreshFinance = useCallback(
@@ -151,12 +151,14 @@ export const Agenda: React.FC = () => {
     if (!clinic?.id) return;
 
     try {
-      // 1. Fetch patients
-      const { data: patientsData } = await supabase
+      // 1. Fetch patients. A secretária agenda para qualquer paciente; o
+      // profissional, só para os que acessa (próprios ou concedidos — 0029).
+      let patientsQuery = supabase
         .from('patients')
         .select('id, name, email, phone')
-        .eq('clinic_id', clinic.id)
-        .order('name');
+        .eq('clinic_id', clinic.id);
+      if (userRole !== 'secretary') patientsQuery = patientsQuery.eq('has_clinical_access', true);
+      const { data: patientsData } = await patientsQuery.order('name');
       if (patientsData) setPatients(patientsData as AgendaPatient[]);
 
       // 2. Fetch services
@@ -188,7 +190,8 @@ export const Agenda: React.FC = () => {
                 ...p,
                 role: member?.role || 'nutritionist'
               };
-            }).filter(p => p.is_active !== false);
+            // Só dono/nutricionista atende (o banco recusa consulta com a secretária).
+            }).filter(p => p.is_active !== false && p.role !== 'secretary');
             setProfessionals(mappedProfessionals);
           }
         }
@@ -196,7 +199,7 @@ export const Agenda: React.FC = () => {
     } catch (err) {
       logger.error('Erro ao carregar dados do formulário:', err);
     }
-  }, [clinic?.id]);
+  }, [clinic?.id, userRole]);
 
   // Load appointments
   const fetchAppointments = useCallback(async () => {

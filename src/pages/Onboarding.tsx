@@ -170,31 +170,22 @@ export const Onboarding: React.FC = () => {
     setLoading(true);
     try {
       if (!clinic?.id) {
-        // Criar nova clínica
-        const { data: newClinic, error: clinicError } = await supabase.from('clinics').insert([{
-          owner_id: session.user.id,
-          name: clinicData.name || `Consultório de ${profileData.full_name.split(' ')[0] || 'Nutrição'}`,
-          plan_level: 'starter',
-          cep: clinicData.cep,
-          address: clinicData.address,
-          neighborhood: clinicData.neighborhood,
-          city: clinicData.city,
-          state: clinicData.state,
-          complement: clinicData.complement,
-          operating_hours: clinicData.operating_hours,
-          email: clinicData.email,
-          phone: clinicData.phone,
-        }]).select().single();
-        
+        // Criar nova clínica: a RPC cria a clínica e o vínculo de owner juntos
+        // e define plano/assinatura no servidor (migration 0028).
+        const { error: clinicError } = await supabase.rpc('create_my_clinic', {
+          p_name: clinicData.name || `Consultório de ${profileData.full_name.split(' ')[0] || 'Nutrição'}`,
+          p_cep: clinicData.cep,
+          p_address: clinicData.address,
+          p_neighborhood: clinicData.neighborhood,
+          p_city: clinicData.city,
+          p_state: clinicData.state,
+          p_complement: clinicData.complement,
+          p_operating_hours: clinicData.operating_hours,
+          p_email: clinicData.email,
+          p_phone: clinicData.phone,
+        });
+
         if (clinicError) throw clinicError;
-
-        const { error: memberError } = await supabase.from('clinic_members').insert([{
-          clinic_id: newClinic.id,
-          user_id: session.user.id,
-          role: 'owner'
-        }]);
-
-        if (memberError) throw memberError;
       } else {
         // Atualizar clínica existente
         const { error } = await supabase.from('clinics').update({

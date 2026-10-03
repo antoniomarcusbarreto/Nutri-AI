@@ -82,17 +82,21 @@ Deno.serve(async (req: Request) => {
   // 2. Autorização: chamador precisa ser OWNER da clínica do alvo.
   const admin = createClient(supabaseUrl, serviceKey);
 
-  // Clínica do alvo: como membro da equipe ou como paciente.
-  const [{ data: memberRows }, { data: patientRows }] = await Promise.all([
-    admin.from("clinic_members").select("clinic_id").eq("user_id", targetUserId),
-    admin.from("patients").select("clinic_id").eq("user_id", targetUserId),
-  ]);
-  const targetClinicIds = new Set<string>([
-    ...(memberRows ?? []).map((r) => r.clinic_id),
-    ...(patientRows ?? []).map((r) => r.clinic_id),
-  ]);
-  if (targetClinicIds.size === 0) {
+  // Vínculos do alvo. Só conta como "da clínica" a equipe (não owner) ou o
+  // paciente EXCLUSIVO dela — sem isso, cadastrar o e-mail de alguém de outra
+  // clínica (ou do Master) como paciente dava ao dono poder sobre o login dele.
+  const [{ data: memberRows }, { data: patientRows }, { data: targetProfile }, { data: callerProfile }] =
+    await Promise.all([
+      admin.from("clinic_members").select("clinic_id, role").eq("user_id", targetUserId),
+      admin.from("patients").select("clinic_id").eq("user_id", targetUserId),
+      admin.from("profiles").select("is_superadmin").eq("id", targetUserId).maybeSingle(),
+      admin.from("profiles").select("is_active").eq("id", user.id).maybeSingle(),
+    ]);
+  if ((memberRows ?? []).length === 0 && (patientRows ?? []).length === 0) {
     return json({ error: "Usuário-alvo não encontrado." }, 404, req);
+  }
+  if (!callerProfile?.is_active || targetProfile?.is_superadmin) {
+    return json({ error: "Acesso negado. Apenas o proprietário da clínica pode alterar o e-mail." }, 403, req);
   }
 
   const { data: ownerRows } = await admin
@@ -102,7 +106,16 @@ Deno.serve(async (req: Request) => {
     .eq("role", "owner");
   const callerOwnerClinics = new Set<string>((ownerRows ?? []).map((r) => r.clinic_id));
 
-  const authorized = [...targetClinicIds].some((c) => callerOwnerClinics.has(c));
+  const staffClinics = (memberRows ?? [])
+    .filter((r) => r.role === "nutritionist" || r.role === "secretary")
+    .map((r) => r.clinic_id);
+  const patientClinics = new Set<string>((patientRows ?? []).map((r) => r.clinic_id));
+  const isExclusivePatientOf = (c: string) =>
+    (memberRows ?? []).length === 0 && patientClinics.size === 1 && patientClinics.has(c);
+
+  const authorized = [...callerOwnerClinics].some(
+    (c) => staffClinics.includes(c) || isExclusivePatientOf(c),
+  );
   if (!authorized) {
     return json({ error: "Acesso negado. Apenas o proprietário da clínica pode alterar o e-mail." }, 403, req);
   }

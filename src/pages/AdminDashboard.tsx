@@ -4,6 +4,7 @@ import { Shield, Key, Calendar, Save, UserPlus, Trash2, Lock } from 'lucide-reac
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DateInput, Modal } from '../components/ui';
+import { MasterAccessPanel } from '../components/admin/MasterAccessPanel';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Erro inesperado');
 
@@ -85,12 +86,22 @@ function userProfileKind(u: AdminUser): UserProfileKind {
 }
 
 async function fetchAdminData(): Promise<{ users: AdminUser[]; clinics: AdminClinic[] }> {
-  const [usersRes, clinicsRes] = await Promise.all([
-    supabase.from('profiles').select('*, clinic_members(role, clinic_id, clinics(name)), patients(clinic_id, clinics(name))').order('created_at', { ascending: false }),
+  // O Master não lê a tabela `patients` (migration 0029): o vínculo
+  // paciente → clínica vem de uma RPC que expõe só isso.
+  const [usersRes, clinicsRes, linksRes] = await Promise.all([
+    supabase.from('profiles').select('*, clinic_members(role, clinic_id, clinics(name))').order('created_at', { ascending: false }),
     supabase.from('clinics').select('*, owner:profiles(full_name)').order('created_at', { ascending: false }),
+    supabase.rpc('admin_patient_links'),
   ]);
+  const links = (linksRes.data ?? []) as { user_id: string; clinic_id: string; clinic_name: string }[];
+  const users = ((usersRes.data ?? []) as unknown as AdminUser[]).map((u) => ({
+    ...u,
+    patients: links
+      .filter((l) => l.user_id === u.id)
+      .map((l) => ({ clinic_id: l.clinic_id, clinics: { name: l.clinic_name } })),
+  }));
   return {
-    users: (usersRes.data ?? []) as unknown as AdminUser[],
+    users,
     clinics: (clinicsRes.data ?? []) as unknown as AdminClinic[],
   };
 }
@@ -368,6 +379,12 @@ export const AdminDashboard: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <MasterAccessPanel
+        users={users}
+        clinics={clinics}
+        onMessage={(text, type) => setMessage({ text, type })}
+      />
 
       {/* Clinics Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">

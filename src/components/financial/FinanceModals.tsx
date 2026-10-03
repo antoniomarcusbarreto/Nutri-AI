@@ -234,8 +234,11 @@ export const NewChargeModal: React.FC<{ open: boolean; onClose: () => void }> = 
         clinic_id: clinic.id,
         patient_id: patientId,
         service_id: serviceId || null,
-        // Secretária não é o profissional do recibo; os demais assinam o próprio lançamento.
-        nutritionist_id: userRole === 'secretary' ? null : profile?.id ?? null,
+        // Secretária não é o profissional do recibo: o lançamento fica com o
+        // nutricionista responsável pelo paciente (migration 0029), que assim o vê.
+        nutritionist_id: userRole === 'secretary'
+          ? patients.find((p) => p.id === patientId)?.nutritionist_id ?? null
+          : profile?.id ?? null,
         description: description.trim(),
         amount: amountValue,
         discount: 0,

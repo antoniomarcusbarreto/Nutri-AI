@@ -32,6 +32,12 @@ export const qk = {
     byNutritionist: (nutritionistId: string) => ['patients', 'nutritionist', nutritionistId] as const,
     detail: (patientId: string) => ['patients', 'detail', patientId] as const,
   },
+  clinicProfessionals: (clinicId: string) => ['clinic', 'professionals', clinicId] as const,
+  accessGrants: {
+    all: ['access_grants'] as const,
+    mine: ['access_grants', 'mine'] as const,
+    requestable: ['access_grants', 'requestable'] as const,
+  },
   patientExams: {
     byPatient: (patientId: string) => ['patient_exams', patientId] as const,
   },

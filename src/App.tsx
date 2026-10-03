@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { ProtectedRoute, RequireRole } from './components/layout/ProtectedRoute';
 import { Layout } from './components/layout/Layout';
 import { PageLoader } from './components/layout/PageLoader';
 import { ToastProvider } from './contexts/ToastContext';
@@ -33,6 +33,8 @@ const PublicPlanViewer = lazy(() => import('./pages/PublicPlanViewer'));
 const PatientPortal = lazy(() => import('./pages/PatientPortal').then(m => ({ default: m.PatientPortal })));
 const PreConsulta = lazy(() => import('./pages/PreConsulta').then(m => ({ default: m.PreConsulta })));
 const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(m => ({ default: m.ConfirmAppointment })));
+
+const CLINICAL: ('owner' | 'nutritionist')[] = ['owner', 'nutritionist'];
 
 function App() {
   return (
@@ -71,11 +73,12 @@ function App() {
                 <Route path="/pacientes" element={<Patients />} />
                 <Route path="/servicos" element={<Services />} />
                 <Route path="/financeiro" element={<Financial />} />
-                <Route path="/consultas" element={<Consultations />} />
-                <Route path="/acompanhamento" element={<Tracking />} />
-                <Route path="/planos" element={<MealPlans />} />
-                <Route path="/exames" element={<Exams />} />
-                <Route path="/admin" element={<AdminDashboard />} />
+                {/* Telas clínicas: só profissionais (secretária não vê prontuário). */}
+                <Route path="/consultas" element={<RequireRole roles={CLINICAL}><Consultations /></RequireRole>} />
+                <Route path="/acompanhamento" element={<RequireRole roles={CLINICAL}><Tracking /></RequireRole>} />
+                <Route path="/planos" element={<RequireRole roles={CLINICAL}><MealPlans /></RequireRole>} />
+                <Route path="/exames" element={<RequireRole roles={CLINICAL}><Exams /></RequireRole>} />
+                <Route path="/admin" element={<RequireRole superadminOnly><AdminDashboard /></RequireRole>} />
                 <Route path="/settings" element={<Settings />} />
                 {/* Catch-all redirect to dashboard for logged in users */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />

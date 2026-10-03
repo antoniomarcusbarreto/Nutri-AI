@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { logger } from '../lib/logger';
 import { PageHeader, Modal, Card, Button, Input, Select, Textarea, FormActions } from '../components/ui';
 import { reportToSupport, type SupportRequestType } from '../lib/support';
+import { AccessSharingPanel } from '../components/settings/AccessSharingPanel';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
@@ -51,7 +52,11 @@ export const Settings: React.FC = () => {
   const currentColor = profile?.theme_color || 'white';
   
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'clinic' | 'team' | 'services' | 'patient_access' | 'support'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'clinic' | 'team' | 'services' | 'patient_access' | 'sharing' | 'support'>(() =>
+    new URLSearchParams(window.location.search).get('aba') === 'compartilhamento' ? 'sharing' : 'profile');
+  // Compartilhamento de pacientes e login dos pacientes são coisas de profissional
+  // (migration 0029: secretária não tem acesso clínico).
+  const isProfessional = userRole === 'owner' || userRole === 'nutritionist';
   const [services, setServices] = useState<{ id?: string, name: string; duration_minutes: number; price: number; modality: string }[]>([]);
   const [newService, setNewService] = useState({ name: '', duration_minutes: 60, price: 150, modality: 'presencial' });
   const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
@@ -213,6 +218,7 @@ export const Settings: React.FC = () => {
         .from('patients')
         .select('id, name, email, user_id, profiles(is_active)')
         .eq('clinic_id', clinic.id)
+        .eq('has_clinical_access', true)
         .not('user_id', 'is', null)
         .order('name');
 
@@ -579,12 +585,22 @@ export const Settings: React.FC = () => {
           >
             Serviços Prestados
           </button>
-          <button
-            onClick={() => setActiveTab('patient_access')}
-            className={`${activeTab === 'patient_access' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Acesso dos Pacientes
-          </button>
+          {isProfessional && (
+            <button
+              onClick={() => setActiveTab('patient_access')}
+              className={`${activeTab === 'patient_access' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Acesso dos Pacientes
+            </button>
+          )}
+          {isProfessional && (
+            <button
+              onClick={() => setActiveTab('sharing')}
+              className={`${activeTab === 'sharing' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Compartilhamento
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('support')}
             className={`${activeTab === 'support' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
@@ -1143,6 +1159,8 @@ export const Settings: React.FC = () => {
           </div>
         </Card>
       )}
+
+      {activeTab === 'sharing' && isProfessional && <AccessSharingPanel />}
 
       {activeTab === 'support' && (
         <Card as="section" padding="none" radius="2xl" className="overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">

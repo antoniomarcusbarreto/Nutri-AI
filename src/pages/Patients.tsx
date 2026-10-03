@@ -1,25 +1,49 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, Check, ClipboardList } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, Check, ClipboardList, KeyRound } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { usePatients } from '../hooks/queries/usePatients';
+import { useAccessGrantMutations, useClinicProfessionals } from '../hooks/queries/useAccessGrants';
 import { qk } from '../lib/queryKeys';
 import { logger } from '../lib/logger';
 import type { PatientRow } from '../types/clinical';
 import { PageHeader, Modal } from '../components/ui';
 
-const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
+const errMessage = (err: unknown): string => {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) return String((err as { message: unknown }).message);
+  return '';
+};
 
 export const Patients: React.FC = () => {
-  const { clinic, isReadOnly, isTrialActive } = useAuth();
+  const { clinic, profile, userRole, isReadOnly, isTrialActive } = useAuth();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const isSecretary = userRole === 'secretary';
 
   const { data: patients = [], isLoading: loading } = usePatients(clinic?.id);
   const refetchPatients = () => queryClient.invalidateQueries({ queryKey: qk.patients.all });
+
+  // Responsável pelo paciente (migration 0029): a secretária escolhe; o
+  // profissional cadastra sempre para si.
+  const { data: professionals = [] } = useClinicProfessionals(clinic?.id);
+  const professionalName = (id: string | null | undefined) =>
+    professionals.find((p) => p.id === id)?.full_name ?? 'Outro profissional';
+  const { request: requestAccess } = useAccessGrantMutations();
+
+  const handleRequestAccess = (patient: PatientRow) => {
+    if (requestAccess.isPending) return;
+    requestAccess.mutate(
+      { ownerId: patient.nutritionist_id, patientId: patient.id, reason: 'Pedido pela lista de pacientes' },
+      {
+        onSuccess: () => showToast(`Pedido enviado para ${professionalName(patient.nutritionist_id)}.`, 'success'),
+        onError: (err) => showToast(errMessage(err) || 'Não foi possível enviar o pedido.', 'error'),
+      },
+    );
+  };
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,7 +58,8 @@ export const Patients: React.FC = () => {
     birth_date: '',
     biological_sex: 'F',
     main_goal: 'Emagrecimento',
-    has_app_access: false
+    has_app_access: false,
+    nutritionist_id: ''
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +143,8 @@ export const Patients: React.FC = () => {
         birth_date: patient.birth_date ? toInputDate(patient.birth_date) : '',
         biological_sex: patient.biological_sex || 'F',
         main_goal: patient.main_goal || 'Emagrecimento',
-        has_app_access: false
+        has_app_access: false,
+        nutritionist_id: patient.nutritionist_id
       });
     } else {
       setEditingPatient(null);
@@ -132,7 +158,8 @@ export const Patients: React.FC = () => {
         birth_date: '',
         biological_sex: 'F',
         main_goal: 'Emagrecimento',
-        has_app_access: false
+        has_app_access: false,
+        nutritionist_id: isSecretary ? (professionals.length === 1 ? professionals[0].id : '') : profile?.id ?? ''
       });
     }
     setIsModalOpen(true);
@@ -150,6 +177,11 @@ export const Patients: React.FC = () => {
     const isoBirthDate = toIsoDate(formData.birth_date);
     if (!isoBirthDate) {
       setError('Data de Nascimento inválida. Use o formato DD/MM/AAAA');
+      return;
+    }
+
+    if (!editingPatient && isSecretary && !formData.nutritionist_id) {
+      setError('Escolha o nutricionista responsável pelo paciente.');
       return;
     }
 
@@ -199,7 +231,9 @@ export const Patients: React.FC = () => {
           p_password: generatedPassword,
           p_birth_date: isoBirthDate,
           p_biological_sex: formData.biological_sex,
-          p_main_goal: formData.main_goal
+          p_main_goal: formData.main_goal,
+          // Ignorado pelo banco quando quem cadastra é o profissional (fica com ele).
+          p_nutritionist_id: formData.nutritionist_id || null
         });
 
         if (rpcError) throw rpcError;
@@ -238,18 +272,21 @@ export const Patients: React.FC = () => {
     setClinicalError(null);
 
     try {
+      // Ficha de saúde fica em `patient_health` (migration 0029), fora do
+      // alcance da secretária.
       const { error: updateError } = await supabase
-        .from('patients')
-        .update({
+        .from('patient_health')
+        .upsert({
+          patient_id: selectedClinicalPatient.id,
           allergies: clinicalFormData.allergies,
           dietary_restrictions: clinicalFormData.dietary_restrictions,
           pathologies: clinicalFormData.pathologies,
           medications: clinicalFormData.medications,
           physical_activity_level: clinicalFormData.physical_activity_level,
           profession: clinicalFormData.profession,
-          sleep_quality: clinicalFormData.sleep_quality
-        })
-        .eq('id', selectedClinicalPatient.id);
+          sleep_quality: clinicalFormData.sleep_quality,
+          updated_at: new Date().toISOString(),
+        });
 
       if (updateError) throw updateError;
 
@@ -287,7 +324,9 @@ export const Patients: React.FC = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <PageHeader
         title="Pacientes"
-        description="Gerencie seus pacientes e prontuários."
+        description={isSecretary
+          ? 'Cadastro dos pacientes da clínica. Prontuários ficam restritos a cada nutricionista.'
+          : 'Gerencie seus pacientes e prontuários.'}
         actions={<>
           {isLimitReached && (
             <span className="text-sm text-red-600 bg-red-50 px-3 py-1 rounded-full font-medium">
@@ -346,18 +385,26 @@ export const Patients: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredPatients.map((patient) => (
+                filteredPatients.map((patient) => {
+                  const hasAccess = patient.has_clinical_access === true;
+                  const canEditRegistration = hasAccess || isSecretary;
+                  return (
                   <tr key={patient.id} className="hover:bg-slate-50 transition-colors">
                     <td className="whitespace-nowrap py-4 pl-6 pr-3">
                       <div className="font-medium text-slate-900 flex items-center gap-2">
                         {patient.name}
-                        {!patient.physical_activity_level && (
+                        {hasAccess && !patient.physical_activity_level && (
                           <span className="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20" title="Ficha clínica não preenchida">
                             ⚠️ Incompleto
                           </span>
                         )}
                       </div>
                       <div className="text-slate-500 text-sm mt-0.5">CPF: {patient.cpf || 'Não informado'}</div>
+                      {patient.nutritionist_id !== profile?.id && (
+                        <div className="text-slate-500 text-xs mt-0.5">
+                          Responsável: {professionalName(patient.nutritionist_id)}
+                        </div>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
                       <div className="flex items-center gap-2 mb-1">
@@ -372,12 +419,12 @@ export const Patients: React.FC = () => {
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
                       <button
                         onClick={() => toggleStatus(patient)}
-                        disabled={isReadOnly}
+                        disabled={isReadOnly || !canEditRegistration}
                         className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset transition-colors ${
-                          patient.status === 'ativo' 
-                            ? 'bg-green-50 text-green-700 ring-green-600/20 hover:bg-green-100' 
+                          patient.status === 'ativo'
+                            ? 'bg-green-50 text-green-700 ring-green-600/20 hover:bg-green-100'
                             : 'bg-slate-50 text-slate-600 ring-slate-500/10 hover:bg-slate-100'
-                        } ${isReadOnly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        } ${isReadOnly || !canEditRegistration ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         {patient.status === 'ativo' ? <Power className="h-3 w-3" /> : <PowerOff className="h-3 w-3" />}
                         {patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
@@ -414,26 +461,42 @@ export const Patients: React.FC = () => {
                             </>
                           )}
                         </button>
-                        <button 
-                          onClick={() => handleOpenClinicalModal(patient)}
-                          className="transition-colors flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-slate-500 hover:text-primary-600 hover:bg-slate-50"
-                          title="Ficha Clínica (Anamnese)"
-                        >
-                          <ClipboardList className="h-4 w-4" />
-                          Ficha
-                        </button>
-                        <button 
-                          onClick={() => handleOpenModal(patient)}
-                          disabled={isReadOnly}
-                          className="text-primary-600 hover:text-primary-900 disabled:opacity-50"
-                          title="Editar Paciente"
-                        >
-                          <Edit className="h-5 w-5" />
-                        </button>
+                        {hasAccess && (
+                          <button
+                            onClick={() => handleOpenClinicalModal(patient)}
+                            className="transition-colors flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-slate-500 hover:text-primary-600 hover:bg-slate-50"
+                            title="Ficha Clínica (Anamnese)"
+                          >
+                            <ClipboardList className="h-4 w-4" />
+                            Ficha
+                          </button>
+                        )}
+                        {!hasAccess && !isSecretary && (
+                          <button
+                            onClick={() => handleRequestAccess(patient)}
+                            disabled={isReadOnly || requestAccess.isPending}
+                            className="transition-colors flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-slate-500 hover:text-primary-600 hover:bg-slate-50 disabled:opacity-50"
+                            title={`Pedir a ${professionalName(patient.nutritionist_id)} acesso ao prontuário`}
+                          >
+                            <KeyRound className="h-4 w-4" />
+                            Solicitar acesso
+                          </button>
+                        )}
+                        {canEditRegistration && (
+                          <button
+                            onClick={() => handleOpenModal(patient)}
+                            disabled={isReadOnly}
+                            className="text-primary-600 hover:text-primary-900 disabled:opacity-50"
+                            title="Editar Paciente"
+                          >
+                            <Edit className="h-5 w-5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -458,6 +521,29 @@ export const Patients: React.FC = () => {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isSecretary && (
+                  <div className="md:col-span-2">
+                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Nutricionista responsável *</label>
+                    <select
+                      required
+                      disabled={!!editingPatient}
+                      value={formData.nutritionist_id}
+                      onChange={e => setFormData({...formData, nutritionist_id: e.target.value})}
+                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm disabled:bg-slate-50 disabled:text-slate-500"
+                    >
+                      <option value="" disabled>Selecione…</option>
+                      {professionals.map((p) => (
+                        <option key={p.id} value={p.id}>{p.full_name}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {editingPatient
+                        ? 'Só o suporte pode transferir o paciente para outro nutricionista.'
+                        : 'Só este nutricionista verá o prontuário do paciente.'}
+                    </p>
+                  </div>
+                )}
+
                 <div className="md:col-span-2">
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Nome Completo *</label>
                   <input

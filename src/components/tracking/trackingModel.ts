@@ -379,6 +379,337 @@ export const buildBiomarkerSeries = (exams: ExamRecord[]): BiomarkerSeries[] => 
   return Array.from(byName, ([name, points]) => ({ name, points }));
 };
 
+/** Distância até a faixa de referência (0 = dentro). */
+const distanceToRange = (v: number, r: ReferenceRange) =>
+  r.low != null && v < r.low ? r.low - v : r.high != null && v > r.high ? v - r.high : 0;
+
+export type Trend = 'better' | 'worse' | 'same' | null;
+
+/** Leitura comparativa de um biomarcador: último resultado do período × o anterior. */
+export interface BiomarkerRow {
+  name: string;
+  inPeriod: BiomarkerPoint[];
+  last: BiomarkerPoint;
+  prev: BiomarkerPoint | null;
+  delta: number | null;
+  trend: Trend;
+  range: ReferenceRange | null;
+}
+
+/** Linhas do período, alterados primeiro. `ALL_TIME` dá o retrato atual. */
+export const buildBiomarkerRows = (series: BiomarkerSeries[], range: DateRange): BiomarkerRow[] =>
+  series
+    .map((s): BiomarkerRow | null => {
+      const inPeriod = s.points.filter((p) => inRange(p.date, range));
+      if (inPeriod.length === 0) return null;
+      const last = inPeriod[inPeriod.length - 1];
+      // "Anterior" olha o histórico inteiro: comparar com o exame anterior é
+      // útil mesmo quando ele caiu fora do período selecionado.
+      const idx = s.points.indexOf(last);
+      const prev = idx > 0 ? s.points[idx - 1] : null;
+      const delta = prev && last.value != null && prev.value != null ? last.value - prev.value : null;
+      const refRange = parseReferenceRange(last.reference);
+      let trend: Trend = null;
+      if (refRange && delta != null && last.value != null && prev?.value != null) {
+        const dNow = distanceToRange(last.value, refRange);
+        const dPrev = distanceToRange(prev.value, refRange);
+        trend = dNow < dPrev ? 'better' : dNow > dPrev ? 'worse' : 'same';
+      }
+      return { name: s.name, inPeriod, last, prev, delta, trend, range: refRange };
+    })
+    .filter((r): r is BiomarkerRow => r !== null)
+    .sort((a, b) => Number(b.last.altered) - Number(a.last.altered) || a.name.localeCompare(b.name, 'pt-BR'));
+
+export const ALL_TIME: DateRange = { start: null, end: null };
+
+// --- Abas ------------------------------------------------------------------
+
+export type TrackingTab = 'visao' | 'corpo' | 'exames' | 'historico';
+
+export const parseTab = (raw: string | null): TrackingTab =>
+  raw === 'corpo' || raw === 'exames' || raw === 'historico' ? raw : 'visao';
+
+export const TAB_PANEL_ID = 'tracking-panel';
+export const tabId = (tab: TrackingTab) => `tracking-tab-${tab}`;
+
+// --- Progresso -------------------------------------------------------------
+
+type BodyMetric = 'weight' | 'bodyFat' | 'muscleMass';
+
+export interface MetricChange {
+  first: number;
+  last: number;
+  delta: number;
+  firstDate: Date;
+  lastDate: Date;
+}
+
+const metricChange = (series: BodyPoint[], key: BodyMetric): MetricChange | null => {
+  const pts = series.filter((p) => p[key] != null);
+  if (pts.length < 2) return null;
+  const a = pts[0];
+  const b = pts[pts.length - 1];
+  return { first: a[key] as number, last: b[key] as number, delta: (b[key] as number) - (a[key] as number), firstDate: a.date, lastDate: b.date };
+};
+
+export interface Progress {
+  /** Primeira consulta realizada. */
+  start: Date | null;
+  doneCount: number;
+  weight: MetricChange | null;
+  bodyFat: MetricChange | null;
+  muscleMass: MetricChange | null;
+  /** Pesos em ordem cronológica, para o minigráfico. */
+  weightTrail: { ts: number; value: number }[];
+}
+
+/** Evolução no histórico inteiro — independe do período selecionado. */
+export const buildProgress = (appointments: AppointmentRecord[], body: BodyPoint[], now = new Date()): Progress => {
+  const done = appointments
+    .filter((a) => getAppointmentStatus(a, now) === 'concluido')
+    .map((a) => new Date(a.date_time))
+    .sort((a, b) => a.getTime() - b.getTime());
+  return {
+    start: done[0] ?? null,
+    doneCount: done.length,
+    weight: metricChange(body, 'weight'),
+    bodyFat: metricChange(body, 'bodyFat'),
+    muscleMass: metricChange(body, 'muscleMass'),
+    weightTrail: body.filter((p) => p.weight != null).map((p) => ({ ts: p.ts, value: p.weight as number })),
+  };
+};
+
+/**
+ * Direção desejada do peso a partir do objetivo (texto livre): -1 perder,
+ * +1 ganhar, 0 desconhecida — sem objetivo claro, a cor fica neutra.
+ */
+export const weightGoalDirection = (goal: string | null | undefined): -1 | 0 | 1 => {
+  if (!goal) return 0;
+  const s = goal.toLowerCase();
+  if (/emagrec|perd|redu|secar|obesid/.test(s)) return -1;
+  if (/ganh|hipertrof|engord/.test(s)) return 1;
+  return 0;
+};
+
+// --- Efeito dos planos -----------------------------------------------------
+
+export interface PlanEffect {
+  plan: MealPlanRecord;
+  start: Date;
+  /** Início do plano seguinte, ou hoje para o plano atual. */
+  end: Date;
+  current: boolean;
+  days: number;
+  /** Medições feitas durante a vigência do plano. */
+  measurements: number;
+  weight: number | null;
+  bodyFat: number | null;
+  muscleMass: number | null;
+}
+
+/**
+ * Variação de cada métrica durante a vigência de cada plano: base = última
+ * medição até o início do plano (ou a primeira dentro dele); fim = última
+ * medição antes do plano seguinte. Do mais recente ao mais antigo.
+ */
+export const buildPlanEffects = (plans: MealPlanRecord[], body: BodyPoint[], now = new Date()): PlanEffect[] => {
+  const sorted = [...plans].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  return sorted
+    .map((plan, i): PlanEffect => {
+      const start = new Date(plan.created_at);
+      const next = sorted[i + 1];
+      const end = next ? new Date(next.created_at) : now;
+      const inWindow = body.filter((p) => p.ts > start.getTime() && p.ts <= end.getTime());
+      const change = (key: BodyMetric) => {
+        const base = body.filter((p) => p[key] != null && p.ts <= start.getTime()).pop();
+        const pts = [...(base ? [base] : []), ...inWindow.filter((p) => p[key] != null)];
+        return pts.length < 2 ? null : (pts[pts.length - 1][key] as number) - (pts[0][key] as number);
+      };
+      return {
+        plan,
+        start,
+        end,
+        current: !next,
+        days: Math.max(0, differenceInCalendarDays(end, start)),
+        measurements: inWindow.length,
+        weight: change('weight'),
+        bodyFat: change('bodyFat'),
+        muscleMass: change('muscleMass'),
+      };
+    })
+    .reverse();
+};
+
+// --- Projeção --------------------------------------------------------------
+
+/** Semana do tratamento contada a partir do primeiro plano alimentar. */
+export const treatmentWeek = (plans: MealPlanRecord[], now = new Date()): number | null => {
+  if (plans.length === 0) return null;
+  const first = plans.reduce((a, b) => (new Date(a.created_at) < new Date(b.created_at) ? a : b));
+  return Math.floor(Math.max(0, differenceInCalendarDays(now, new Date(first.created_at))) / 7) + 1;
+};
+
+export const estimatedWeeks = (exam: ExamRecord | null): number | null =>
+  exam?.ai_feedback?.tempo_estimado || exam?.ai_feedback?.base_weeks || null;
+
+// --- Pontos de atenção -----------------------------------------------------
+
+/** Sem retorno agendado e última consulta há mais que isso → alerta. */
+export const RETURN_ALERT_DAYS = 60;
+const MISSED_WINDOW_MONTHS = 6;
+const STALE_EXAM_DAYS = 90;
+const STALE_MEASURE_DAYS = 90;
+const STALE_PLAN_DAYS = 90;
+
+export type AttentionTarget = { tab: TrackingTab; marker?: string } | { route: string };
+
+export interface AttentionItem {
+  id: string;
+  tone: 'bad' | 'warn';
+  title: string;
+  detail?: string;
+  action?: { label: string; target: AttentionTarget };
+}
+
+const listNames = (names: string[], max = 3) =>
+  names.length <= max ? names.join(', ') : `${names.slice(0, max).join(', ')} e mais ${names.length - max}`;
+
+export const isReturnOverdue = (stats: FlowStats) =>
+  !stats.next && stats.daysSinceLastDone != null && stats.daysSinceLastDone > RETURN_ALERT_DAYS;
+
+/**
+ * O que pede ação agora, numa lista só — antes cada sinal ficava escondido
+ * dentro da sua seção (falta no histórico, alterado no fim da tabela…).
+ */
+export const buildAttentionItems = (input: {
+  stats: FlowStats;
+  appointments: AppointmentRecord[];
+  /** Retrato atual dos biomarcadores (`buildBiomarkerRows` com `ALL_TIME`). */
+  biomarkers: BiomarkerRow[];
+  body: BodyPoint[];
+  latestPlan: MealPlanRecord | null;
+  latestExam: ExamRecord | null;
+  mealPlans: MealPlanRecord[];
+  now?: Date;
+}): AttentionItem[] => {
+  const { stats, appointments, biomarkers, body, latestPlan, latestExam, mealPlans, now = new Date() } = input;
+  const items: AttentionItem[] = [];
+
+  const altered = biomarkers.filter((r) => r.last.altered);
+  if (altered.length > 0) {
+    items.push({
+      id: 'altered',
+      tone: 'bad',
+      title: `${altered.length} biomarcador${altered.length > 1 ? 'es alterados' : ' alterado'} no último resultado`,
+      detail: listNames(altered.map((r) => r.name)),
+      action: { label: 'Ver exames', target: { tab: 'exames', marker: altered[0].name } },
+    });
+  }
+
+  const worse = biomarkers.filter((r) => r.trend === 'worse');
+  if (worse.length > 0) {
+    items.push({
+      id: 'worse',
+      tone: 'bad',
+      title: `${worse.length} biomarcador${worse.length > 1 ? 'es se afastaram' : ' se afastou'} da referência`,
+      detail: listNames(worse.map((r) => r.name)),
+      action: { label: 'Comparar', target: { tab: 'exames', marker: worse[0].name } },
+    });
+  }
+
+  if (altered.length > 0 && latestExam) {
+    const days = differenceInCalendarDays(now, examDate(latestExam));
+    if (days > STALE_EXAM_DAYS) {
+      items.push({
+        id: 'stale-exam',
+        tone: 'warn',
+        title: `Último exame há ${days} dias, com marcadores alterados`,
+        detail: 'Vale pedir um exame de controle.',
+        action: { label: 'Anexar exame', target: { route: '/exames' } },
+      });
+    }
+  }
+
+  if (isReturnOverdue(stats)) {
+    items.push({
+      id: 'return',
+      tone: 'warn',
+      title: `${stats.daysSinceLastDone} dias sem consulta e nenhum retorno agendado`,
+      action: { label: 'Agendar retorno', target: { route: '/agenda' } },
+    });
+  }
+
+  const missedSince = subMonths(now, MISSED_WINDOW_MONTHS);
+  const missed = appointments.filter((a) => {
+    const d = new Date(a.date_time);
+    return d >= missedSince && getAppointmentStatus(a, now) === 'nao_compareceu';
+  }).length;
+  if (missed > 0) {
+    items.push({
+      id: 'missed',
+      tone: missed > 1 ? 'bad' : 'warn',
+      title: `${missed} falta${missed > 1 ? 's' : ''} nos últimos ${MISSED_WINDOW_MONTHS} meses`,
+      action: { label: 'Ver histórico', target: { tab: 'historico' } },
+    });
+  }
+
+  const lastMeasure = body[body.length - 1] ?? null;
+  if (stats.lastDone) {
+    if (!lastMeasure) {
+      items.push({
+        id: 'no-measure',
+        tone: 'warn',
+        title: 'Nenhuma avaliação física registrada',
+        detail: 'Peso, gordura e massa muscular são lançados na consulta.',
+      });
+    } else {
+      const days = differenceInCalendarDays(now, lastMeasure.date);
+      if (days > STALE_MEASURE_DAYS && stats.lastDone > lastMeasure.date) {
+        items.push({
+          id: 'stale-measure',
+          tone: 'warn',
+          title: `Sem avaliação física há ${days} dias`,
+          detail: 'Houve consulta depois, mas sem medições.',
+          action: { label: 'Ver composição', target: { tab: 'corpo' } },
+        });
+      }
+    }
+  }
+
+  if (latestPlan) {
+    const days = differenceInCalendarDays(now, new Date(latestPlan.created_at));
+    if (days > STALE_PLAN_DAYS) {
+      items.push({
+        id: 'stale-plan',
+        tone: 'warn',
+        title: `Plano alimentar sem revisão há ${days} dias`,
+        action: { label: 'Revisar plano', target: { route: '/planos' } },
+      });
+    }
+  } else if (stats.lastDone) {
+    items.push({
+      id: 'no-plan',
+      tone: 'warn',
+      title: 'Paciente ainda sem plano alimentar',
+      action: { label: 'Criar plano', target: { route: '/planos' } },
+    });
+  }
+
+  const weeks = estimatedWeeks(latestExam);
+  const week = treatmentWeek(mealPlans, now);
+  if (weeks && week && week > weeks) {
+    items.push({
+      id: 'projection',
+      tone: 'warn',
+      title: `Semana ${week} de ${weeks} estimadas pela IA`,
+      detail: 'Passou da duração estimada; vale reavaliar com um novo exame.',
+      action: { label: 'Ver projeção', target: { tab: 'exames' } },
+    });
+  }
+
+  return items.sort((a, b) => Number(b.tone === 'bad') - Number(a.tone === 'bad'));
+};
+
 // --- Linha do tempo --------------------------------------------------------
 
 export type JourneyEvent =

@@ -60,7 +60,12 @@ export const Exams: React.FC = () => {
   const [examToDelete, setExamToDelete] = useState<ExamRecord | null>(null);
 
   // Dados via TanStack Query (Onda 4): lista de pacientes e exames com ai_feedback.
-  const { data: patients = [], isLoading: loadingPatients } = usePatients(clinic?.id, { enabled: isAuthorized });
+  const { data: visiblePatients = [], isLoading: loadingPatients } = usePatients(clinic?.id, { enabled: isAuthorized });
+  // Exames são dado clínico: só pacientes próprios ou concedidos (migration 0029).
+  const patients = useMemo(
+    () => visiblePatients.filter((p) => p.has_clinical_access === true),
+    [visiblePatients],
+  );
   const { data: exams = [], isLoading: loadingExams } = usePatientExams(selectedPatient?.id);
   const { upsertExam, removeExam, invalidate: invalidateExams } = useExamCache(selectedPatient?.id);
 
@@ -643,7 +648,7 @@ ${insights}`;
                       <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
                       <div>
                         <h5 className="text-xs font-semibold text-slate-900 leading-none">Assistente de IA Nutricional</h5>
-                        <p className="text-xs text-indigo-500 font-medium uppercase tracking-wider mt-0.5">Gemini 1.5 Pro</p>
+                        <p className="text-xs text-indigo-500 font-medium uppercase tracking-wider mt-0.5">Análise por IA · Gemini</p>
                       </div>
                     </div>
 

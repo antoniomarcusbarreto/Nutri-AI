@@ -3,6 +3,25 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Stethoscope } from 'lucide-react';
 
+type StaffRole = 'owner' | 'nutritionist' | 'secretary';
+
+/**
+ * Guarda de rota. `roles` restringe a papéis da clínica; `superadminOnly`, ao
+ * Master. O menu já esconde esses itens, mas sem a guarda a URL direta abria
+ * a tela (o RLS ainda bloqueava os dados — isto evita a tela quebrada).
+ */
+export const RequireRole: React.FC<{ roles?: StaffRole[]; superadminOnly?: boolean; children: React.ReactNode }> = ({
+  roles,
+  superadminOnly,
+  children,
+}) => {
+  const { profile, userRole, loading } = useAuth();
+  if (loading) return null;
+  if (superadminOnly && !profile?.is_superadmin) return <Navigate to="/dashboard" replace />;
+  if (roles && (!userRole || !roles.includes(userRole))) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+};
+
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { session, loading, profile, clinic, isPatient } = useAuth();
   const location = useLocation();

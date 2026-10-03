@@ -15,60 +15,20 @@ import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CheckCircle2, 
 import { Card, EmptyState } from '../ui';
 import { cn } from '../../lib/cn';
 import type { RechartsTooltipProps } from '../../types/clinical';
-import { ChartTooltipBox, SectionHeader } from './chartKit';
+import { ChartTooltipBox, SectionHeader, Sparkline } from './chartKit';
 import { DOMAIN } from './trackingTheme';
 import { niceScale, SERIES, timeAxisProps, yAxisProps } from './chartConfig';
 import {
+  buildBiomarkerRows,
   fmtDelta,
   fmtShortDate,
-  inRange,
-  parseReferenceRange,
   type BiomarkerPoint,
   type BiomarkerSeries,
   type DateRange,
-  type ReferenceRange,
+  type Trend,
 } from './trackingModel';
 
 const COLLAPSED_ROWS = 8;
-
-/** Distância até a faixa de referência (0 = dentro). */
-const distanceToRange = (v: number, r: ReferenceRange) =>
-  r.low != null && v < r.low ? r.low - v : r.high != null && v > r.high ? v - r.high : 0;
-
-type Trend = 'better' | 'worse' | 'same' | null;
-
-interface Row {
-  name: string;
-  inPeriod: BiomarkerPoint[];
-  last: BiomarkerPoint;
-  prev: BiomarkerPoint | null;
-  delta: number | null;
-  trend: Trend;
-  range: ReferenceRange | null;
-}
-
-const buildRows = (series: BiomarkerSeries[], range: DateRange): Row[] =>
-  series
-    .map((s): Row | null => {
-      const inPeriod = s.points.filter((p) => inRange(p.date, range));
-      if (inPeriod.length === 0) return null;
-      const last = inPeriod[inPeriod.length - 1];
-      // "Anterior" olha o histórico inteiro: comparar com o exame anterior é
-      // útil mesmo quando ele caiu fora do período selecionado.
-      const idx = s.points.indexOf(last);
-      const prev = idx > 0 ? s.points[idx - 1] : null;
-      const delta = prev && last.value != null && prev.value != null ? last.value - prev.value : null;
-      const refRange = parseReferenceRange(last.reference);
-      let trend: Trend = null;
-      if (refRange && delta != null && last.value != null && prev?.value != null) {
-        const dNow = distanceToRange(last.value, refRange);
-        const dPrev = distanceToRange(prev.value, refRange);
-        trend = dNow < dPrev ? 'better' : dNow > dPrev ? 'worse' : 'same';
-      }
-      return { name: s.name, inPeriod, last, prev, delta, trend, range: refRange };
-    })
-    .filter((r): r is Row => r !== null)
-    .sort((a, b) => Number(b.last.altered) - Number(a.last.altered) || a.name.localeCompare(b.name, 'pt-BR'));
 
 const TREND_UI: Record<Exclude<Trend, null>, { label: string; className: string }> = {
   better: { label: 'aproximou-se da referência', className: 'bg-emerald-50 text-emerald-700' },
@@ -76,27 +36,16 @@ const TREND_UI: Record<Exclude<Trend, null>, { label: string; className: string 
   same: { label: 'sem mudança em relação à referência', className: 'bg-slate-100 text-slate-600' },
 };
 
-/** Minigráfico em SVG puro — uma dúzia de ResponsiveContainers custaria caro. */
 const TREND_STROKE: Record<Exclude<Trend, null>, string> = { better: '#059669', worse: '#e11d48', same: '#64748b' };
 
-const Sparkline: React.FC<{ points: BiomarkerPoint[]; trend: Trend }> = ({ points, trend }) => {
+const TrendSparkline: React.FC<{ points: BiomarkerPoint[]; trend: Trend }> = ({ points, trend }) => {
   const vals = points.filter((p) => p.value != null);
-  if (vals.length < 2) return <span className="text-xs text-slate-400">—</span>;
-  const w = 72;
-  const h = 22;
-  const xs = vals.map((p) => p.ts);
-  const ys = vals.map((p) => p.value as number);
-  const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
-  const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
-  const px = (x: number) => (x1 === x0 ? w / 2 : ((x - x0) / (x1 - x0)) * (w - 4) + 2);
-  const py = (y: number) => (y1 === y0 ? h / 2 : h - 2 - ((y - y0) / (y1 - y0)) * (h - 4));
-  const d = vals.map((p, i) => `${i ? 'L' : 'M'}${px(p.ts).toFixed(1)},${py(p.value as number).toFixed(1)}`).join(' ');
-  const last = vals[vals.length - 1];
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" className="overflow-visible">
-      <path d={d} fill="none" stroke={trend ? TREND_STROKE[trend] : '#64748b'} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={px(last.ts)} cy={py(last.value as number)} r={3} fill={last.altered ? '#e11d48' : '#059669'} stroke="#fff" strokeWidth={1.5} />
-    </svg>
+    <Sparkline
+      values={vals.map((p) => ({ ts: p.ts, value: p.value as number }))}
+      stroke={trend ? TREND_STROKE[trend] : '#64748b'}
+      dotColor={vals[vals.length - 1]?.altered ? '#e11d48' : '#059669'}
+    />
   );
 };
 
@@ -123,13 +72,11 @@ const SUMMARY_TONE = {
   bad: 'border-rose-100 bg-rose-50 text-rose-700',
 } as const;
 
-const SummaryTile: React.FC<{ tone: keyof typeof SUMMARY_TONE; icon: React.ReactNode; value: number; label: string }> = ({ tone, icon, value, label }) => (
-  <li className={cn('flex items-center gap-3 rounded-2xl border px-4 py-3', value === 0 ? 'border-slate-200 bg-white text-slate-500' : SUMMARY_TONE[tone])}>
-    <span className="shrink-0 [&>svg]:h-5 [&>svg]:w-5" aria-hidden="true">{icon}</span>
-    <span className="min-w-0">
-      <span className="block text-2xl font-medium leading-none tabular-nums">{value}</span>
-      <span className="mt-1 block text-xs">{label}</span>
-    </span>
+/** Resumo em chip (antes eram 4 cards grandes que repetiam a tabela logo abaixo). */
+const SummaryChip: React.FC<{ tone: keyof typeof SUMMARY_TONE; icon: React.ReactNode; value: number; label: string }> = ({ tone, icon, value, label }) => (
+  <li className={cn('inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs', value === 0 ? 'border-slate-200 bg-white text-slate-500' : SUMMARY_TONE[tone])}>
+    <span className="shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5" aria-hidden="true">{icon}</span>
+    <span className="font-semibold tabular-nums">{value}</span> {label}
   </li>
 );
 
@@ -137,6 +84,9 @@ export interface BiomarkersSectionProps {
   series: BiomarkerSeries[];
   range: DateRange;
   periodText: string;
+  /** Marcador em foco no gráfico (fica na URL); sem valor, o primeiro da lista. */
+  selectedName: string | null;
+  onSelect: (name: string) => void;
   onOpenExam: (examId: string) => void;
 }
 
@@ -146,9 +96,8 @@ export interface BiomarkersSectionProps {
  * referência sombreada. Substitui o gráfico único com todos os marcadores na
  * mesma escala (glicose ~90 esmagava TSH ~2 numa linha reta).
  */
-export const BiomarkersSection: React.FC<BiomarkersSectionProps> = ({ series, range, periodText, onOpenExam }) => {
-  const rows = useMemo(() => buildRows(series, range), [series, range]);
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+export const BiomarkersSection: React.FC<BiomarkersSectionProps> = ({ series, range, periodText, selectedName, onSelect, onOpenExam }) => {
+  const rows = useMemo(() => buildBiomarkerRows(series, range), [series, range]);
   const [expanded, setExpanded] = useState(false);
 
   const selected = rows.find((r) => r.name === selectedName) ?? rows[0] ?? null;
@@ -203,11 +152,11 @@ export const BiomarkersSection: React.FC<BiomarkersSectionProps> = ({ series, ra
         />
       ) : (
         <>
-          <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumo do último resultado de cada biomarcador">
-            <SummaryTile tone="bad" icon={<AlertTriangle />} value={alteredCount} label="alterado(s)" />
-            <SummaryTile tone="good" icon={<CheckCircle2 />} value={normalCount} label="dentro da referência" />
-            <SummaryTile tone="good" icon={<TrendingUp />} value={betterCount} label="aproximaram-se da referência" />
-            <SummaryTile tone="bad" icon={<ArrowDownRight />} value={worseCount} label="afastaram-se da referência" />
+          <ul className="flex flex-wrap gap-2" aria-label="Resumo do último resultado de cada biomarcador">
+            <SummaryChip tone="bad" icon={<AlertTriangle />} value={alteredCount} label="alterado(s)" />
+            <SummaryChip tone="good" icon={<CheckCircle2 />} value={normalCount} label="dentro da referência" />
+            <SummaryChip tone="good" icon={<TrendingUp />} value={betterCount} label="aproximaram-se da referência" />
+            <SummaryChip tone="bad" icon={<ArrowDownRight />} value={worseCount} label="afastaram-se da referência" />
           </ul>
 
           {selected && (
@@ -284,7 +233,7 @@ export const BiomarkersSection: React.FC<BiomarkersSectionProps> = ({ series, ra
                         <button
                           type="button"
                           aria-pressed={isSelected}
-                          onClick={() => setSelectedName(r.name)}
+                          onClick={() => onSelect(r.name)}
                           className={cn('text-left cursor-pointer hover:underline', isSelected ? 'font-medium text-[#5024fc]' : 'text-slate-900')}
                         >
                           {r.name}
@@ -314,7 +263,7 @@ export const BiomarkersSection: React.FC<BiomarkersSectionProps> = ({ series, ra
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-500">{r.last.reference || '—'}</td>
-                      <td className="px-4 py-2.5"><Sparkline points={r.inPeriod} trend={r.trend} /></td>
+                      <td className="px-4 py-2.5"><TrendSparkline points={r.inPeriod} trend={r.trend} /></td>
                     </tr>
                   );
                 })}

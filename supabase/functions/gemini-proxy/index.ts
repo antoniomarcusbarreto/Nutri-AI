@@ -1,5 +1,5 @@
 // supabase/functions/gemini-proxy/index.ts
-// Proxy seguro para a API do Google Gemini (laudos de exame + planos alimentares).
+// Proxy seguro para a API do Google Gemini (laudos de exame, planos alimentares e prontuário SOAP).
 // A GEMINI_API_KEY fica como secret do servidor e nunca chega ao cliente.
 //
 // Hardening (SEC-10):
@@ -13,13 +13,19 @@
 //
 // Secrets: GEMINI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY.
 // Opcionais: ALLOWED_ORIGINS (csv, adiciona domínios), AI_DAILY_LIMIT (int),
-//            GEMINI_MODEL (modelo primário).
+//            GEMINI_MODEL_EXAM / GEMINI_MODEL_MEAL / GEMINI_MODEL_SOAP
+//            (sobrescrevem o modelo primário de cada tarefa).
+//
+// Modelo por tarefa: o cliente manda só `task` ("exam" | "meal_plan" | "soap");
+// o nome do modelo é decidido aqui, no servidor — o cliente nunca escolhe
+// modelo (senão poderia forçar o mais caro). Laudo de exame (PDF clínico) usa
+// o Flash mais forte; SOAP (só reorganiza texto) usa o Flash-Lite.
 //
 // Resiliência (fallback de modelo):
-//   - Se o modelo primário (env GEMINI_MODEL) responder 404/"not found"/
-//     "deprecated" ou falhar de rede, o proxy refaz a chamada automaticamente
-//     usando FALLBACK_MODEL, sem expor o erro ao front-end. Isso evita que
-//     uma descontinuação de modelo pelo Google derrube o app em produção.
+//   - Cada tarefa tem uma cadeia de modelos. Se um responder 404/"not found"/
+//     "deprecated" ou falhar de rede, o proxy tenta o próximo da cadeia, sem
+//     expor o erro ao front-end. Isso evita que uma descontinuação de modelo
+//     pelo Google derrube o app em produção.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -28,6 +34,7 @@ const BASE_ORIGINS = [
   "https://nutri-ai.io",
   "https://www.nutri-ai.io",
   "https://dtkoegdmmhnxsrrxmoiq.supabase.co",
+  "https://nutri-ai-self-nine.vercel.app",
   "http://localhost:5173",
   "http://localhost:4173",
 ];
@@ -38,9 +45,19 @@ const ALLOWED_ORIGINS = [...BASE_ORIGINS, ...EXTRA_ORIGINS];
 const MAX_BODY_BYTES = 15 * 1024 * 1024; // 15 MB
 const AI_DAILY_LIMIT = Number(Deno.env.get("AI_DAILY_LIMIT") ?? "50");
 
-const PRIMARY_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
-// Modelo antigo e estável, usado só se o primário estiver indisponível/descontinuado.
-const FALLBACK_MODEL = "gemini-1.5-flash";
+type Task = "exam" | "meal_plan" | "soap";
+
+// Cadeia de modelos por tarefa: [primário, ...fallbacks]. O primário pode ser
+// trocado por env sem redeploy; os fallbacks são modelos estáveis atuais.
+const MODEL_CHAINS: Record<Task, string[]> = {
+  exam: [Deno.env.get("GEMINI_MODEL_EXAM") ?? "gemini-3.7-flash", "gemini-3.6-flash"],
+  meal_plan: [Deno.env.get("GEMINI_MODEL_MEAL") ?? "gemini-3.6-flash", "gemini-3.5-flash"],
+  soap: [Deno.env.get("GEMINI_MODEL_SOAP") ?? "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
+};
+
+function isTask(v: unknown): v is Task {
+  return typeof v === "string" && Object.hasOwn(MODEL_CHAINS, v);
+}
 
 function baseCors(origin: string): Record<string, string> {
   const h: Record<string, string> = {
@@ -128,13 +145,16 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Requisição muito grande." }, 413, origin);
   }
 
-  let body: { contents?: unknown; systemInstruction?: unknown; generationConfig?: unknown };
+  let body: { task?: unknown; contents?: unknown; systemInstruction?: unknown; generationConfig?: unknown };
   try {
     body = JSON.parse(new TextDecoder().decode(raw));
   } catch {
     return json({ error: "Corpo inválido." }, 400, origin);
   }
-  const { contents, systemInstruction, generationConfig } = body;
+  const { task, contents, systemInstruction, generationConfig } = body;
+  if (!isTask(task)) {
+    return json({ error: "O campo 'task' é inválido." }, 400, origin);
+  }
   if (!Array.isArray(contents) || contents.length === 0) {
     return json({ error: "O campo 'contents' é obrigatório." }, 400, origin);
   }
@@ -162,59 +182,48 @@ Deno.serve(async (req: Request) => {
   }
 
   const geminiPayload = { contents, systemInstruction, generationConfig };
-  let geminiResponse: Response;
+  // Dedup: se o env apontar o primário para o mesmo modelo do fallback.
+  const chain = [...new Set(MODEL_CHAINS[task])];
 
-  try {
-    geminiResponse = await callGeminiModel(PRIMARY_MODEL, geminiApiKey, geminiPayload);
-  } catch (err) {
-    console.error(
-      `gemini-proxy fetch (modelo primário "${PRIMARY_MODEL}"):`,
-      err instanceof Error ? err.message : String(err),
-    );
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    const hasNext = i < chain.length - 1;
+
+    let geminiResponse: Response;
     try {
-      console.error(`gemini-proxy: tentando fallback "${FALLBACK_MODEL}"`);
-      geminiResponse = await callGeminiModel(FALLBACK_MODEL, geminiApiKey, geminiPayload);
-    } catch (fallbackErr) {
+      geminiResponse = await callGeminiModel(model, geminiApiKey, geminiPayload);
+    } catch (err) {
       console.error(
-        `gemini-proxy fetch (fallback "${FALLBACK_MODEL}"):`,
-        fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+        `gemini-proxy fetch (task "${task}", modelo "${model}"):`,
+        err instanceof Error ? err.message : String(err),
       );
+      if (hasNext) continue;
       return json({ error: "Falha ao contatar o serviço de IA." }, 502, origin);
     }
-  }
 
-  if (!geminiResponse.ok) {
-    const detail = await geminiResponse.text().catch(() => "");
-
-    if (isModelUnavailable(geminiResponse.status, detail)) {
-      console.error(
-        `gemini-proxy: modelo primário "${PRIMARY_MODEL}" indisponível (${geminiResponse.status}), ` +
-          `tentando fallback "${FALLBACK_MODEL}"`,
-      );
-      try {
-        geminiResponse = await callGeminiModel(FALLBACK_MODEL, geminiApiKey, geminiPayload);
-      } catch (fallbackErr) {
+    if (!geminiResponse.ok) {
+      const detail = await geminiResponse.text().catch(() => "");
+      if (hasNext && isModelUnavailable(geminiResponse.status, detail)) {
         console.error(
-          `gemini-proxy fetch (fallback "${FALLBACK_MODEL}"):`,
-          fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+          `gemini-proxy: modelo "${model}" indisponível (${geminiResponse.status}) para task "${task}", ` +
+            `tentando "${chain[i + 1]}"`,
         );
-        return json({ error: "Falha ao contatar o serviço de IA." }, 502, origin);
+        continue;
       }
-
-      if (!geminiResponse.ok) {
-        const fallbackDetail = await geminiResponse.text().catch(() => "");
-        console.error("gemini-proxy upstream (fallback):", geminiResponse.status, fallbackDetail.slice(0, 500));
-        const status = geminiResponse.status === 429 ? 429 : 502;
-        return json({ error: "O serviço de IA não conseguiu processar a solicitação." }, status, origin);
-      }
-    } else {
-      console.error("gemini-proxy upstream:", geminiResponse.status, detail.slice(0, 500));
+      console.error(`gemini-proxy upstream (task "${task}", modelo "${model}"):`, geminiResponse.status, detail.slice(0, 500));
       const status = geminiResponse.status === 429 ? 429 : 502;
       return json({ error: "O serviço de IA não conseguiu processar a solicitação." }, status, origin);
     }
+
+    const geminiData = await geminiResponse.json();
+    // Gemini 3 pode devolver partes de "pensamento" antes da resposta: pega a
+    // primeira parte de texto que não seja thought.
+    const parts: Array<{ text?: string; thought?: boolean }> =
+      geminiData.candidates?.[0]?.content?.parts ?? [];
+    const text = parts.find((p) => typeof p.text === "string" && !p.thought)?.text ?? null;
+    console.log(`gemini-proxy ok: task "${task}", modelo "${model}"`);
+    return json({ text }, 200, origin);
   }
 
-  const geminiData = await geminiResponse.json();
-  const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-  return json({ text }, 200, origin);
+  return json({ error: "O serviço de IA não conseguiu processar a solicitação." }, 502, origin);
 });

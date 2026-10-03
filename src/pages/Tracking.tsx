@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ClipboardList, ShieldAlert, Users } from 'lucide-react';
 import { usePatients } from '../hooks/queries/usePatients';
 import { usePatientExams } from '../hooks/queries/usePatientExams';
@@ -22,22 +22,38 @@ import { CompositionSection } from '../components/tracking/CompositionSection';
 import { BiomarkersSection } from '../components/tracking/BiomarkersSection';
 import { PredictionCard } from '../components/tracking/PredictionCard';
 import { JourneyTimeline } from '../components/tracking/JourneyTimeline';
+import { TrackingTabs } from '../components/tracking/TrackingTabs';
+import { OverviewTab } from '../components/tracking/OverviewTab';
+import { PlanEffectTable } from '../components/tracking/PlanEffectTable';
+import { ExamInsightCard } from '../components/tracking/ExamInsightCard';
 import { AppointmentDetailModal, ExamDetailModal, MealPlanDetailModal } from '../components/tracking/TrackingModals';
 import {
   ageFromBirthDate,
+  ALL_TIME,
+  buildAttentionItems,
+  buildBiomarkerRows,
   buildBiomarkerSeries,
   buildBodySeries,
   buildJourney,
+  buildPlanEffects,
+  buildProgress,
   computeFlowStats,
   examDate,
+  getAppointmentStatus,
   inRange,
   isUpcoming,
   parsePeriod,
+  parseTab,
   periodLabel,
   periodRange,
   serializePeriod,
+  TAB_PANEL_ID,
+  tabId,
+  weightGoalDirection,
+  type AttentionTarget,
   type JourneyEvent,
   type Period,
+  type TrackingTab,
 } from '../components/tracking/trackingModel';
 
 const EMPTY: never[] = [];
@@ -52,22 +68,31 @@ const readStoredPatient = (): string | null => {
 };
 
 /**
- * Acompanhamento: evolução do paciente (composição corporal, biomarcadores),
- * projeção da IA e linha do tempo de consultas/exames/planos.
+ * Acompanhamento em abas: Visão geral (situação atual, pontos de atenção,
+ * ficha clínica), Corpo (composição + efeito dos planos), Exames
+ * (biomarcadores, parecer e projeção da IA) e Histórico (linha do tempo).
  *
- * Paciente e período ficam na URL (`?paciente=…&periodo=6m`) — o "voltar" do
- * navegador funciona e dá para compartilhar/abrir direto uma visão.
+ * Paciente, período, aba e marcador ficam na URL
+ * (`?paciente=…&periodo=6m&aba=exames&marcador=Glicose`) — o "voltar" do
+ * navegador troca de aba e dá para compartilhar/abrir direto uma visão.
  */
 export const Tracking: React.FC = () => {
   const { clinic, userRole } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const isAuthorized = userRole === 'owner' || userRole === 'nutritionist';
   const [searchParams, setSearchParams] = useSearchParams();
   // "Agora" fixo durante a visita: mantém o render puro e as derivações estáveis.
   const [now] = useState(() => new Date());
 
-  const { data: allPatients = EMPTY as PatientRow[], isLoading: loadingPatients } =
+  const { data: visiblePatients = EMPTY as PatientRow[], isLoading: loadingPatients } =
     usePatients(clinic?.id, { enabled: isAuthorized });
+  // Só pacientes com acesso clínico (próprios ou concedidos — migration 0029);
+  // os que o profissional só vê pelo cadastro não têm prontuário a mostrar.
+  const allPatients = useMemo(
+    () => visiblePatients.filter((p) => p.has_clinical_access === true),
+    [visiblePatients],
+  );
 
   // Paciente: URL → último usado neste navegador → primeiro ativo.
   const urlPatientId = searchParams.get('paciente');
@@ -79,6 +104,7 @@ export const Tracking: React.FC = () => {
     return allPatients.find((p) => p.status === 'ativo')?.id ?? '';
   }, [allPatients, urlPatientId]);
   const patient = allPatients.find((p) => p.id === selectedPatientId) ?? null;
+  const age = patient ? ageFromBirthDate(patient.birth_date, now) : null;
 
   const periodParam = searchParams.get('periodo');
   const period = useMemo(() => parsePeriod(periodParam), [periodParam]);
@@ -86,15 +112,24 @@ export const Tracking: React.FC = () => {
   const range = useMemo(() => periodRange(period, now), [period, now]);
   const periodText = periodLabel(period);
 
-  const updateParam = useCallback((key: string, value: string) => {
+  const tab = parseTab(searchParams.get('aba'));
+  const marker = searchParams.get('marcador');
+
+  /** `null` remove o parâmetro. Troca de aba entra no histórico; o resto substitui. */
+  const updateParams = useCallback((updates: Record<string, string | null>, push = false) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      next.set(key, value);
+      Object.entries(updates).forEach(([k, v]) => (v == null ? next.delete(k) : next.set(k, v)));
       return next;
-    }, { replace: true });
+    }, { replace: !push });
   }, [setSearchParams]);
+  const updateParam = (key: string, value: string) => updateParams({ [key]: value });
 
-  const selectPatient = (id: string) => updateParam('paciente', id);
+  const selectPatient = (id: string) => updateParams({ paciente: id, marcador: null });
+  const goTab = (next: TrackingTab, nextMarker?: string) =>
+    updateParams({ aba: next === 'visao' ? null : next, marcador: nextMarker ?? null }, true);
+  const onAttention = (target: AttentionTarget) =>
+    'route' in target ? navigate(target.route) : goTab(target.tab, target.marker);
 
   // Compartilha a seleção com Planos Alimentares (mesma chave), para os atalhos
   // do cabeçalho abrirem já no paciente em foco.
@@ -153,6 +188,26 @@ export const Tracking: React.FC = () => {
     [exams],
   );
   const latestPlan = mealPlans[0] ?? null; // query já vem em created_at desc
+
+  // Visão geral: retrato atual, independente do período.
+  const biomarkersNow = useMemo(() => buildBiomarkerRows(biomarkerSeries, ALL_TIME), [biomarkerSeries]);
+  const alteredNow = biomarkersNow.filter((r) => r.last.altered).length;
+  const attention = useMemo(
+    () => buildAttentionItems({ stats, appointments, biomarkers: biomarkersNow, body: bodySeries, latestPlan, latestExam, mealPlans, now }),
+    [stats, appointments, biomarkersNow, bodySeries, latestPlan, latestExam, mealPlans, now],
+  );
+  const progress = useMemo(() => buildProgress(appointments, bodySeries, now), [appointments, bodySeries, now]);
+  const weightDirection = weightGoalDirection(patient?.main_goal);
+  const lastVisit = useMemo(
+    () => appointments
+      .filter((a) => getAppointmentStatus(a, now) === 'concluido' && pickOne(a.consultations))
+      .reduce<AppointmentRecord | null>((acc, a) => (!acc || new Date(a.date_time) > new Date(acc.date_time) ? a : acc), null),
+    [appointments, now],
+  );
+  const planEffects = useMemo(
+    () => buildPlanEffects(mealPlans, bodySeries, now).filter((e) => inRange(e.start, range)),
+    [mealPlans, bodySeries, now, range],
+  );
 
   const years = useMemo(() => {
     const set = new Set<number>([now.getFullYear()]);
@@ -215,14 +270,7 @@ export const Tracking: React.FC = () => {
         </div>
       ) : (
         <>
-          <PatientSummary
-            patient={patient}
-            age={ageFromBirthDate(patient.birth_date, now)}
-            stats={stats}
-            latestPlan={latestPlan}
-            latestExamDate={latestExam ? examDate(latestExam) : null}
-            onOpenPlan={setPlanForModal}
-          />
+          <PatientSummary patient={patient} age={age} />
 
           {!hasHistory ? (
             <EmptyState
@@ -233,32 +281,81 @@ export const Tracking: React.FC = () => {
             />
           ) : (
             <>
-              <PeriodBar period={period} onChange={setPeriod} years={years} />
-              <CompositionSection
-                points={bodyInPeriod}
-                history={bodySeries}
-                plans={plansInPeriod}
-                age={ageFromBirthDate(patient.birth_date, now)}
-                periodText={periodText}
-              />
-              <BiomarkersSection
-                key={selectedPatientId}
-                series={biomarkerSeries}
-                range={range}
-                periodText={periodText}
-                onOpenExam={(id) => setExamForModal(exams.find((e) => e.id === id) ?? null)}
-              />
-              <PredictionCard latestExam={latestExam} mealPlans={mealPlans} now={now} />
-              <JourneyTimeline
-                key={`${selectedPatientId}:${periodKey}`}
-                events={pastEvents}
-                upcoming={upcoming}
-                stats={stats}
-                periodText={periodText}
-                onShowAll={() => setPeriod({ kind: 'all' })}
-                onOpenAppointment={setAptForModal}
-                onOpenEvent={openEvent}
-              />
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <TrackingTabs value={tab} onChange={(t) => goTab(t)} badges={{ exames: alteredNow }} />
+                {tab === 'visao' ? (
+                  <p className="text-xs text-slate-500">Situação atual, considerando todo o histórico.</p>
+                ) : (
+                  <PeriodBar period={period} onChange={setPeriod} years={years} />
+                )}
+              </div>
+
+              <div role="tabpanel" id={TAB_PANEL_ID} aria-labelledby={tabId(tab)} className="flex flex-col gap-6">
+                {tab === 'visao' && (
+                  <OverviewTab
+                    patient={patient}
+                    stats={stats}
+                    attention={attention}
+                    progress={progress}
+                    weightDirection={weightDirection}
+                    latestPlan={latestPlan}
+                    latestExam={latestExam}
+                    lastVisit={lastVisit}
+                    now={now}
+                    onAttention={onAttention}
+                    onOpenPlan={setPlanForModal}
+                    onOpenExam={setExamForModal}
+                    onOpenAppointment={setAptForModal}
+                  />
+                )}
+
+                {tab === 'corpo' && (
+                  <>
+                    <CompositionSection
+                      points={bodyInPeriod}
+                      history={bodySeries}
+                      plans={plansInPeriod}
+                      age={age}
+                      periodText={periodText}
+                    />
+                    <PlanEffectTable
+                      effects={planEffects}
+                      weightDirection={weightDirection}
+                      periodText={periodText}
+                      onOpenPlan={setPlanForModal}
+                    />
+                  </>
+                )}
+
+                {tab === 'exames' && (
+                  <>
+                    <BiomarkersSection
+                      key={selectedPatientId}
+                      series={biomarkerSeries}
+                      range={range}
+                      periodText={periodText}
+                      selectedName={marker}
+                      onSelect={(name) => updateParam('marcador', name)}
+                      onOpenExam={(id) => setExamForModal(exams.find((e) => e.id === id) ?? null)}
+                    />
+                    <ExamInsightCard exam={latestExam} onOpenExam={setExamForModal} />
+                    <PredictionCard latestExam={latestExam} mealPlans={mealPlans} now={now} />
+                  </>
+                )}
+
+                {tab === 'historico' && (
+                  <JourneyTimeline
+                    key={`${selectedPatientId}:${periodKey}`}
+                    events={pastEvents}
+                    upcoming={upcoming}
+                    stats={stats}
+                    periodText={periodText}
+                    onShowAll={() => setPeriod({ kind: 'all' })}
+                    onOpenAppointment={setAptForModal}
+                    onOpenEvent={openEvent}
+                  />
+                )}
+              </div>
             </>
           )}
         </>

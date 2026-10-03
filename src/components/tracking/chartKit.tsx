@@ -24,6 +24,35 @@ export const SectionHeader: React.FC<{
   </header>
 );
 
+/**
+ * Minigráfico em SVG puro — uma dúzia de ResponsiveContainers custaria caro.
+ * Com menos de 2 pontos não há tendência para mostrar.
+ */
+export const Sparkline: React.FC<{
+  values: { ts: number; value: number }[];
+  stroke: string;
+  /** Cor do ponto final (ex.: vermelho quando o último resultado está alterado). */
+  dotColor?: string;
+  width?: number;
+  height?: number;
+}> = ({ values, stroke, dotColor = stroke, width: w = 72, height: h = 22 }) => {
+  if (values.length < 2) return <span className="text-xs text-slate-400">—</span>;
+  const xs = values.map((p) => p.ts);
+  const ys = values.map((p) => p.value);
+  const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+  const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+  const px = (x: number) => (x1 === x0 ? w / 2 : ((x - x0) / (x1 - x0)) * (w - 4) + 2);
+  const py = (y: number) => (y1 === y0 ? h / 2 : h - 2 - ((y - y0) / (y1 - y0)) * (h - 4));
+  const d = values.map((p, i) => `${i ? 'L' : 'M'}${px(p.ts).toFixed(1)},${py(p.value).toFixed(1)}`).join(' ');
+  const last = values[values.length - 1];
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" className="overflow-visible">
+      <path d={d} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={px(last.ts)} cy={py(last.value)} r={3} fill={dotColor} stroke="#fff" strokeWidth={1.5} />
+    </svg>
+  );
+};
+
 interface TooltipRow {
   label: string;
   value: string;

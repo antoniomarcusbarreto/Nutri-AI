@@ -12,9 +12,47 @@ import type { Database } from '../lib/database.types';
 
 export type { ExamBiomarker };
 
-/** Linhas completas do schema gerado — usar quando o select é `*`. */
-export type PatientRow = Database['public']['Tables']['patients']['Row'];
+/** Cadastro do paciente (sem dados de saúde — migration 0029). */
+export type PatientRecord = Database['public']['Tables']['patients']['Row'];
 export type ServiceRow = Database['public']['Tables']['services']['Row'];
+
+/** Ficha de saúde (tabela `patient_health`, só para quem tem acesso clínico). */
+export type PatientHealthRow = Database['public']['Tables']['patient_health']['Row'];
+export type PatientHealthFields = Omit<PatientHealthRow, 'patient_id' | 'updated_at'>;
+
+export const PATIENT_HEALTH_FIELDS = [
+  'allergies', 'dietary_restrictions', 'pathologies', 'medications',
+  'physical_activity_level', 'profession', 'sleep_quality',
+] as const satisfies readonly (keyof PatientHealthFields)[];
+
+/**
+ * Paciente como a UI usa: cadastro + ficha de saúde achatada (ausente quando
+ * o usuário só vê o cadastro — secretária ou nutricionista sem concessão) +
+ * `has_clinical_access` (campo calculado do banco).
+ */
+export type PatientRow = PatientRecord &
+  Partial<{ [K in keyof PatientHealthFields]: PatientHealthFields[K] }> & {
+    has_clinical_access?: boolean;
+  };
+
+/** Select padrão de paciente com a ficha embutida (achatar com `withHealth`). */
+export const PATIENT_SELECT = '*, has_clinical_access, patient_health(*)';
+
+type PatientWithEmbeddedHealth = PatientRecord & {
+  has_clinical_access?: boolean;
+  patient_health?: Partial<PatientHealthRow> | Partial<PatientHealthRow>[] | null;
+};
+
+/** Achata o `patient_health` embutido nos campos do próprio paciente. */
+export function withHealth<T extends Partial<PatientWithEmbeddedHealth>>(
+  p: T,
+): Omit<T, 'patient_health'> & Partial<PatientHealthFields> {
+  const { patient_health, ...rest } = p;
+  const h = Array.isArray(patient_health) ? patient_health[0] : patient_health;
+  const health: Partial<PatientHealthFields> = {};
+  if (h) for (const k of PATIENT_HEALTH_FIELDS) health[k] = h[k] ?? null;
+  return { ...rest, ...health };
+}
 
 /** Conteúdo do JSONB `patient_exams.ai_feedback`. */
 export interface AiFeedback {
@@ -34,9 +72,9 @@ export interface PatientLite {
   main_goal?: string | null;
 }
 
-/** Subset de `patients` retornado pelo join de `useNutritionistPatients`. */
+/** Subset de `patients` retornado por `useNutritionistPatients`. */
 export type PatientPickFromAppointments = Pick<
-  PatientRow,
+  PatientRecord,
   'id' | 'name' | 'email' | 'phone' | 'birth_date' | 'biological_sex' | 'main_goal' | 'status'
 >;
 

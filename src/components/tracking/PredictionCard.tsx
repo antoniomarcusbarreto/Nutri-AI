@@ -1,9 +1,8 @@
 import React from 'react';
-import { differenceInCalendarDays } from 'date-fns';
 import { Sparkles, Target } from 'lucide-react';
 import { Card } from '../ui';
 import type { ExamRecord, MealPlanRecord } from '../../types/clinical';
-import { examDate, fmtDate } from './trackingModel';
+import { estimatedWeeks, examDate, fmtDate, treatmentWeek } from './trackingModel';
 
 export interface PredictionCardProps {
   latestExam: ExamRecord | null;
@@ -19,18 +18,13 @@ export interface PredictionCardProps {
  */
 export const PredictionCard: React.FC<PredictionCardProps> = ({ latestExam, mealPlans, now }) => {
   const fb = latestExam?.ai_feedback;
-  const weeks = fb?.tempo_estimado || fb?.base_weeks || null;
+  const weeks = estimatedWeeks(latestExam);
   const focus = fb?.focos_sugeridos?.filter(Boolean) ?? [];
   const description = fb?.analise_preditiva?.trim();
   if (!latestExam || (!description && !weeks && focus.length === 0)) return null;
 
   // Início do tratamento = primeiro plano alimentar.
-  const firstPlan = mealPlans.length
-    ? mealPlans.reduce((a, b) => (new Date(a.created_at) < new Date(b.created_at) ? a : b))
-    : null;
-  const currentWeek = firstPlan
-    ? Math.floor(Math.max(0, differenceInCalendarDays(now, new Date(firstPlan.created_at))) / 7) + 1
-    : null;
+  const currentWeek = treatmentWeek(mealPlans, now);
 
   return (
     <Card as="section" aria-labelledby="prediction-title" className="space-y-4 border-indigo-100 bg-indigo-50">
