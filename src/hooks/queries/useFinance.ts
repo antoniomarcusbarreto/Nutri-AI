@@ -18,16 +18,23 @@ import {
  * bloco de pagamento da Agenda sempre coerentes entre si.
  */
 
+// `payment_patient_name` (campo calculado, migration 0030): o dono vê os
+// recebimentos da clínica toda, mas o RLS de `patients` esconde o cadastro de
+// pacientes de outro nutricionista — o nome vem por aqui, sem CPF/telefone.
 const PAYMENT_SELECT =
-  '*, patients ( name, cpf, phone ), profiles!payments_nutritionist_id_fkey ( full_name, crn )';
+  '*, payment_patient_name, patients ( name, cpf, phone ), profiles!payments_nutritionist_id_fkey ( full_name, crn )';
 
 // PostgREST pode devolver `numeric` como string dependendo da configuração.
-const normalizePayment = (row: PaymentRecord): PaymentRecord => ({
-  ...row,
-  amount: Number(row.amount),
-  discount: Number(row.discount),
-  net_amount: Number(row.net_amount),
-});
+const normalizePayment = (row: PaymentRecord & { payment_patient_name?: string | null }): PaymentRecord => {
+  const { payment_patient_name, ...rest } = row;
+  return {
+    ...rest,
+    patients: rest.patients ?? (payment_patient_name ? { name: payment_patient_name, cpf: null, phone: null } : null),
+    amount: Number(rest.amount),
+    discount: Number(rest.discount),
+    net_amount: Number(rest.net_amount),
+  };
+};
 
 const normalizeExpense = (row: ExpenseRecord): ExpenseRecord => ({ ...row, amount: Number(row.amount) });
 

@@ -73,7 +73,9 @@ export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
   const undo = useUndoPayment();
   const setCancelled = useSetChargeCancelled();
   const remove = useDeletePayment();
+  // Secretária só recebe (migration 0030 garante no banco): não edita nem exclui cobrança.
   const canDelete = userRole === 'owner' || userRole === 'nutritionist';
+  const canEditCharge = canDelete;
 
   const [query, setQuery] = useState('');
   const [paying, setPaying] = useState<PaymentRecord | null>(null);
@@ -263,7 +265,7 @@ export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
                               <>
                                 <div className="fixed inset-0 z-10" onClick={() => setOpenMenu(null)} aria-hidden="true" />
                                 <div role="menu" className="absolute right-0 z-20 mt-1 w-52 rounded-xl border border-slate-200 bg-white bg-white-pure p-1 shadow-md">
-                                  {p.status === 'pendente' && (
+                                  {p.status === 'pendente' && canEditCharge && (
                                     <MenuItem icon={<Pencil />} onClick={() => { setOpenMenu(null); setEditing(p); }}>Editar valor ou data</MenuItem>
                                   )}
                                   {p.status === 'pago' && (
