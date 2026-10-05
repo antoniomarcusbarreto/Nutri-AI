@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Plus, 
   ChevronLeft, 
@@ -79,6 +80,7 @@ interface AgendaReschedule {
 
 export const Agenda: React.FC = () => {
   const { clinic, isReadOnly, profile, userRole } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   // Criar/remarcar/cancelar/excluir consulta mexe na cobrança via trigger (migration 0026).
   const refreshFinance = useCallback(
@@ -412,6 +414,19 @@ export const Agenda: React.FC = () => {
     setPatientSearch('');
     setIsNewModalOpen(true);
   };
+
+  // Atalho do Dashboard: /agenda?novo=1 abre o novo agendamento para hoje,
+  // depois que os profissionais carregaram (definem o nutricionista padrão).
+  useEffect(() => {
+    if (searchParams.get('novo') !== '1' || professionals.length === 0) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('novo');
+      return next;
+    }, { replace: true });
+    handleDayClick(new Date());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, professionals.length]);
 
   const handleAppointmentClick = (apt: AgendaAppointment, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering day cell click

@@ -17,9 +17,17 @@ export const qk = {
   appointments: {
     all: ['appointments'] as const,
     upcoming: (clinicId: string) => ['appointments', 'upcoming', clinicId] as const,
+    /** Hoje + próximos dias, a partir do início do dia `day` (YYYY-MM-DD). */
+    agenda: (clinicId: string, day: string) => ['appointments', 'agenda', clinicId, day] as const,
     byMonth: (clinicId: string, monthKey: string) =>
       ['appointments', 'month', clinicId, monthKey] as const,
     byPatient: (patientId: string) => ['appointments', 'patient', patientId] as const,
+  },
+  dashboard: {
+    all: ['dashboard'] as const,
+    actions: (clinicId: string, userId: string, clinical: boolean) =>
+      ['dashboard', 'actions', clinicId, userId, clinical] as const,
+    setup: (clinicId: string) => ['dashboard', 'setup', clinicId] as const,
   },
   reminders: {
     all: ['reminders'] as const,

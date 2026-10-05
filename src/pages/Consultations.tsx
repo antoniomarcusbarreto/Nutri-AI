@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   FileText,
   Search,
@@ -510,6 +511,22 @@ ${insights}`;
     }
     setSelectedAppointment(apt);
   };
+
+  // Atalho do Dashboard ("Atender"): /consultas?agendamento=<id> abre o atendimento.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkId = searchParams.get('agendamento');
+  useEffect(() => {
+    if (!deepLinkId || loading) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('agendamento');
+      return next;
+    }, { replace: true });
+    const apt = appointments.find((a) => a.id === deepLinkId);
+    if (apt) handleOpenAppointment(apt);
+    else showToast('Agendamento não encontrado.', 'error');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkId, loading]);
 
   // Pós-finalização do atendimento (disparado por <ConsultationForm/>).
   const handleConsultationFinalized = async () => {

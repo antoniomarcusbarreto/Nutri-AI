@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, Check, ClipboardList, KeyRound } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -19,6 +20,7 @@ const errMessage = (err: unknown): string => {
 
 export const Patients: React.FC = () => {
   const { clinic, profile, userRole, isReadOnly, isTrialActive } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -164,6 +166,19 @@ export const Patients: React.FC = () => {
     }
     setIsModalOpen(true);
   };
+
+  // Atalho do Dashboard: /pacientes?novo=1 abre o cadastro. A secretária
+  // espera a lista de profissionais (define o nutricionista padrão).
+  useEffect(() => {
+    if (searchParams.get('novo') !== '1' || isReadOnly || (isSecretary && professionals.length === 0)) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('novo');
+      return next;
+    }, { replace: true });
+    handleOpenModal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, professionals.length]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
