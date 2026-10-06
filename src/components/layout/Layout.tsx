@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -7,6 +7,19 @@ import { uploadAvatar } from '../../lib/storage';
 
 import { useToast } from '../../contexts/ToastContext';
 import { logger } from '../../lib/logger';
+import { CopilotProvider, useCopilot } from '../copilot/CopilotProvider';
+import { CopilotButton } from '../copilot/CopilotButton';
+
+// Painel + react-markdown só são baixados quando o co-piloto é aberto.
+const CopilotPanel = lazy(() => import('../copilot/CopilotPanel'));
+
+const CopilotMount: React.FC = () => {
+  const { open } = useCopilot();
+  const [loaded, setLoaded] = useState(false);
+  if (open && !loaded) setLoaded(true);
+  if (!loaded) return null;
+  return <Suspense fallback={null}><CopilotPanel /></Suspense>;
+};
 
 export const Layout: React.FC = () => {
   const { profile, clinic, updateProfile } = useAuth();
@@ -75,6 +88,7 @@ export const Layout: React.FC = () => {
   };
 
   return (
+    <CopilotProvider>
     <div className={`flex h-screen overflow-hidden print:h-auto print:block print:overflow-visible ${shellBg} ${isDarkShell ? 'theme-dark' : ''} ${themeColor === 'master' ? 'theme-master' : ''} font-sans transition-colors duration-200 print:!bg-white`}>
       <a
         href="#conteudo"
@@ -126,6 +140,7 @@ export const Layout: React.FC = () => {
           </button>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
+            <CopilotButton textClass={getTextColor()} />
             <span className={`text-sm font-medium ${getTextColor()}`}>
               {profile?.full_name || 'Profissional'}
             </span>
@@ -176,6 +191,8 @@ export const Layout: React.FC = () => {
           <Outlet />
         </div>
       </main>
+      <CopilotMount />
     </div>
+    </CopilotProvider>
   );
 };

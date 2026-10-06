@@ -61,6 +61,22 @@ function kindFromStatus(status: number): GeminiErrorKind {
   }
 }
 
+/**
+ * Traduz o erro de `supabase.functions.invoke` de uma função de IA num
+ * `GeminiError`. Usado pelo gemini-proxy e pelo co-piloto.
+ */
+export async function toGeminiError(error: unknown): Promise<GeminiError> {
+  // supabase-js: FunctionsHttpError (não-2xx) traz .context: Response
+  const ctx = (error as { context?: Response }).context;
+  if (ctx && typeof ctx.status === 'number') {
+    let serverMsg: string | undefined;
+    try { serverMsg = (await ctx.clone().json())?.error; } catch { /* corpo não-JSON */ }
+    return new GeminiError(kindFromStatus(ctx.status), serverMsg);
+  }
+  // FunctionsFetchError / FunctionsRelayError → sem Response
+  return new GeminiError('network');
+}
+
 export type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 
 /** Tarefa de IA; o gemini-proxy escolhe o modelo a partir dela (o cliente nunca escolhe modelo). */
@@ -89,17 +105,7 @@ export async function callGemini<T>(opts: {
     },
   });
 
-  if (error) {
-    // supabase-js: FunctionsHttpError (não-2xx) traz .context: Response
-    const ctx = (error as { context?: Response }).context;
-    if (ctx && typeof ctx.status === 'number') {
-      let serverMsg: string | undefined;
-      try { serverMsg = (await ctx.clone().json())?.error; } catch { /* corpo não-JSON */ }
-      throw new GeminiError(kindFromStatus(ctx.status), serverMsg);
-    }
-    // FunctionsFetchError / FunctionsRelayError → sem Response
-    throw new GeminiError('network');
-  }
+  if (error) throw await toGeminiError(error);
 
   const text: string | null = data?.text ?? null;
   if (!text) throw new GeminiError('upstream');

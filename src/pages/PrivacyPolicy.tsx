@@ -40,6 +40,9 @@ export const PrivacyPolicy: React.FC = () => {
             <p className="mb-6">
               Os dados coletados são utilizados estritamente para o funcionamento das funcionalidades do sistema. As fotos de pratos enviadas pelos pacientes são processadas via API de inteligência artificial de forma segura para fins exclusivos de identificação de ingredientes e macronutrientes daquela refeição. Não comercializamos, sob nenhuma hipótese, dados de saúde ou informações pessoais com terceiros.
             </p>
+            <p className="mb-6">
+              Os recursos de IA usados pelo profissional (análise de exames, estruturação de prontuário, geração de plano alimentar e o Co-piloto, assistente que responde perguntas sobre pacientes, agenda e financeiro) enviam ao provedor de IA somente os dados necessários para aquela tarefa. O Co-piloto não envia CPF, e-mail nem telefone dos pacientes, apenas consulta dados que o próprio profissional já tem permissão para ver e não altera nenhuma informação. As conversas com o Co-piloto não são armazenadas pelo NutriAI.
+            </p>
 
             <h2 className="text-xl font-bold text-slate-900 mt-8 mb-4">3. Segurança e Armazenamento</h2>
             <p className="mb-6">
