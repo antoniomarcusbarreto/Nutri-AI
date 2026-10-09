@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   Plus, 
@@ -40,6 +40,8 @@ import { AgendaMonthGrid } from '../components/agenda/AgendaMonthGrid';
 import { AppointmentPaymentBlock } from '../components/financial/AppointmentPaymentBlock';
 import { useQueryClient } from '@tanstack/react-query';
 import { qk } from '../lib/queryKeys';
+import { usePendingChangeRequests, useHandleChangeRequest } from '../hooks/queries/usePortal';
+import { PatientRequestsPanel } from '../components/agenda/PatientRequestsPanel';
 
 interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
 interface AgendaServiceLink { id?: string; name?: string | null; duration_minutes?: number | null; price?: number | null }
@@ -124,6 +126,8 @@ export const Agenda: React.FC = () => {
   const [reschedules, setReschedules] = useState<AgendaReschedule[]>([]);
   const [loadingReschedules, setLoadingReschedules] = useState(false);
   const [isRescheduleMode, setIsRescheduleMode] = useState(false);
+  // Pedido do paciente pelo app (migration 0031): abrir a consulta já em "Reagendar".
+  const autoRescheduleRef = useRef<string | null>(null);
   const [rescheduleData, setRescheduleData] = useState({
     date: '',
     time: '',
@@ -239,6 +243,35 @@ export const Agenda: React.FC = () => {
     }
   }, [clinic?.id]);
 
+  // Pedidos de pacientes pelo app (o RLS recorta pelo que o usuário enxerga).
+  const { data: changeRequests = [] } = usePendingChangeRequests(clinic?.id);
+  const resolveRequest = useHandleChangeRequest();
+  const [resolvingRequestId, setResolvingRequestId] = useState<string | null>(null);
+  const pendingRescheduleFor = (appointmentId: string | undefined) =>
+    changeRequests.find((r) => r.appointment_id === appointmentId && r.kind === 'reschedule');
+
+  const handleResolveRequest = (requestId: string, status: 'aceito' | 'recusado', silent = false) => {
+    setResolvingRequestId(requestId);
+    resolveRequest.mutate(
+      { requestId, status },
+      {
+        onSuccess: () => {
+          if (!silent) showToast(status === 'recusado' ? 'Pedido recusado. Combine outro horário com o paciente.' : 'Pedido resolvido.', 'success');
+          fetchAppointments();
+        },
+        onError: () => showToast('Não foi possível atualizar o pedido.', 'error'),
+        onSettled: () => setResolvingRequestId(null),
+      },
+    );
+  };
+
+  const openRescheduleFromRequest = (appointmentId: string) => {
+    const apt = appointments.find((a) => a.id === appointmentId);
+    if (!apt) return;
+    autoRescheduleRef.current = apt.id;
+    setSelectedAppointment(apt);
+  };
+
   const isAttention = (apt: AgendaAppointment) => {
     if (!apt) return false;
     if (apt.status === 'cancelado' || apt.status === 'concluido') return false;
@@ -300,6 +333,11 @@ export const Agenda: React.FC = () => {
         time: format(apptDate, 'HH:mm'),
         reason: ''
       });
+      if (autoRescheduleRef.current === selectedApptId) {
+        setIsRescheduleMode(true);
+        setRescheduleData((prev) => ({ ...prev, reason: 'A pedido do paciente (app)' }));
+      }
+      autoRescheduleRef.current = null;
     } else {
       setReschedules([]);
       setIsRescheduleMode(false);
@@ -427,6 +465,23 @@ export const Agenda: React.FC = () => {
     handleDayClick(new Date());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, professionals.length]);
+
+  // Atalho do Dashboard: /agenda?agendamento=<id> abre os detalhes da consulta.
+  useEffect(() => {
+    const id = searchParams.get('agendamento');
+    if (!id || appointments.length === 0) return;
+    const apt = appointments.find((a) => a.id === id);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('agendamento');
+      return next;
+    }, { replace: true });
+    if (apt) {
+      setSelectedDate(new Date(apt.date_time));
+      setSelectedAppointment(apt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, appointments.length]);
 
   const handleAppointmentClick = (apt: AgendaAppointment, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering day cell click
@@ -564,6 +619,10 @@ export const Agenda: React.FC = () => {
       // Reset reschedule mode
       setIsRescheduleMode(false);
       
+      // Pedido de reagendamento do paciente, se houver, fica atendido.
+      const request = pendingRescheduleFor(selectedAppointment.id);
+      if (request) handleResolveRequest(request.id, 'aceito', true);
+
       // Refresh the reschedules list
       fetchReschedules(selectedAppointment.id);
       refreshFinance();
@@ -664,6 +723,15 @@ export const Agenda: React.FC = () => {
             Novo Agendamento
           </Button>
         </>}
+      />
+
+      <PatientRequestsPanel
+        requests={changeRequests}
+        appointmentById={(id) => appointments.find((a) => a.id === id)}
+        onReschedule={openRescheduleFromRequest}
+        onResolve={(id, status) => handleResolveRequest(id, status)}
+        resolvingId={resolvingRequestId}
+        readOnly={isReadOnly}
       />
 
       {/* CALENDAR BODY */}
@@ -1165,6 +1233,28 @@ export const Agenda: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {(() => {
+                const request = pendingRescheduleFor(selectedAppointment.id);
+                if (!request) return null;
+                return (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-sm">
+                    <p className="font-semibold text-blue-900">O paciente pediu outro horário pelo app</p>
+                    {request.preferred_times && <p className="mt-1 text-slate-700"><span className="text-slate-500">Prefere:</span> {request.preferred_times}</p>}
+                    {request.note && <p className="mt-1 text-slate-600">&ldquo;{request.note}&rdquo;</p>}
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        onClick={() => handleResolveRequest(request.id, 'recusado')}
+                        disabled={resolvingRequestId === request.id}
+                        className="mt-2 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-50"
+                      >
+                        Recusar pedido
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Copy Link Section */}
               <div className="bg-primary-50/50 border border-primary-100/80 rounded-2xl p-4 flex flex-col gap-2.5">

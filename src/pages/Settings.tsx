@@ -1,19 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Palette, Check, RefreshCw, Lock, Unlock, Key, Search, UserCheck, Info, AlertTriangle, LifeBuoy, Send } from 'lucide-react';
+import { Palette, Check, RefreshCw, Lock, Unlock, Smartphone, Search, UserCheck, Info, AlertTriangle, LifeBuoy, Send } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { logger } from '../lib/logger';
 import { PageHeader, Modal, Card, Button, Input, Select, Textarea, FormActions } from '../components/ui';
 import { reportToSupport, type SupportRequestType } from '../lib/support';
 import { AccessSharingPanel } from '../components/settings/AccessSharingPanel';
+import { PortalAccessModal } from '../components/patients/PortalAccessModal';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
 interface TeamMember {
   id: string;
   full_name?: string | null;
-  email?: string | null;
+  email: string | null;
   phone?: string | null;
   crn?: string | null;
   role?: string | null;
@@ -24,7 +25,7 @@ interface TeamMember {
 interface StaffRpcRow {
   user_id: string;
   full_name?: string | null;
-  email?: string | null;
+  email: string | null;
   phone?: string | null;
   crn?: string | null;
   role?: string | null;
@@ -39,9 +40,10 @@ interface PatientProfileLink {
 interface PatientAccessRow {
   id: string;
   name: string;
-  email?: string | null;
-  user_id?: string | null;
-  has_app_access?: boolean | null;
+  email: string | null;
+  user_id: string | null;
+  phone: string | null;
+  portal_access_until: string | null;
   profiles?: PatientProfileLink | PatientProfileLink[] | null;
 }
 
@@ -65,10 +67,7 @@ export const Settings: React.FC = () => {
   const [patientAccessList, setPatientAccessList] = useState<PatientAccessRow[]>([]);
   const [searchPatientAccess, setSearchPatientAccess] = useState('');
   const [loadingPatientsAccess, setLoadingPatientsAccess] = useState(false);
-  const [passwordModalPatient, setPasswordModalPatient] = useState<PatientAccessRow | null>(null);
-  const [newPatientPassword, setNewPatientPassword] = useState('');
-  const [passwordSaving, setPasswordSaving] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [portalModalPatient, setPortalModalPatient] = useState<PatientAccessRow | null>(null);
 
   // Team states
   const [teamList, setTeamList] = useState<TeamMember[]>([]);
@@ -216,7 +215,7 @@ export const Settings: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('patients')
-        .select('id, name, email, user_id, profiles(is_active)')
+        .select('id, name, email, phone, user_id, portal_access_until, profiles(is_active)')
         .eq('clinic_id', clinic.id)
         .eq('has_clinical_access', true)
         .not('user_id', 'is', null)
@@ -391,31 +390,6 @@ export const Settings: React.FC = () => {
       showToast(errMessage(err) || 'Erro ao alterar status de acesso do paciente.', 'error');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passwordModalPatient?.user_id || !newPatientPassword) return;
-    
-    setPasswordSaving(true);
-    setPasswordError(null);
-    try {
-      const { error } = await supabase.rpc('change_patient_password', {
-        p_patient_user_id: passwordModalPatient.user_id,
-        p_new_password: newPatientPassword
-      });
-      
-      if (error) throw error;
-      
-      showToast('Senha alterada com sucesso!', 'success');
-      setPasswordModalPatient(null);
-      setNewPatientPassword('');
-    } catch (err) {
-      logger.error('Erro ao alterar senha do paciente:', err);
-      setPasswordError(errMessage(err) || 'Erro ao redefinir a senha do paciente.');
-    } finally {
-      setPasswordSaving(false);
     }
   };
 
@@ -1139,15 +1113,11 @@ export const Settings: React.FC = () => {
                           
                           <button
                             type="button"
-                            onClick={() => {
-                              setPasswordModalPatient(patient);
-                              setNewPatientPassword('');
-                              setPasswordError(null);
-                            }}
+                            onClick={() => setPortalModalPatient(patient)}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
                           >
-                            <Key className="w-3.5 h-3.5" />
-                            Alterar Senha
+                            <Smartphone className="w-3.5 h-3.5" />
+                            Prazo do app
                           </button>
                         </div>
                       </Card>
@@ -1218,38 +1188,16 @@ export const Settings: React.FC = () => {
         </Card>
       )}
 
-      {/* Modal de Alteração de Senha do Paciente */}
-      {passwordModalPatient && (
-      <Modal
-        open={!!passwordModalPatient}
-        onClose={() => setPasswordModalPatient(null)}
-        title="Definir nova senha"
-        description={`Paciente: ${passwordModalPatient.name}`}
-        footer={<>
-          <button type="button" onClick={() => setPasswordModalPatient(null)} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer">Cancelar</button>
-          <button type="submit" form="patient-password-form" disabled={passwordSaving} className="rounded-xl font-bold py-2.5 px-5 text-sm transition-all text-white bg-[#5024fc] hover:bg-[#431cdb] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-            {passwordSaving ? (<><RefreshCw className="w-4 h-4 animate-spin" />Salvando...</>) : 'Salvar nova senha'}
-          </button>
-        </>}
-      >
-            {passwordError && (
-              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium">
-                {passwordError}
-              </div>
-            )}
-
-            <form id="patient-password-form" onSubmit={handleChangePasswordSubmit} className="space-y-4">
-              <Input
-                label="Nova Senha Temporária"
-                type="password"
-                required
-                placeholder="Mínimo de 6 caracteres"
-                minLength={6}
-                value={newPatientPassword}
-                onChange={e => setNewPatientPassword(e.target.value)}
-              />
-            </form>
-      </Modal>
+      {portalModalPatient && (
+        <PortalAccessModal
+          open={!!portalModalPatient}
+          patient={portalModalPatient}
+          readOnly={isReadOnly}
+          onClose={() => {
+            setPortalModalPatient(null);
+            loadPatientsAccess();
+          }}
+        />
       )}
 
       {/* Modal de Cadastro/Edição de Funcionário */}

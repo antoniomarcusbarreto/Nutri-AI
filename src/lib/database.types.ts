@@ -547,6 +547,9 @@ export type Database = {
           name: string
           nutritionist_id: string
           phone: string | null
+          portal_access_until: string | null
+          portal_terms_accepted_at: string | null
+          portal_terms_version: string | null
           status: string
           user_id: string | null
         }
@@ -563,6 +566,9 @@ export type Database = {
           name: string
           nutritionist_id: string
           phone?: string | null
+          portal_access_until?: string | null
+          portal_terms_accepted_at?: string | null
+          portal_terms_version?: string | null
           status?: string
           user_id?: string | null
         }
@@ -579,6 +585,9 @@ export type Database = {
           name?: string
           nutritionist_id?: string
           phone?: string | null
+          portal_access_until?: string | null
+          portal_terms_accepted_at?: string | null
+          portal_terms_version?: string | null
           status?: string
           user_id?: string | null
         }

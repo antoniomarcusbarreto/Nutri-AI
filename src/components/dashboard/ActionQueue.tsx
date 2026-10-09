@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ClipboardList, Copy, FlaskConical, MessageCircle, UserRoundX, Utensils } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Copy, FlaskConical, MessageCircle, Smartphone, UserRoundX, Utensils } from 'lucide-react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { DashboardActions } from '../../hooks/queries/useDashboard';
 import { cn } from '../../lib/cn';
@@ -82,7 +82,7 @@ export interface ActionQueueProps {
 export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmation, onCopyForm }) => {
   const a = query.data;
   const total = a
-    ? a.confirmations.length + a.missingForms.length + a.pendingExams.length + a.withoutPlan.length + a.withoutReturn.length
+    ? a.patientRequests.length + a.confirmations.length + a.missingForms.length + a.pendingExams.length + a.withoutPlan.length + a.withoutReturn.length
     : 0;
 
   return (
@@ -105,6 +105,18 @@ export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmat
         </div>
       ) : (
         <ul className="space-y-2.5">
+          <Group
+            icon={Smartphone}
+            tone="rose"
+            title="Pedidos de pacientes pelo app"
+            rows={a.patientRequests.map((r) => ({
+              key: r.id,
+              primary: r.patientName,
+              secondary: `${r.kind === 'cancel' ? 'cancelou' : 'quer reagendar'}${r.dateTime ? ` ${fmtWhen(r.dateTime)}` : ''}`,
+              to: `/agenda?agendamento=${r.appointmentId}`,
+            }))}
+            more={{ to: '/agenda', label: 'Abrir agenda' }}
+          />
           <Group
             icon={MessageCircle}
             tone="amber"

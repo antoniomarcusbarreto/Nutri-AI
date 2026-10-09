@@ -30,7 +30,12 @@ const Exams = lazy(() => import('./pages/Exams').then(m => ({ default: m.Exams }
 const Tracking = lazy(() => import('./pages/Tracking').then(m => ({ default: m.Tracking })));
 const MealPlans = lazy(() => import('./pages/MealPlans').then(m => ({ default: m.MealPlans })));
 const PublicPlanViewer = lazy(() => import('./pages/PublicPlanViewer'));
-const PatientPortal = lazy(() => import('./pages/PatientPortal').then(m => ({ default: m.PatientPortal })));
+const PortalInvite = lazy(() => import('./pages/PortalInvite').then(m => ({ default: m.PortalInvite })));
+const PortalLayout = lazy(() => import('./components/portal/PortalLayout').then(m => ({ default: m.PortalLayout })));
+const PortalHome = lazy(() => import('./pages/portal/PortalHome').then(m => ({ default: m.PortalHome })));
+const PortalPlan = lazy(() => import('./pages/portal/PortalPlan').then(m => ({ default: m.PortalPlan })));
+const PortalAgenda = lazy(() => import('./pages/portal/PortalAgenda').then(m => ({ default: m.PortalAgenda })));
+const PortalProfile = lazy(() => import('./pages/portal/PortalProfile').then(m => ({ default: m.PortalProfile })));
 const PreConsulta = lazy(() => import('./pages/PreConsulta').then(m => ({ default: m.PreConsulta })));
 const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(m => ({ default: m.ConfirmAppointment })));
 
@@ -50,16 +55,23 @@ function App() {
               <Route path="/ficha/:token" element={<PreConsulta />} />
               <Route path="/plano/:id" element={<PublicPlanViewer />} />
               <Route path="/confirmar/:token" element={<ConfirmAppointment />} />
+              <Route path="/convite/:token" element={<PortalInvite />} />
               <Route path="/login" element={<Login />} />
               <Route path="/termos" element={<TermsOfService />} />
               <Route path="/privacidade" element={<PrivacyPolicy />} />
 
-              {/* Patient Portal Route (Standalone, no sidebar) */}
+              {/* Portal do Paciente (sem sidebar; migration 0031) */}
               <Route path="/portal" element={
                 <ProtectedRoute>
-                  <PatientPortal />
+                  <PortalLayout />
                 </ProtectedRoute>
-              } />
+              }>
+                <Route index element={<PortalHome />} />
+                <Route path="plano" element={<PortalPlan />} />
+                <Route path="agenda" element={<PortalAgenda />} />
+                <Route path="perfil" element={<PortalProfile />} />
+                <Route path="*" element={<Navigate to="/portal" replace />} />
+              </Route>
 
               {/* Protected Routes with Sidebar Layout */}
               <Route element={

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
+import type { PortalContext } from '../types/portal';
 
 interface Profile {
   id: string;
@@ -41,6 +42,9 @@ interface AuthContextType {
   clinic: Clinic | null;
   userRole: 'owner' | 'nutritionist' | 'secretary' | null;
   isPatient: boolean;
+  /** Dados do portal do paciente logado (null para a equipe ou sem acesso liberado). */
+  patientPortal: PortalContext | null;
+  refreshPortal: () => Promise<void>;
   loading: boolean;
   signOut: () => Promise<void>;
   remainingTrialDays: number;
@@ -58,6 +62,8 @@ const AuthContext = createContext<AuthContextType>({
   clinic: null,
   userRole: null,
   isPatient: false,
+  patientPortal: null,
+  refreshPortal: async () => {},
   loading: true,
   signOut: async () => {},
   remainingTrialDays: 0,
@@ -78,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'nutritionist' | 'secretary' | null>(null);
   const [isPatient, setIsPatient] = useState(false);
+  const [patientPortal, setPatientPortal] = useState<PortalContext | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Trial & Subscription Logic
@@ -227,6 +234,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
         if (patientData && patientData.length > 0) {
           setIsPatient(true);
+          // Prazo vencido NÃO desloga: o portal fica somente leitura (migration 0031).
+          const { data: portal, error: portalError } = await supabase.rpc('portal_context');
+          if (portalError) logger.error('Error fetching portal context:', portalError);
+          setPatientPortal((portal as PortalContext | null) ?? null);
         }
       }
     } catch (error) {
@@ -255,6 +266,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
         setClinic(null);
         setUserRole(null);
+        setIsPatient(false);
+        setPatientPortal(null);
         setLoading(false);
       }
     });
@@ -263,17 +276,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Montagem única: assina onAuthStateChange e faz o bootstrap da sessão.
   }, []);
 
+  const refreshPortal = useCallback(async () => {
+    const { data, error } = await supabase.rpc('portal_context');
+    if (error) {
+      logger.error('Error refreshing portal context:', error);
+      return;
+    }
+    setPatientPortal((data as PortalContext | null) ?? null);
+  }, []);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
 
   const value = useMemo(
     () => ({
-      session, user, profile, clinic, userRole, isPatient, loading, signOut,
+      session, user, profile, clinic, userRole, isPatient, patientPortal, refreshPortal, loading, signOut,
       remainingTrialDays, isReadOnly, isTrialActive, updateTheme, updateProfile, updateClinic,
     }),
     [
-      session, user, profile, clinic, userRole, isPatient, loading, signOut,
+      session, user, profile, clinic, userRole, isPatient, patientPortal, refreshPortal, loading, signOut,
       remainingTrialDays, isReadOnly, isTrialActive, updateTheme, updateProfile, updateClinic,
     ],
   );

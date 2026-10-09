@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, Check, ClipboardList, KeyRound } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, Check, ClipboardList, KeyRound, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -11,6 +11,8 @@ import { qk } from '../lib/queryKeys';
 import { logger } from '../lib/logger';
 import type { PatientRow } from '../types/clinical';
 import { PageHeader, Modal } from '../components/ui';
+import { PortalAccessModal } from '../components/patients/PortalAccessModal';
+import { portalAccessState } from '../types/portal';
 
 const errMessage = (err: unknown): string => {
   if (err instanceof Error) return err.message;
@@ -56,16 +58,16 @@ export const Patients: React.FC = () => {
     email: '',
     phone: '',
     status: 'ativo',
-    password: '',
     birth_date: '',
     biological_sex: 'F',
     main_goal: 'Emagrecimento',
-    has_app_access: false,
     nutritionist_id: ''
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [portalPatientId, setPortalPatientId] = useState<string | null>(null);
+  const portalPatient = patients.find((p) => p.id === portalPatientId) ?? null;
 
   // Clinical modal states
   const [isClinicalModalOpen, setIsClinicalModalOpen] = useState(false);
@@ -141,11 +143,9 @@ export const Patients: React.FC = () => {
         email: patient.email || '',
         phone: patient.phone || '',
         status: patient.status,
-        password: '', // Don't prefill password
         birth_date: patient.birth_date ? toInputDate(patient.birth_date) : '',
         biological_sex: patient.biological_sex || 'F',
         main_goal: patient.main_goal || 'Emagrecimento',
-        has_app_access: false,
         nutritionist_id: patient.nutritionist_id
       });
     } else {
@@ -156,11 +156,9 @@ export const Patients: React.FC = () => {
         email: '',
         phone: '',
         status: 'ativo',
-        password: '',
         birth_date: '',
         biological_sex: 'F',
         main_goal: 'Emagrecimento',
-        has_app_access: false,
         nutritionist_id: isSecretary ? (professionals.length === 1 ? professionals[0].id : '') : profile?.id ?? ''
       });
     }
@@ -184,11 +182,6 @@ export const Patients: React.FC = () => {
     e.preventDefault();
     if (!clinic) return;
     
-    if (!editingPatient && formData.has_app_access && formData.password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
-      return;
-    }
-
     const isoBirthDate = toIsoDate(formData.birth_date);
     if (!isoBirthDate) {
       setError('Data de Nascimento inválida. Use o formato DD/MM/AAAA');
@@ -231,11 +224,8 @@ export const Patients: React.FC = () => {
           showToast('Link de confirmação enviado ao novo e-mail do paciente.', 'success');
         }
       } else {
-        // Create new patient via RPC
-        const generatedPassword = formData.has_app_access
-          ? formData.password
-          : `${crypto.randomUUID().slice(0, 10)}A1@`;
-        
+        // Cadastro sem conta de login: o acesso ao app é liberado depois, por
+        // convite (migration 0031).
         const { error: rpcError } = await supabase.rpc('create_patient_account', {
           p_clinic_id: clinic.id,
           p_name: formData.name,
@@ -243,7 +233,6 @@ export const Patients: React.FC = () => {
           p_email: formData.email,
           p_phone: formData.phone,
           p_status: formData.status,
-          p_password: generatedPassword,
           p_birth_date: isoBirthDate,
           p_biological_sex: formData.biological_sex,
           p_main_goal: formData.main_goal,
@@ -415,6 +404,14 @@ export const Patients: React.FC = () => {
                         )}
                       </div>
                       <div className="text-slate-500 text-sm mt-0.5">CPF: {patient.cpf || 'Não informado'}</div>
+                      {hasAccess && portalAccessState(patient.portal_access_until) !== 'none' && (
+                        <div className="text-slate-500 text-xs mt-0.5 flex items-center gap-1">
+                          <Smartphone className="h-3 w-3" aria-hidden="true" />
+                          {portalAccessState(patient.portal_access_until) === 'active'
+                            ? `App até ${new Date(patient.portal_access_until!).toLocaleDateString('pt-BR')}`
+                            : 'App somente leitura'}
+                        </div>
+                      )}
                       {patient.nutritionist_id !== profile?.id && (
                         <div className="text-slate-500 text-xs mt-0.5">
                           Responsável: {professionalName(patient.nutritionist_id)}
@@ -484,6 +481,16 @@ export const Patients: React.FC = () => {
                           >
                             <ClipboardList className="h-4 w-4" />
                             Ficha
+                          </button>
+                        )}
+                        {hasAccess && (
+                          <button
+                            onClick={() => setPortalPatientId(patient.id)}
+                            className="transition-colors flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-slate-500 hover:text-primary-600 hover:bg-slate-50"
+                            title="Acesso do paciente ao app"
+                          >
+                            <Smartphone className="h-4 w-4" />
+                            App
                           </button>
                         )}
                         {!hasAccess && !isSecretary && (
@@ -579,39 +586,8 @@ export const Patients: React.FC = () => {
                     onChange={e => setFormData({...formData, email: e.target.value})}
                     className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
                   />
-                  <p className="text-xs text-slate-500 mt-1">Será usado para o login do paciente.</p>
+                  <p className="text-xs text-slate-500 mt-1">É para este e-mail que vai o código do convite do app.</p>
                 </div>
-
-                {!editingPatient && (
-                  <div className="md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 mt-1">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.has_app_access}
-                        onChange={e => setFormData({...formData, has_app_access: e.target.checked})}
-                        className="h-4.5 w-4.5 rounded border-slate-350 text-indigo-650 focus:ring-indigo-600 cursor-pointer"
-                      />
-                      <div>
-                        <span className="block text-sm font-semibold text-slate-900">Permitir acesso do paciente ao Aplicativo</span>
-                        <span className="block text-xs text-slate-500 mt-0.5">O paciente poderá fazer login para ver o plano alimentar e registrar o diário.</span>
-                      </div>
-                    </label>
-                  </div>
-                )}
-
-                {!editingPatient && formData.has_app_access && (
-                  <div className="md:col-span-2">
-                    <label className="text-slate-700 font-semibold text-sm mb-1 block">Senha de Acesso *</label>
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      value={formData.password}
-                      onChange={e => setFormData({...formData, password: e.target.value})}
-                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 focus:outline-none bg-white font-normal text-slate-700 shadow-sm"
-                    />
-                  </div>
-                )}
 
                 <div>
                   <label className="text-slate-700 font-semibold text-sm mb-1 block">Telefone (WhatsApp) *</label>
@@ -801,6 +777,14 @@ export const Patients: React.FC = () => {
 
             </form>
       </Modal>
+      )}
+      {portalPatient && (
+        <PortalAccessModal
+          open={!!portalPatient}
+          patient={portalPatient}
+          readOnly={isReadOnly}
+          onClose={() => setPortalPatientId(null)}
+        />
       )}
     </div>
   );

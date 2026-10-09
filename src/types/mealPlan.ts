@@ -29,3 +29,9 @@ export const MEAL_NAMES: Record<string, string> = {
   dinner: 'Jantar',
   supper: 'Ceia',
 };
+
+/** Refeições do plano na ordem do dia. */
+export const sortMealKeys = (meals: Record<string, unknown>): string[] => {
+  const order = Object.keys(MEAL_NAMES);
+  return Object.keys(meals).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+};

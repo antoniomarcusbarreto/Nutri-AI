@@ -195,6 +195,7 @@ export interface PendingConfirmation { id: string; patientName: string; dateTime
 export interface MissingForm { patientId: string; patientName: string; dateTime: string; formToken: string | null }
 export interface PendingExam { id: string; patientId: string; patientName: string; uploadedAt: string }
 export interface PatientSince { patientId: string; patientName: string; since: string }
+export interface PatientRequest { id: string; appointmentId: string; patientName: string; kind: 'reschedule' | 'cancel'; dateTime: string | null }
 
 export interface DashboardActions {
   /** Consultas pendentes de confirmação nas próximas 48h. */
@@ -207,6 +208,8 @@ export interface DashboardActions {
   withoutPlan: PatientSince[];
   /** Pacientes ativos sem consulta há 45+ dias e sem retorno marcado. */
   withoutReturn: PatientSince[];
+  /** Pedidos feitos pelo paciente no app (reagendar / cancelou) — migration 0031. */
+  patientRequests: PatientRequest[];
 }
 
 const HEALTH_FIELDS = ['allergies', 'dietary_restrictions', 'pathologies', 'medications', 'physical_activity_level', 'profession', 'sleep_quality'] as const;
@@ -245,13 +248,20 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
         .order('date_time', { ascending: true });
       if (clinical) confirmationsQuery = confirmationsQuery.eq('nutritionist_id', userId!);
 
+      // O RLS recorta os pedidos pelas consultas que o usuário enxerga.
+      const requestsQuery = supabase.from('appointment_change_requests')
+        .select('id, appointment_id, kind, appointments(date_time, patients:patient_id(name))')
+        .eq('clinic_id', clinicId!).eq('status', 'pendente')
+        .order('created_at', { ascending: true });
+
       if (!clinical) {
-        const { data, error } = await confirmationsQuery;
+        const [{ data, error }, requests] = await Promise.all([confirmationsQuery, requestsQuery]);
         if (error) throw error;
-        return { confirmations: mapConfirmations(data), missingForms: [], pendingExams: [], withoutPlan: [], withoutReturn: [] };
+        if (requests.error) throw requests.error;
+        return { confirmations: mapConfirmations(data), missingForms: [], pendingExams: [], withoutPlan: [], withoutReturn: [], patientRequests: mapRequests(requests.data) };
       }
 
-      const [confirmations, upcoming, exams, consultations, plans, history] = await Promise.all([
+      const [confirmations, upcoming, exams, consultations, plans, history, requests] = await Promise.all([
         confirmationsQuery,
         supabase.from('appointments')
           .select(`patient_id, date_time, patients:patient_id(name, form_token, patient_health(${HEALTH_FIELDS.join(', ')}))`)
@@ -276,8 +286,9 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
           .gte('date_time', ago365d)
           .order('date_time', { ascending: false })
           .limit(1000),
+        requestsQuery,
       ]);
-      for (const r of [confirmations, upcoming, exams, consultations, plans, history]) {
+      for (const r of [confirmations, upcoming, exams, consultations, plans, history, requests]) {
         if (r.error) throw r.error;
       }
 
@@ -337,8 +348,20 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
         pendingExams,
         withoutPlan,
         withoutReturn,
+        patientRequests: mapRequests(requests.data),
       };
     },
+  });
+}
+
+function mapRequests(data: unknown): PatientRequest[] {
+  type Row = { id: string; appointment_id: string; kind: 'reschedule' | 'cancel'; appointments: One<{ date_time?: string; patients?: One<{ name?: string }> }> };
+  return ((data ?? []) as Row[]).map((r) => {
+    const apt = pickOne(r.appointments);
+    return {
+      id: r.id, appointmentId: r.appointment_id, kind: r.kind,
+      dateTime: apt?.date_time ?? null, patientName: pickOne(apt?.patients ?? null)?.name ?? 'Paciente',
+    };
   });
 }
 

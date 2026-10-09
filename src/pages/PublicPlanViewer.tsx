@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Lock, Clock, CheckCircle2, Printer, Apple } from 'lucide-react';
+import { Lock, CheckCircle2, Printer, Apple } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { logger } from '../lib/logger';
-import { type MealOption, MEAL_NAMES } from '../types/mealPlan';
+import { type MealOption } from '../types/mealPlan';
+import { MealPlanView } from '../components/mealplan/MealPlanView';
 
 interface PublicPlan {
   meals: Record<string, MealOption[]>;
@@ -13,58 +14,12 @@ interface PublicPlan {
   patient?: { name?: string | null } | null;
 }
 
-const getHeaderTheme = (mealKey: string) => {
-  if (['breakfast', 'morning_snack'].includes(mealKey)) {
-    return {
-      bg: 'bg-amber-50',
-      text: 'text-amber-800',
-      icon: 'text-amber-600',
-      border: 'border-amber-100',
-      switcherBg: 'bg-amber-100/50',
-      switcherActive: 'bg-white text-amber-700 shadow-sm ring-1 ring-amber-200',
-      switcherInactive: 'text-amber-600/70 hover:text-amber-700 hover:bg-amber-100/50'
-    };
-  }
-  if (['lunch', 'dinner'].includes(mealKey)) {
-    return {
-      bg: 'bg-blue-50',
-      text: 'text-blue-800',
-      icon: 'text-blue-600',
-      border: 'border-blue-100',
-      switcherBg: 'bg-blue-100/50',
-      switcherActive: 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-200',
-      switcherInactive: 'text-blue-600/70 hover:text-blue-700 hover:bg-blue-100/50'
-    };
-  }
-  if (['pre_workout', 'post_workout'].includes(mealKey)) {
-    return {
-      bg: 'bg-emerald-50',
-      text: 'text-emerald-800',
-      icon: 'text-emerald-600',
-      border: 'border-emerald-100',
-      switcherBg: 'bg-emerald-100/50',
-      switcherActive: 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-200',
-      switcherInactive: 'text-emerald-600/70 hover:text-emerald-700 hover:bg-emerald-100/50'
-    };
-  }
-  return {
-    bg: 'bg-indigo-50',
-    text: 'text-indigo-800',
-    icon: 'text-indigo-600',
-    border: 'border-indigo-100',
-    switcherBg: 'bg-indigo-100/50',
-    switcherActive: 'bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-200',
-    switcherInactive: 'text-indigo-600/70 hover:text-indigo-700 hover:bg-indigo-100/50'
-  };
-};
-
 export default function PublicPlanViewer() {
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [planData, setPlanData] = useState<PublicPlan | null>(null);
   const [birthDate, setBirthDate] = useState('');
-  const [optionActiveTab, setOptionActiveTab] = useState<{ [key: string]: number }>({});
 
   const formatDOB = (value: string) => {
     const v = value.replace(/\D/g, '');
@@ -100,12 +55,6 @@ export default function PublicPlanViewer() {
 
       setPlanData(data);
       
-      // Initialize tabs
-      const initialTabs: { [key: string]: number } = {};
-      Object.keys(data.meals || {}).forEach(m => {
-        initialTabs[m] = 0;
-      });
-      setOptionActiveTab(initialTabs);
       
     } catch (err) {
       logger.error(err);
@@ -208,89 +157,7 @@ export default function PublicPlanViewer() {
                   <p className="text-base text-slate-800 font-semibold mt-1">Plano Alimentar</p>
                 </div>
 
-                {/* Meals list */}
-                <div className="space-y-5">
-                  {Object.keys(planData.meals)
-                    .sort((a, b) => {
-                      const order = Object.keys(MEAL_NAMES);
-                      return order.indexOf(a) - order.indexOf(b);
-                    })
-                    .map(mealKey => {
-                    const options: MealOption[] = planData.meals[mealKey] || [];
-                    const activeOptionIdx = optionActiveTab[mealKey] !== undefined ? optionActiveTab[mealKey] : 0;
-                    const currentOption: MealOption = options[activeOptionIdx] || options[0] || { description: '', items: [], kcal: 0 };
-                    const headerTheme = getHeaderTheme(mealKey);
-
-                    return (
-                      <div key={mealKey} className="border border-slate-200/85 rounded-2xl bg-white shadow-sm overflow-hidden flex flex-col print:border-slate-300 print:shadow-none print:!overflow-visible">
-                        
-                        {/* Meal Title Bar */}
-                        <div className={`${headerTheme.bg} border-b ${headerTheme.border} px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0`}>
-                          <div className={`text-sm font-semibold ${headerTheme.text} flex items-center gap-2`}>
-                            <Clock className={`w-4 h-4 ${headerTheme.icon}`} />
-                            <span>{MEAL_NAMES[mealKey]}</span>
-                          </div>
-                          
-                          {/* 3 Options Tab Switchers */}
-                          <div className={`flex p-0.5 ${headerTheme.switcherBg} rounded-lg shrink-0 print:hidden`}>
-                            {options.map((_opt, optIdx) => (
-                              <button
-                                key={optIdx}
-                                onClick={() => setOptionActiveTab(prev => ({ ...prev, [mealKey]: optIdx }))}
-                                className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                  activeOptionIdx === optIdx 
-                                    ? headerTheme.switcherActive
-                                    : headerTheme.switcherInactive
-                                }`}
-                              >
-                                OPÇÃO {optIdx + 1}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Selected Option Content Area */}
-                        <div className="p-5 space-y-4">
-                          
-                          {/* Option Description Input */}
-                          <div>
-                            <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5 print:hidden">
-                              Descrição da Opção {activeOptionIdx + 1}
-                            </label>
-                            <p className="text-sm font-semibold text-slate-700 bg-transparent border-none py-1.5">
-                              {currentOption.description || `Opção ${activeOptionIdx + 1}`}
-                            </p>
-                          </div>
-
-                          {/* Items List */}
-                          <div>
-                            <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                              Alimentos / Componentes
-                            </label>
-                            <ul className="space-y-2">
-                              {currentOption.items?.map((item, itemIdx: number) => (
-                                <li key={itemIdx} className="flex gap-3 text-sm text-slate-600 font-medium group">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 shrink-0"></span>
-                                  {/* `items` é string[] (formato da IA/editor) — DEBT-05 */}
-                                  <p>{typeof item === 'string' ? item : (item as unknown as { description?: string }).description}</p>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          {/* Kcal Footer */}
-                          <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Calorias:</span>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-sm font-bold text-slate-700">{currentOption.kcal || 0}</span>
-                              <span className="text-xs font-semibold text-slate-400">kcal</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <MealPlanView meals={planData.meals} />
               </div>
             </div>
           </div>
