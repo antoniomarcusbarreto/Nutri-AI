@@ -149,7 +149,7 @@ export const PortalLayout: React.FC = () => {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Link to="/portal" className="rounded-xl focus-visible:ring-2 focus-visible:ring-teal-500" aria-label="Início">
+          <Link to="/portal" className="shrink-0 rounded-xl focus-visible:ring-2 focus-visible:ring-teal-500" aria-label="Início">
             <Wordmark />
           </Link>
           {patientPortal.clinic.name && (

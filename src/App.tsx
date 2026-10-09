@@ -36,7 +36,8 @@ const PortalHome = lazy(() => import('./pages/portal/PortalHome').then(m => ({ d
 const PortalPlan = lazy(() => import('./pages/portal/PortalPlan').then(m => ({ default: m.PortalPlan })));
 const PortalAgenda = lazy(() => import('./pages/portal/PortalAgenda').then(m => ({ default: m.PortalAgenda })));
 const PortalProfile = lazy(() => import('./pages/portal/PortalProfile').then(m => ({ default: m.PortalProfile })));
-const PreConsulta = lazy(() => import('./pages/PreConsulta').then(m => ({ default: m.PreConsulta })));
+const FichaMoved = lazy(() => import('./pages/FichaMoved').then(m => ({ default: m.FichaMoved })));
+const PortalHealthPage = lazy(() => import('./pages/portal/PortalHealth').then(m => ({ default: m.PortalHealthPage })));
 const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(m => ({ default: m.ConfirmAppointment })));
 
 const CLINICAL: ('owner' | 'nutritionist')[] = ['owner', 'nutritionist'];
@@ -52,7 +53,7 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Landing />} />
-              <Route path="/ficha/:token" element={<PreConsulta />} />
+              <Route path="/ficha/:token" element={<FichaMoved />} />
               <Route path="/plano/:id" element={<PublicPlanViewer />} />
               <Route path="/confirmar/:token" element={<ConfirmAppointment />} />
               <Route path="/convite/:token" element={<PortalInvite />} />
@@ -70,6 +71,7 @@ function App() {
                 <Route path="plano" element={<PortalPlan />} />
                 <Route path="agenda" element={<PortalAgenda />} />
                 <Route path="perfil" element={<PortalProfile />} />
+                <Route path="ficha" element={<PortalHealthPage />} />
                 <Route path="*" element={<Navigate to="/portal" replace />} />
               </Route>
 

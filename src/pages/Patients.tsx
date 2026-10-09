@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, Check, ClipboardList, KeyRound, Smartphone } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, ClipboardList, KeyRound, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -65,7 +65,6 @@ export const Patients: React.FC = () => {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [portalPatientId, setPortalPatientId] = useState<string | null>(null);
   const portalPatient = patients.find((p) => p.id === portalPatientId) ?? null;
 
@@ -444,35 +443,6 @@ export const Patients: React.FC = () => {
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-3">
-                        <button 
-                          onClick={() => {
-                            if (patient.form_token) {
-                              const link = `${window.location.origin}/ficha/${patient.form_token}`;
-                              navigator.clipboard.writeText(link);
-                              setCopiedId(patient.id);
-                              setTimeout(() => setCopiedId(null), 2000);
-                            } else {
-                              showToast('Token não gerado. Edite e salve o paciente para gerar.', 'error');
-                            }
-                          }}
-                          className={`transition-colors flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md ${
-                            copiedId === patient.id 
-                              ? 'bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20' 
-                              : 'text-slate-500 hover:text-primary-600 hover:bg-slate-50'
-                          }`}
-                          title="Copiar Link da Ficha"
-                        >
-                          {copiedId === patient.id ? (
-                            <>
-                              <Check className="h-4 w-4" /> Copiado
-                            </>
-                          ) : (
-                            <>
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                              Link
-                            </>
-                          )}
-                        </button>
                         {hasAccess && (
                           <button
                             onClick={() => handleOpenClinicalModal(patient)}

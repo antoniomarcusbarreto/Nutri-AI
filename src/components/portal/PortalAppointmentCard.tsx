@@ -5,7 +5,9 @@ import { ptBR } from 'date-fns/locale';
 import { Button, Modal, Textarea } from '../ui';
 import { useToast } from '../../contexts/ToastContext';
 import { usePortalAppointmentActions } from '../../hooks/queries/usePortal';
-import { isActionable, type AppointmentStatus, type PortalAppointment } from '../../types/portal';
+import { isActionable, type AppointmentStatus, type PortalAppointment, type PortalRequest } from '../../types/portal';
+import { PickSlotModal } from './PickSlotModal';
+import { PortalRequestNotice } from './PortalRequestNotice';
 import { cn } from '../../lib/cn';
 
 const STATUS: Record<AppointmentStatus, { label: string; className: string }> = {
@@ -24,27 +26,29 @@ export interface PortalAppointmentCardProps {
   canAct: boolean;
   /** Destaque maior (próxima consulta na tela inicial). */
   featured?: boolean;
+  /** Pedido de remarcação desta consulta (aberto ou respondido há pouco). */
+  request?: PortalRequest;
+  /** O nutricionista tem grade configurada: dá para escolher horário pelo app. */
+  bookingEnabled?: boolean;
+  clinicPhone?: string | null;
 }
 
-export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ appointment: a, patientId, canAct, featured }) => {
+export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ appointment: a, patientId, canAct, featured, request, bookingEnabled, clinicPhone }) => {
   const { showToast } = useToast();
-  const { confirm, cancel, requestReschedule } = usePortalAppointmentActions(patientId);
+  const { confirm, cancel, requestReschedule } = usePortalAppointmentActions();
   const [dialog, setDialog] = useState<'cancel' | 'reschedule' | null>(null);
   const [note, setNote] = useState('');
-  const [preferred, setPreferred] = useState('');
-  const [preferredError, setPreferredError] = useState<string | null>(null);
 
   const date = new Date(a.date_time);
   const status = STATUS[a.status] ?? STATUS.pendente;
   const actionable = canAct && isActionable(a);
-  const hasPendingReschedule = a.pending_request_kind === 'reschedule';
+  const openRequest = request && (request.status === 'pendente' || request.status === 'proposto') ? request : undefined;
+  const hasPendingReschedule = !!openRequest || a.pending_request_kind === 'reschedule';
   const online = (a.modality ?? '').toLowerCase().includes('online');
 
   const closeDialog = () => {
     setDialog(null);
     setNote('');
-    setPreferred('');
-    setPreferredError(null);
   };
 
   const onConfirm = () =>
@@ -65,22 +69,17 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
       },
     );
 
-  const onReschedule = () => {
-    if (!preferred.trim()) {
-      setPreferredError('Conte quais dias e horários ficam melhores para você.');
-      return;
-    }
+  const onReschedule = (slot: string, slotNote: string) =>
     requestReschedule.mutate(
-      { appointmentId: a.id, preferredTimes: preferred, note },
+      { appointmentId: a.id, slot, note: slotNote },
       {
         onSuccess: () => {
           closeDialog();
-          showToast('Pedido enviado. A clínica vai responder com um novo horário.', 'success');
+          showToast('Pedido enviado. A clínica confirma o novo horário em breve.', 'success');
         },
         onError: (err) => showToast(errText(err), 'error'),
       },
     );
-  };
 
   return (
     <article className={cn('rounded-2xl border border-slate-200 bg-white p-5 shadow-sm', featured && 'sm:p-6')}>
@@ -90,7 +89,7 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
           <span className="text-2xl font-semibold leading-none tabular-nums">{format(date, 'd')}</span>
         </div>
         <div className="min-w-0 flex-1">
-          <p className={cn('font-semibold capitalize text-slate-900', featured ? 'text-lg' : 'text-base')}>
+          <p className={cn('font-semibold text-slate-900 first-letter:uppercase', featured ? 'text-lg' : 'text-base')}>
             {format(date, "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
@@ -118,12 +117,18 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
             {hasPendingReschedule && a.status !== 'cancelado' && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
                 <CalendarClock className="h-3 w-3" aria-hidden="true" />
-                Reagendamento pedido
+                {openRequest?.status === 'proposto' ? 'Nova data sugerida' : 'Remarcação pedida'}
               </span>
             )}
           </div>
         </div>
       </div>
+
+      {request && a.status !== 'cancelado' && (
+        <div className="mt-4">
+          <PortalRequestNotice request={request} canAct={canAct} />
+        </div>
+      )}
 
       {actionable && (
         <div className="mt-5 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:flex-wrap">
@@ -138,7 +143,7 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
               Confirmar presença
             </Button>
           )}
-          {!hasPendingReschedule && (
+          {!hasPendingReschedule && bookingEnabled && (
             <Button
               variant="secondary"
               className="h-11 sm:h-auto"
@@ -156,46 +161,27 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
           >
             Cancelar consulta
           </Button>
+          {!hasPendingReschedule && !bookingEnabled && clinicPhone && (
+            <p className="text-center text-sm text-slate-500 sm:basis-full sm:text-left">
+              Para remarcar, ligue para a clínica: <a className="font-medium text-[#5024fc]" href={`tel:${clinicPhone}`}>{clinicPhone}</a>
+            </p>
+          )}
         </div>
       )}
 
-      <Modal
+      <PickSlotModal
         open={dialog === 'reschedule'}
         onClose={closeDialog}
-        title="Pedir outro horário"
-        description="A clínica recebe o pedido e responde com um novo horário."
-        footer={
-          <>
-            <Button variant="secondary" onClick={closeDialog}>Voltar</Button>
-            <Button variant="primary" loading={requestReschedule.isPending} onClick={onReschedule}>Enviar pedido</Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            Sua consulta de <strong className="font-semibold text-slate-900">{format(date, "d 'de' MMMM 'às' HH:mm", { locale: ptBR })}</strong> continua
-            marcada até a clínica confirmar a troca.
-          </p>
-          <Textarea
-            label="Quais dias e horários ficam melhores?"
-            placeholder="Ex.: terça ou quinta depois das 17h"
-            value={preferred}
-            maxLength={500}
-            error={preferredError ?? undefined}
-            onChange={(e) => {
-              setPreferred(e.target.value);
-              setPreferredError(null);
-            }}
-          />
-          <Textarea
-            label="Observação (opcional)"
-            value={note}
-            maxLength={500}
-            rows={2}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-      </Modal>
+        patientId={patientId}
+        appointmentId={a.id}
+        title="Escolher outro horário"
+        description="Horários livres na agenda. A clínica confirma a troca."
+        intro={<>Sua consulta de <strong className="font-semibold text-slate-900">{format(date, "d 'de' MMMM 'às' HH:mm", { locale: ptBR })}</strong> continua marcada até a clínica confirmar.</>}
+        submitLabel="Pedir este horário"
+        submitting={requestReschedule.isPending}
+        onSubmit={onReschedule}
+        clinicPhone={clinicPhone}
+      />
 
       <Modal
         open={dialog === 'cancel'}
@@ -211,8 +197,7 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
       >
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
-            {format(date, "EEEE, d 'de' MMMM 'às' HH:mm", { locale: ptBR })}. Se preferir só mudar o horário, use
-            &ldquo;Pedir outro horário&rdquo;.
+            {format(date, "EEEE, d 'de' MMMM 'às' HH:mm", { locale: ptBR })}. {bookingEnabled ? <>Se preferir só mudar o horário, use &ldquo;Pedir outro horário&rdquo;.</> : null}
           </p>
           <Textarea
             label="Quer contar o motivo? (opcional)"

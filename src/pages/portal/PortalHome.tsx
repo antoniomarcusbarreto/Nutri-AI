@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, UtensilsCrossed } from 'lucide-react';
+import { ArrowRight, CalendarDays, ClipboardList, UtensilsCrossed } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { usePortalAppointments, usePortalMealPlan } from '../../hooks/queries/usePortal';
+import { isHealthComplete, usePortalAppointments, usePortalHealth, usePortalMealPlan, usePortalRequests } from '../../hooks/queries/usePortal';
+import { PortalBookingSection } from '../../components/portal/PortalBookingSection';
+import { latestRescheduleByAppointment } from '../../types/portal';
 import { PortalAppointmentCard } from '../../components/portal/PortalAppointmentCard';
 import { MealPlanView } from '../../components/mealplan/MealPlanView';
 import { MEAL_NAMES, sortMealKeys } from '../../types/mealPlan';
@@ -56,6 +58,10 @@ export const PortalHome: React.FC = () => {
   const patientId = patientPortal?.patient_id;
   const appointments = usePortalAppointments(patientId);
   const plan = usePortalMealPlan(patientId);
+  const { data: requests = [] } = usePortalRequests(patientId);
+  const health = usePortalHealth(patientId);
+  const needsHealthForm = health.isSuccess && !isHealthComplete(health.data) && !!patientPortal?.active;
+  const requestFor = latestRescheduleByAppointment(requests);
   const [now] = useState(() => Date.now());
 
   const next = (appointments.data ?? [])
@@ -76,6 +82,22 @@ export const PortalHome: React.FC = () => {
         )}
       </div>
 
+      {needsHealthForm && (
+        <Link
+          to="/portal/ficha"
+          className="flex items-center gap-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4 transition-colors hover:bg-teal-50"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-teal-700 ring-1 ring-teal-200">
+            <ClipboardList className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-teal-900">Preencha sua ficha de saúde</span>
+            <span className="block text-sm text-teal-800">Ajuda a preparar sua consulta. Leva uns 3 minutos.</span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-teal-700" aria-hidden="true" />
+        </Link>
+      )}
+
       <section aria-labelledby="home-next">
         <SectionTitle id="home-next" icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />} title="Próxima consulta" to="/portal/agenda" linkLabel="Todas" />
         {appointments.isLoading ? (
@@ -83,13 +105,25 @@ export const PortalHome: React.FC = () => {
         ) : appointments.isError ? (
           <p className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">Não foi possível carregar suas consultas. Tente de novo em instantes.</p>
         ) : next ? (
-          <PortalAppointmentCard appointment={next} patientId={patientId!} canAct={!!patientPortal?.active} featured />
+          <PortalAppointmentCard
+            appointment={next}
+            patientId={patientId!}
+            canAct={!!patientPortal?.active}
+            request={requestFor.get(next.id)}
+            bookingEnabled={!!patientPortal?.booking_enabled}
+            clinicPhone={patientPortal?.clinic.phone}
+            featured
+          />
         ) : (
           <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
-            Nenhuma consulta marcada. Quando a clínica agendar, ela aparece aqui para você confirmar.
+            Nenhuma consulta marcada.{patientPortal?.booking_enabled ? '' : ' Quando a clínica agendar, ela aparece aqui para você confirmar.'}
           </p>
         )}
       </section>
+
+      {patientPortal && !appointments.isLoading && (
+        <PortalBookingSection portal={patientPortal} requests={requests} hasUpcoming={!!next} />
+      )}
 
       <section aria-labelledby="home-meal">
         <SectionTitle

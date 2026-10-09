@@ -75,11 +75,10 @@ const CopyButton: React.FC<{ label: string; onClick: () => void }> = ({ label, o
 export interface ActionQueueProps {
   query: UseQueryResult<DashboardActions>;
   onCopyConfirmation: (token: string | null, patientName: string) => void;
-  onCopyForm: (formToken: string | null, patientName: string) => void;
 }
 
 /** "O que precisa da minha atenção" — cada grupo leva direto à ação. */
-export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmation, onCopyForm }) => {
+export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmation }) => {
   const a = query.data;
   const total = a
     ? a.patientRequests.length + a.confirmations.length + a.missingForms.length + a.pendingExams.length + a.withoutPlan.length + a.withoutReturn.length
@@ -112,8 +111,8 @@ export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmat
             rows={a.patientRequests.map((r) => ({
               key: r.id,
               primary: r.patientName,
-              secondary: `${r.kind === 'cancel' ? 'cancelou' : 'quer reagendar'}${r.dateTime ? ` ${fmtWhen(r.dateTime)}` : ''}`,
-              to: `/agenda?agendamento=${r.appointmentId}`,
+              secondary: `${r.kind === 'cancel' ? 'cancelou' : r.kind === 'booking' ? 'pediu consulta' : 'quer remarcar'}${r.dateTime ? ` ${fmtWhen(r.dateTime)}` : ''}`,
+              to: r.appointmentId ? `/agenda?agendamento=${r.appointmentId}` : '/agenda',
             }))}
             more={{ to: '/agenda', label: 'Abrir agenda' }}
           />
@@ -136,8 +135,9 @@ export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmat
             rows={a.missingForms.map((f) => ({
               key: f.patientId,
               primary: f.patientName,
-              secondary: `consulta ${fmtWhen(f.dateTime)}`,
-              action: <CopyButton label={`Copiar link da ficha de ${f.patientName}`} onClick={() => onCopyForm(f.formToken, f.patientName)} />,
+              // A ficha é preenchida no app do paciente; sem app, libere o acesso em Pacientes.
+              secondary: `consulta ${fmtWhen(f.dateTime)}${f.hasApp ? ' · aguardando no app' : ' · sem acesso ao app'}`,
+              to: '/pacientes',
             }))}
           />
           <Group

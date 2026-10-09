@@ -59,8 +59,18 @@ export const qk = {
     all: ['portal'] as const,
     appointments: (patientId: string) => ['portal', 'appointments', patientId] as const,
     mealPlan: (patientId: string) => ['portal', 'meal_plan', patientId] as const,
+    requests: (patientId: string) => ['portal', 'requests', patientId] as const,
+    health: (patientId: string) => ['portal', 'health', patientId] as const,
+    slots: (patientId: string, from: string, to: string, appointmentId: string) =>
+      ['portal', 'slots', patientId, from, to, appointmentId] as const,
     /** Convite pendente de um paciente (visão da equipe). */
     inviteStatus: (patientId: string) => ['portal', 'invite', patientId] as const,
+  },
+  availability: {
+    all: ['availability'] as const,
+    byNutritionist: (nutritionistId: string) => ['availability', nutritionistId] as const,
+    staffSlots: (nutritionistId: string, from: string, to: string, minutes: number, excludeAppointment: string, excludeRequest: string) =>
+      ['availability', 'slots', nutritionistId, from, to, minutes, excludeAppointment, excludeRequest] as const,
   },
   changeRequests: {
     all: ['change_requests'] as const,

@@ -1022,3 +1022,15 @@ html[data-theme="blue"] {
     min-height: auto !important;
   }
 }
+
+/* iOS Safari dá zoom automático ao focar campo com fonte < 16px e não desfaz:
+   a página passa a "não caber" e exige arrastar para os lados. Só no iOS
+   (-webkit-touch-callout), os campos ficam com 16px; o código de 6 dígitos
+   (text-2xl) mantém o tamanho maior. */
+@supports (-webkit-touch-callout: none) {
+  input:not(.text-2xl):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

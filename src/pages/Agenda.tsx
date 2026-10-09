@@ -40,7 +40,7 @@ import { AgendaMonthGrid } from '../components/agenda/AgendaMonthGrid';
 import { AppointmentPaymentBlock } from '../components/financial/AppointmentPaymentBlock';
 import { useQueryClient } from '@tanstack/react-query';
 import { qk } from '../lib/queryKeys';
-import { usePendingChangeRequests, useHandleChangeRequest } from '../hooks/queries/usePortal';
+import { usePendingChangeRequests, useHandleChangeRequest, useProposeChangeRequest } from '../hooks/queries/usePortal';
 import { PatientRequestsPanel } from '../components/agenda/PatientRequestsPanel';
 
 interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
@@ -246,9 +246,10 @@ export const Agenda: React.FC = () => {
   // Pedidos de pacientes pelo app (o RLS recorta pelo que o usuário enxerga).
   const { data: changeRequests = [] } = usePendingChangeRequests(clinic?.id);
   const resolveRequest = useHandleChangeRequest();
+  const proposeRequest = useProposeChangeRequest();
   const [resolvingRequestId, setResolvingRequestId] = useState<string | null>(null);
   const pendingRescheduleFor = (appointmentId: string | undefined) =>
-    changeRequests.find((r) => r.appointment_id === appointmentId && r.kind === 'reschedule');
+    changeRequests.find((r) => r.appointment_id === appointmentId && r.kind === 'reschedule' && r.status === 'pendente');
 
   const handleResolveRequest = (requestId: string, status: 'aceito' | 'recusado', silent = false) => {
     setResolvingRequestId(requestId);
@@ -256,11 +257,24 @@ export const Agenda: React.FC = () => {
       { requestId, status },
       {
         onSuccess: () => {
-          if (!silent) showToast(status === 'recusado' ? 'Pedido recusado. Combine outro horário com o paciente.' : 'Pedido resolvido.', 'success');
+          if (!silent) showToast(status === 'recusado' ? 'Pedido recusado. O paciente vê o aviso no app.' : 'Pedido aceito. A consulta já está na agenda.', 'success');
           fetchAppointments();
         },
-        onError: () => showToast('Não foi possível atualizar o pedido.', 'error'),
+        onError: (err) => showToast((err as { message?: string })?.message || 'Não foi possível atualizar o pedido.', 'error'),
         onSettled: () => setResolvingRequestId(null),
+      },
+    );
+  };
+
+  const handleProposeRequest = (requestId: string, proposedAt: string, note: string, done: () => void) => {
+    proposeRequest.mutate(
+      { requestId, proposedAt, note },
+      {
+        onSuccess: () => {
+          done();
+          showToast('Sugestão enviada. A consulta muda quando o paciente aceitar no app.', 'success');
+        },
+        onError: (err) => showToast((err as { message?: string })?.message || 'Não foi possível enviar a sugestão.', 'error'),
       },
     );
   };
@@ -620,8 +634,10 @@ export const Agenda: React.FC = () => {
       setIsRescheduleMode(false);
       
       // Pedido de reagendamento do paciente, se houver, fica atendido.
+      // Só pedidos antigos (sem horário escolhido): aceitar um pedido com
+      // horário aplicaria o horário do paciente por cima deste.
       const request = pendingRescheduleFor(selectedAppointment.id);
-      if (request) handleResolveRequest(request.id, 'aceito', true);
+      if (request && !request.requested_at) handleResolveRequest(request.id, 'aceito', true);
 
       // Refresh the reschedules list
       fetchReschedules(selectedAppointment.id);
@@ -727,7 +743,10 @@ export const Agenda: React.FC = () => {
 
       <PatientRequestsPanel
         requests={changeRequests}
-        appointmentById={(id) => appointments.find((a) => a.id === id)}
+        appointmentById={(id) => (id ? appointments.find((a) => a.id === id) : undefined)}
+        serviceMinutes={(serviceId) => services.find((sv) => sv.id === serviceId)?.duration_minutes || 60}
+        onPropose={handleProposeRequest}
+        proposing={proposeRequest.isPending}
         onReschedule={openRescheduleFromRequest}
         onResolve={(id, status) => handleResolveRequest(id, status)}
         resolvingId={resolvingRequestId}
@@ -1240,6 +1259,7 @@ export const Agenda: React.FC = () => {
                 return (
                   <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-sm">
                     <p className="font-semibold text-blue-900">O paciente pediu outro horário pelo app</p>
+                    {request.requested_at && <p className="mt-1 text-slate-700"><span className="text-slate-500">Horário escolhido:</span> {format(new Date(request.requested_at), "dd/MM 'às' HH:mm")}. Responda no painel de pedidos acima da agenda.</p>}
                     {request.preferred_times && <p className="mt-1 text-slate-700"><span className="text-slate-500">Prefere:</span> {request.preferred_times}</p>}
                     {request.note && <p className="mt-1 text-slate-600">&ldquo;{request.note}&rdquo;</p>}
                     {!isReadOnly && (

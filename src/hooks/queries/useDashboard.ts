@@ -192,10 +192,11 @@ export function useAgendaWindow(clinicId: string | undefined) {
 // ---------------------------------------------------------------------------
 
 export interface PendingConfirmation { id: string; patientName: string; dateTime: string; token: string | null }
-export interface MissingForm { patientId: string; patientName: string; dateTime: string; formToken: string | null }
+/** `hasApp`: o paciente tem acesso ao portal, onde preenche a ficha (migration 0033). */
+export interface MissingForm { patientId: string; patientName: string; dateTime: string; hasApp: boolean }
 export interface PendingExam { id: string; patientId: string; patientName: string; uploadedAt: string }
 export interface PatientSince { patientId: string; patientName: string; since: string }
-export interface PatientRequest { id: string; appointmentId: string; patientName: string; kind: 'reschedule' | 'cancel'; dateTime: string | null }
+export interface PatientRequest { id: string; appointmentId: string | null; patientName: string; kind: 'reschedule' | 'cancel' | 'booking'; dateTime: string | null }
 
 export interface DashboardActions {
   /** Consultas pendentes de confirmação nas próximas 48h. */
@@ -250,7 +251,7 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
 
       // O RLS recorta os pedidos pelas consultas que o usuário enxerga.
       const requestsQuery = supabase.from('appointment_change_requests')
-        .select('id, appointment_id, kind, appointments(date_time, patients:patient_id(name))')
+        .select('id, appointment_id, kind, requested_at, patients(name), appointments(date_time)')
         .eq('clinic_id', clinicId!).eq('status', 'pendente')
         .order('created_at', { ascending: true });
 
@@ -264,7 +265,7 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
       const [confirmations, upcoming, exams, consultations, plans, history, requests] = await Promise.all([
         confirmationsQuery,
         supabase.from('appointments')
-          .select(`patient_id, date_time, patients:patient_id(name, form_token, patient_health(${HEALTH_FIELDS.join(', ')}))`)
+          .select(`patient_id, date_time, patients:patient_id(name, portal_access_until, patient_health(${HEALTH_FIELDS.join(', ')}))`)
           .eq('clinic_id', clinicId!).eq('nutritionist_id', userId!).not('status', 'in', NOT_HELD)
           .gte('date_time', nowISO).lte('date_time', in7d)
           .order('date_time', { ascending: true }),
@@ -293,12 +294,12 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
       }
 
       // Ficha de saúde: um item por paciente, na consulta mais próxima.
-      type UpcomingRow = { patient_id: string; date_time: string; patients: One<{ name?: string; form_token?: string | null; patient_health?: One<HealthRow> }> };
+      type UpcomingRow = { patient_id: string; date_time: string; patients: One<{ name?: string; portal_access_until?: string | null; patient_health?: One<HealthRow> }> };
       const missingForms = new Map<string, MissingForm>();
       for (const row of (upcoming.data ?? []) as unknown as UpcomingRow[]) {
         const p = pickOne(row.patients);
         if (!p || missingForms.has(row.patient_id) || hasHealthData(p.patient_health ?? null)) continue;
-        missingForms.set(row.patient_id, { patientId: row.patient_id, patientName: p.name ?? 'Paciente', dateTime: row.date_time, formToken: p.form_token ?? null });
+        missingForms.set(row.patient_id, { patientId: row.patient_id, patientName: p.name ?? 'Paciente', dateTime: row.date_time, hasApp: !!p.portal_access_until && new Date(p.portal_access_until) > now });
       }
 
       type ExamRow = { id: string; created_at: string; patient_id: string; patients: One<{ name?: string }> };
@@ -355,14 +356,13 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
 }
 
 function mapRequests(data: unknown): PatientRequest[] {
-  type Row = { id: string; appointment_id: string; kind: 'reschedule' | 'cancel'; appointments: One<{ date_time?: string; patients?: One<{ name?: string }> }> };
-  return ((data ?? []) as Row[]).map((r) => {
-    const apt = pickOne(r.appointments);
-    return {
-      id: r.id, appointmentId: r.appointment_id, kind: r.kind,
-      dateTime: apt?.date_time ?? null, patientName: pickOne(apt?.patients ?? null)?.name ?? 'Paciente',
-    };
-  });
+  type Row = { id: string; appointment_id: string | null; kind: PatientRequest['kind']; requested_at: string | null; patients: One<{ name?: string }>; appointments: One<{ date_time?: string }> };
+  return ((data ?? []) as Row[]).map((r) => ({
+    id: r.id, appointmentId: r.appointment_id, kind: r.kind,
+    // Retorno: o horário pedido; remarcar/cancelar: a consulta em questão.
+    dateTime: r.kind === 'booking' ? r.requested_at : pickOne(r.appointments)?.date_time ?? null,
+    patientName: pickOne(r.patients)?.name ?? 'Paciente',
+  }));
 }
 
 function mapConfirmations(data: unknown): PendingConfirmation[] {

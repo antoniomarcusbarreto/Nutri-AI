@@ -47,11 +47,6 @@ export const Dashboard: React.FC = () => {
     void copyLink(`/confirmar/${token}`, `Link de confirmação de ${patientName} copiado. Envie pelo WhatsApp.`);
   };
 
-  const copyForm = (formToken: string | null, patientName: string) => {
-    if (!formToken) return showToast('Este paciente ainda não tem link de ficha. Gere em Pacientes.', 'error');
-    void copyLink(`/ficha/${formToken}`, `Link da ficha de ${patientName} copiado. Envie pelo WhatsApp.`);
-  };
-
   const now = new Date();
   const firstName = profile?.full_name?.split(' ')[0];
 
@@ -81,7 +76,7 @@ export const Dashboard: React.FC = () => {
           <TodayAgenda query={agendaQuery} userId={profile?.id} clinical={isClinical} canSchedule={!isReadOnly} onCopyConfirmation={copyConfirmation} />
         </div>
         <div className="lg:col-span-2">
-          <ActionQueue query={actionsQuery} onCopyConfirmation={copyConfirmation} onCopyForm={copyForm} />
+          <ActionQueue query={actionsQuery} onCopyConfirmation={copyConfirmation} />
         </div>
       </div>
 

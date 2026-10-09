@@ -8,6 +8,7 @@ import { PageHeader, Modal, Card, Button, Input, Select, Textarea, FormActions }
 import { reportToSupport, type SupportRequestType } from '../lib/support';
 import { AccessSharingPanel } from '../components/settings/AccessSharingPanel';
 import { PortalAccessModal } from '../components/patients/PortalAccessModal';
+import { AvailabilityPanel } from '../components/settings/AvailabilityPanel';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
@@ -54,8 +55,10 @@ export const Settings: React.FC = () => {
   const currentColor = profile?.theme_color || 'white';
   
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'clinic' | 'team' | 'services' | 'patient_access' | 'sharing' | 'support'>(() =>
-    new URLSearchParams(window.location.search).get('aba') === 'compartilhamento' ? 'sharing' : 'profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'clinic' | 'team' | 'services' | 'patient_access' | 'sharing' | 'availability' | 'support'>(() => {
+    const aba = new URLSearchParams(window.location.search).get('aba');
+    return aba === 'compartilhamento' ? 'sharing' : aba === 'horarios' ? 'availability' : 'profile';
+  });
   // Compartilhamento de pacientes e login dos pacientes são coisas de profissional
   // (migration 0029: secretária não tem acesso clínico).
   const isProfessional = userRole === 'owner' || userRole === 'nutritionist';
@@ -565,6 +568,14 @@ export const Settings: React.FC = () => {
               className={`${activeTab === 'patient_access' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
               Acesso dos Pacientes
+            </button>
+          )}
+          {isProfessional && (
+            <button
+              onClick={() => setActiveTab('availability')}
+              className={`${activeTab === 'availability' ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Horários
             </button>
           )}
           {isProfessional && (
@@ -1129,6 +1140,8 @@ export const Settings: React.FC = () => {
           </div>
         </Card>
       )}
+
+      {activeTab === 'availability' && isProfessional && <AvailabilityPanel />}
 
       {activeTab === 'sharing' && isProfessional && <AccessSharingPanel />}
 
