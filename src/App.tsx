@@ -37,6 +37,7 @@ const PortalPlan = lazy(() => import('./pages/portal/PortalPlan').then(m => ({ d
 const PortalAgenda = lazy(() => import('./pages/portal/PortalAgenda').then(m => ({ default: m.PortalAgenda })));
 const PortalProfile = lazy(() => import('./pages/portal/PortalProfile').then(m => ({ default: m.PortalProfile })));
 const FichaMoved = lazy(() => import('./pages/FichaMoved').then(m => ({ default: m.FichaMoved })));
+const PortalBodyAssessmentPage = lazy(() => import('./pages/portal/PortalBodyAssessment').then(m => ({ default: m.PortalBodyAssessmentPage })));
 const PortalHealthPage = lazy(() => import('./pages/portal/PortalHealth').then(m => ({ default: m.PortalHealthPage })));
 const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(m => ({ default: m.ConfirmAppointment })));
 
@@ -72,6 +73,7 @@ function App() {
                 <Route path="agenda" element={<PortalAgenda />} />
                 <Route path="perfil" element={<PortalProfile />} />
                 <Route path="ficha" element={<PortalHealthPage />} />
+                <Route path="avaliacao" element={<PortalBodyAssessmentPage />} />
                 <Route path="*" element={<Navigate to="/portal" replace />} />
               </Route>
 

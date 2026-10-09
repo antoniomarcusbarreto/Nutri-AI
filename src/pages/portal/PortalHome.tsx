@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, ClipboardList, UtensilsCrossed } from 'lucide-react';
+import { ArrowRight, CalendarDays, Camera, ClipboardList, UtensilsCrossed } from 'lucide-react';
+import { usePortalBodyAssessments } from '../../hooks/queries/useBodyAssessments';
 import { useAuth } from '../../contexts/AuthContext';
 import { isHealthComplete, usePortalAppointments, usePortalHealth, usePortalMealPlan, usePortalRequests } from '../../hooks/queries/usePortal';
 import { PortalBookingSection } from '../../components/portal/PortalBookingSection';
@@ -60,6 +61,8 @@ export const PortalHome: React.FC = () => {
   const plan = usePortalMealPlan(patientId);
   const { data: requests = [] } = usePortalRequests(patientId);
   const health = usePortalHealth(patientId);
+  const body = usePortalBodyAssessments(patientId);
+  const bodyRequested = !!patientPortal?.active && (body.data ?? []).some((a) => a.status === 'solicitada');
   const needsHealthForm = health.isSuccess && !isHealthComplete(health.data) && !!patientPortal?.active;
   const requestFor = latestRescheduleByAppointment(requests);
   const [now] = useState(() => Date.now());
@@ -81,6 +84,22 @@ export const PortalHome: React.FC = () => {
           <p className="mt-1 text-sm text-slate-500">Acompanhamento com {patientPortal.nutritionist_name}</p>
         )}
       </div>
+
+      {bodyRequested && (
+        <Link
+          to="/portal/avaliacao"
+          className="flex items-center gap-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4 transition-colors hover:bg-teal-50"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-teal-700 ring-1 ring-teal-200">
+            <Camera className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-teal-900">Avaliação corporal pedida</span>
+            <span className="block text-sm text-teal-800">Seu nutricionista pediu medidas e/ou fotos. Veja o passo a passo.</span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-teal-700" aria-hidden="true" />
+        </Link>
+      )}
 
       {needsHealthForm && (
         <Link

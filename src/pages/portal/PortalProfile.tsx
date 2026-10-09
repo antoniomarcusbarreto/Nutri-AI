@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronRight, ClipboardList, LogOut, Mail, Phone } from 'lucide-react';
+import { Activity, ChevronRight, ClipboardList, LogOut, Mail, Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui';
 
@@ -45,6 +45,18 @@ export const PortalProfile: React.FC = () => {
         <span className="min-w-0 flex-1">
           <span className="block text-base font-semibold text-slate-900">Ficha de saúde</span>
           <span className="block text-sm text-slate-500">Alergias, restrições, medicamentos e rotina</span>
+        </span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
+      </Link>
+
+      <Link
+        to="/portal/avaliacao"
+        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+      >
+        <Activity className="h-5 w-5 shrink-0 text-teal-700" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold text-slate-900">Avaliação corporal</span>
+          <span className="block text-sm text-slate-500">Medidas, fotos e resultados liberados pelo nutricionista</span>
         </span>
         <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
       </Link>

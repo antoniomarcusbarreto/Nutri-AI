@@ -15,6 +15,7 @@ export interface PortalContext {
   email: string | null;
   phone: string | null;
   birth_date: string | null;
+  biological_sex: string | null;
   main_goal: string | null;
   /** Fim do acesso. No passado = somente leitura. */
   access_until: string;
