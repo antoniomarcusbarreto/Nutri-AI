@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import {
-  Activity, Apple, CalendarDays, Camera, ClipboardList, Home, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, UtensilsCrossed,
+  Activity, Apple, CalendarDays, Camera, ClipboardList, Home, LockKeyhole, LogOut, Phone, ShieldCheck, Sparkles, UserRound, UtensilsCrossed,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,6 +11,7 @@ import { Button } from '../ui';
 import { PORTAL_TERMS_VERSION } from '../../types/portal';
 import { cn } from '../../lib/cn';
 import { usePortalTasks } from './usePortalTasks';
+import { PatientCopilotProvider } from './PatientCopilotProvider';
 
 /**
  * Moldura do Portal do Paciente.
@@ -19,7 +20,8 @@ import { usePortalTasks } from './usePortalTasks';
  *   navegação completa (com contadores do que falta fazer) e o contato da
  *   clínica no rodapé; o conteúdo ocupa um painel largo à direita.
  * - Celular/tablet: cabeçalho compacto + abas embaixo (as 4 rotas mais
- *   usadas; ficha e avaliação ficam a um toque pela tela inicial e Perfil).
+ *   usadas; ficha e avaliação ficam a um toque pela tela inicial e Perfil;
+ *   o assistente tem atalho no cabeçalho).
  *
  * Fica fora de `<main>` de propósito (landmark via `role="main"`): a camada
  * global de `index.css` re-estiliza `main label`/`main input`. Cores usam
@@ -32,6 +34,7 @@ const NAV = [
   { to: '/portal/plano', label: 'Plano alimentar', short: 'Plano', icon: UtensilsCrossed, end: false, mobile: true },
   { to: '/portal/refeicoes', label: 'Diário alimentar', short: 'Diário', icon: Camera, end: false, mobile: true },
   { to: '/portal/agenda', label: 'Consultas', short: 'Consultas', icon: CalendarDays, end: false, mobile: true },
+  { to: '/portal/assistente', label: 'Assistente', short: 'Assistente', icon: Sparkles, end: false, mobile: false },
   { to: '/portal/ficha', label: 'Ficha de saúde', short: 'Ficha', icon: ClipboardList, end: false, mobile: false },
   { to: '/portal/avaliacao', label: 'Avaliação corporal', short: 'Avaliação', icon: Activity, end: false, mobile: false },
   { to: '/portal/perfil', label: 'Perfil', short: 'Perfil', icon: UserRound, end: false, mobile: true },
@@ -266,6 +269,19 @@ export const PortalLayout: React.FC = () => {
             <Apple className="h-7 w-7 text-teal-200" aria-hidden="true" />
             <span className="ml-2.5 text-lg font-semibold tracking-tight">NutriAI</span>
           </Link>
+          <div className="flex min-w-0 items-center gap-1">
+          <NavLink
+            to="/portal/assistente"
+            className={({ isActive }) =>
+              cn(
+                'grid h-10 w-10 place-items-center rounded-lg text-teal-100 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-teal-200 lg:hidden',
+                isActive && 'bg-white/15 text-white',
+              )
+            }
+            aria-label="Assistente"
+          >
+            <Sparkles className="h-5 w-5" aria-hidden="true" />
+          </NavLink>
           <Link
             to="/portal/perfil"
             className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-1 text-sm font-medium text-slate-100 hover:text-white focus-visible:ring-2 focus-visible:ring-teal-200"
@@ -276,12 +292,15 @@ export const PortalLayout: React.FC = () => {
               {initials(patientPortal.name)}
             </span>
           </Link>
+          </div>
         </header>
 
         <main id="conteudo" className="flex-1 bg-slate-200">
           <div className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
             <div className="space-y-6">
-              <Outlet />
+              <PatientCopilotProvider>
+                <Outlet />
+              </PatientCopilotProvider>
             </div>
           </div>
         </main>

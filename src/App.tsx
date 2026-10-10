@@ -40,6 +40,7 @@ const FichaMoved = lazy(() => import('./pages/FichaMoved').then(m => ({ default:
 const PortalBodyAssessmentPage = lazy(() => import('./pages/portal/PortalBodyAssessment').then(m => ({ default: m.PortalBodyAssessmentPage })));
 const PortalMealsPage = lazy(() => import('./pages/portal/PortalMeals').then(m => ({ default: m.PortalMealsPage })));
 const PortalHealthPage = lazy(() => import('./pages/portal/PortalHealth').then(m => ({ default: m.PortalHealthPage })));
+const PortalAssistant = lazy(() => import('./pages/portal/PortalAssistant').then(m => ({ default: m.PortalAssistant })));
 const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(m => ({ default: m.ConfirmAppointment })));
 
 const CLINICAL: ('owner' | 'nutritionist')[] = ['owner', 'nutritionist'];
@@ -76,6 +77,7 @@ function App() {
                 <Route path="refeicoes" element={<PortalMealsPage />} />
                 <Route path="ficha" element={<PortalHealthPage />} />
                 <Route path="avaliacao" element={<PortalBodyAssessmentPage />} />
+                <Route path="assistente" element={<PortalAssistant />} />
                 <Route path="*" element={<Navigate to="/portal" replace />} />
               </Route>
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { differenceInCalendarDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowRight, CalendarX2, CheckCircle2, ChevronRight, Mail, Phone, UtensilsCrossed } from 'lucide-react';
+import { ArrowRight, CalendarX2, CheckCircle2, ChevronRight, Mail, Phone, Sparkles, UtensilsCrossed } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePortalAppointments, usePortalMealPlan, usePortalRequests } from '../../hooks/queries/usePortal';
 import { latestRescheduleByAppointment } from '../../types/portal';
@@ -183,7 +183,18 @@ export const PortalHome: React.FC = () => {
           ) : plan.isError ? (
             <p className="text-sm text-slate-600">Não foi possível carregar seu plano. Tente mais tarde.</p>
           ) : plan.data && mealKey ? (
-            <MealPlanView meals={plan.data.meals} only={[mealKey]} plain />
+            <>
+              <MealPlanView meals={plan.data.meals} only={[mealKey]} plain />
+              {patientPortal?.active && (
+                <Link
+                  to={`/portal/assistente?q=${encodeURIComponent(`Me dá uma receita para o ${(MEAL_NAMES[mealKey] ?? 'próxima refeição').toLowerCase()} de hoje`)}`}
+                  className="mt-4 inline-flex items-center gap-2 self-start rounded-lg text-sm font-medium text-[#5024fc] hover:text-[#431cdb]"
+                >
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  Quer uma receita com esta refeição? Pergunte ao assistente
+                </Link>
+              )}
+            </>
           ) : (
             <EmptyInCard icon={<UtensilsCrossed className="h-7 w-7" aria-hidden="true" />} title="Plano ainda não publicado">
               Ele aparece aqui assim que {nutri} montar.

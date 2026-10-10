@@ -1,7 +1,8 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Printer } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Printer, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePortalMealPlan } from '../../hooks/queries/usePortal';
 import { MealPlanView } from '../../components/mealplan/MealPlanView';
@@ -23,9 +24,18 @@ export const PortalPlan: React.FC = () => {
           </>
         ) : undefined}
         actions={plan.data ? (
+          <>
+          <Link
+            to="/portal/assistente"
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#5024fc] px-3.5 text-sm font-medium text-white hover:bg-[#431cdb] print:hidden"
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            Pedir uma receita
+          </Link>
           <Button variant="secondary" size="sm" className="print:hidden" leftIcon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>
             Imprimir
           </Button>
+          </>
         ) : undefined}
       />
 
