@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import {
-  Activity, CalendarDays, ClipboardList, Clock3, Home, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, UtensilsCrossed,
+  Activity, Apple, CalendarDays, ClipboardList, Clock3, Home, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, UtensilsCrossed,
 } from 'lucide-react';
 import { differenceInCalendarDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -152,31 +152,23 @@ const AccessBanner: React.FC<{ accessUntil: string; active: boolean; nutritionis
   );
 };
 
+/** Barra lateral no padrão do painel da equipe (tema teal: `bg-sidebar-teal`). */
 const Sidebar: React.FC = () => {
   const { patientPortal: p, signOut } = useAuth();
   const { countFor } = usePortalTasks();
   if (!p) return null;
 
   return (
-    <aside className="sticky top-0 hidden h-screen flex-col border-r border-slate-200 bg-white lg:flex">
-      <div className="px-6 pb-6 pt-7">
-        <Link to="/portal" className="inline-block rounded-xl focus-visible:ring-2 focus-visible:ring-teal-500" aria-label="Início">
-          <Wordmark />
+    <aside className="sticky top-0 hidden h-screen w-64 flex-col bg-sidebar-teal text-white lg:flex">
+      <div className="flex h-16 shrink-0 items-center border-b border-teal-700/20 px-6">
+        <Link to="/portal" className="flex items-center rounded-lg focus-visible:ring-2 focus-visible:ring-teal-200" aria-label="Início">
+          <Apple className="h-8 w-8 text-teal-200" aria-hidden="true" />
+          <span className="ml-3 text-xl font-semibold tracking-tight text-white">NutriAI</span>
         </Link>
       </div>
 
-      <div className="mx-4 flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal-600 text-sm font-semibold text-white" aria-hidden="true">
-          {initials(p.name)}
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-slate-900">{p.name}</span>
-          {p.nutritionist_name && <span className="block truncate text-xs text-slate-500">com {p.nutritionist_name}</span>}
-        </span>
-      </div>
-
-      <nav aria-label="Seções" className="mt-6 flex-1 overflow-y-auto px-3">
-        <ul className="space-y-0.5">
+      <nav aria-label="Seções" className="flex flex-1 flex-col overflow-y-auto px-4 pb-4 pt-6">
+        <ul className="flex flex-1 flex-col space-y-1">
           {NAV.map(({ to, label, icon: Icon, end }) => {
             const count = countFor(to);
             return (
@@ -186,20 +178,20 @@ const Sidebar: React.FC = () => {
                   end={end}
                   className={({ isActive }) =>
                     cn(
-                      'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                      isActive ? 'bg-teal-50 text-teal-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                      'group flex items-center gap-x-3 rounded-md p-3 text-sm font-medium leading-6 transition-colors duration-200',
+                      isActive ? 'bg-teal-700/60 text-white' : 'text-teal-100 hover:bg-teal-700/40 hover:text-white',
                     )
                   }
                 >
                   {({ isActive }) => (
                     <>
                       <Icon
-                        className={cn('h-[18px] w-[18px] shrink-0', isActive ? 'text-teal-700' : 'text-slate-400 group-hover:text-slate-600')}
+                        className={cn('h-5 w-5 shrink-0 transition-colors duration-200', isActive ? 'text-white' : 'text-teal-300 group-hover:text-white')}
                         aria-hidden="true"
                       />
                       <span className="flex-1">{label}</span>
                       {count > 0 && (
-                        <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#5024fc] px-1.5 text-[11px] font-semibold tabular-nums text-white">
+                        <span className="grid h-5 min-w-5 place-items-center rounded-full bg-white px-1.5 text-[11px] font-semibold tabular-nums text-teal-900">
                           {count}
                           <span className="sr-only"> pendente{count > 1 ? 's' : ''}</span>
                         </span>
@@ -211,31 +203,31 @@ const Sidebar: React.FC = () => {
             );
           })}
         </ul>
-      </nav>
 
-      <div className="space-y-2 border-t border-slate-100 p-4">
-        {p.clinic.name && (
-          <div className="px-3 pb-1 text-xs leading-relaxed text-slate-500">
-            <p className="font-medium text-slate-700">{p.clinic.name}</p>
-            {p.clinic.phone && (
-              <a href={`tel:${p.clinic.phone}`} className="inline-flex items-center gap-1.5 hover:text-slate-800">
-                <Phone className="h-3 w-3" aria-hidden="true" /> {p.clinic.phone}
-              </a>
-            )}
-            <p className="mt-0.5 tabular-nums">
-              {p.active ? 'Acesso até ' : 'Somente leitura desde '}
-              {format(new Date(p.access_until), 'dd/MM/yyyy')}
-            </p>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={signOut}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
-        >
-          <LogOut className="h-4 w-4" aria-hidden="true" /> Sair
-        </button>
-      </div>
+        <div className="mt-6 space-y-1 border-t border-teal-700/30 pt-4">
+          {p.clinic.name && (
+            <div className="px-3 pb-2 text-xs leading-relaxed text-teal-100/80">
+              <p className="font-medium text-white">{p.clinic.name}</p>
+              {p.clinic.phone && (
+                <a href={`tel:${p.clinic.phone}`} className="inline-flex items-center gap-1.5 hover:text-white">
+                  <Phone className="h-3 w-3" aria-hidden="true" /> {p.clinic.phone}
+                </a>
+              )}
+              <p className="mt-0.5 tabular-nums">
+                {p.active ? 'Acesso até ' : 'Somente leitura desde '}
+                {format(new Date(p.access_until), 'dd/MM/yyyy')}
+              </p>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={signOut}
+            className="group flex w-full items-center gap-x-3 rounded-md p-3 text-sm font-medium leading-6 text-red-200 transition-colors hover:bg-teal-700/40 hover:text-white"
+          >
+            <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" /> Sair
+          </button>
+        </div>
+      </nav>
     </aside>
   );
 };
@@ -291,35 +283,46 @@ export const PortalLayout: React.FC = () => {
   if (patientPortal.terms_version !== PORTAL_TERMS_VERSION) return <TermsGate />;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 selection:bg-teal-500/20 lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
+    <div className="min-h-screen bg-slate-200 font-sans text-slate-800 antialiased selection:bg-teal-500/20 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <a
+        href="#conteudo"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-900 focus:shadow-lg focus:outline focus:outline-2 focus:outline-[#5024fc]"
+      >
+        Pular para o conteúdo
+      </a>
       <Sidebar />
 
-      <div className="min-w-0">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur lg:hidden">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <Link to="/portal" className="shrink-0 rounded-xl focus-visible:ring-2 focus-visible:ring-teal-500" aria-label="Início">
-              <Wordmark />
-            </Link>
-            <Link
-              to="/portal/perfil"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-teal-600 text-xs font-semibold text-white focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
-              aria-label="Perfil"
-            >
+      <div className="flex min-w-0 flex-col">
+        {/* Cabeçalho no padrão do painel: faixa teal com o nome e o avatar à direita. */}
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-teal-700/20 bg-sidebar-teal px-4 text-white shadow-sm sm:px-6 lg:justify-end lg:px-8">
+          <Link to="/portal" className="flex items-center rounded-lg focus-visible:ring-2 focus-visible:ring-teal-200 lg:hidden" aria-label="Início">
+            <Apple className="h-7 w-7 text-teal-200" aria-hidden="true" />
+            <span className="ml-2.5 text-lg font-semibold tracking-tight">NutriAI</span>
+          </Link>
+          <Link
+            to="/portal/perfil"
+            className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-1 text-sm font-medium text-slate-100 hover:text-white focus-visible:ring-2 focus-visible:ring-teal-200"
+            aria-label="Perfil"
+          >
+            <span className="hidden truncate sm:inline">{patientPortal.name.split(' ')[0]}</span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/15 text-xs font-semibold text-white ring-1 ring-white/30">
               {initials(patientPortal.name)}
-            </Link>
-          </div>
+            </span>
+          </Link>
         </header>
 
-        <div role="main" className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-14 lg:pt-10">
-          <div className="space-y-6">
-            <AccessBanner
-              accessUntil={patientPortal.access_until}
-              active={patientPortal.active}
-              nutritionist={patientPortal.nutritionist_name}
-            />
-            <Outlet />
+        <main id="conteudo" className="flex-1 bg-slate-200">
+          <div className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
+            <div className="space-y-6">
+              <AccessBanner
+                accessUntil={patientPortal.access_until}
+                active={patientPortal.active}
+                nutritionist={patientPortal.nutritionist_name}
+              />
+              <Outlet />
+            </div>
           </div>
-        </div>
+        </main>
       </div>
 
       <MobileTabs />
