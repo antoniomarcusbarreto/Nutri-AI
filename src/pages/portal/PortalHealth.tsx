@@ -69,7 +69,7 @@ const HealthForm: React.FC<{ initial: PortalHealth; canEdit: boolean; patientId:
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
       <fieldset disabled={!canEdit} className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="health-clinical">
+        <section className="space-y-4 rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm" aria-labelledby="health-clinical">
           <h2 id="health-clinical" className="text-base font-semibold text-slate-900">Saúde e restrições</h2>
           <Textarea
             id="health-allergies"
@@ -103,7 +103,7 @@ const HealthForm: React.FC<{ initial: PortalHealth; canEdit: boolean; patientId:
           />
         </section>
 
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="health-habits">
+        <section className="space-y-4 rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm" aria-labelledby="health-habits">
           <h2 id="health-habits" className="text-base font-semibold text-slate-900">Rotina</h2>
           <Select
             id="health-physical_activity_level"

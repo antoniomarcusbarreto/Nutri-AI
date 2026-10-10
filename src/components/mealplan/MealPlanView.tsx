@@ -59,11 +59,61 @@ export interface MealPlanViewProps {
   only?: string[];
   /** Classes do contêiner (ex.: grade em duas colunas no desktop). */
   className?: string;
+  /** Sem moldura nem faixa colorida: para usar dentro de um card de seção. */
+  plain?: boolean;
 }
 
-export const MealPlanView: React.FC<MealPlanViewProps> = ({ meals, only, className }) => {
+export const MealPlanView: React.FC<MealPlanViewProps> = ({ meals, only, className, plain }) => {
   const [optionActiveTab, setOptionActiveTab] = useState<Record<string, number>>({});
   const keys = sortMealKeys(meals).filter((k) => !only || only.includes(k));
+
+  if (plain) {
+    return (
+      <div className={cn('space-y-6', className)}>
+        {keys.map((mealKey) => {
+          const options: MealOption[] = meals[mealKey] || [];
+          const idx = optionActiveTab[mealKey] ?? 0;
+          const current: MealOption = options[idx] || options[0] || { description: '', items: [], kcal: 0 };
+          return (
+            <div key={mealKey} className="space-y-4">
+              {options.length > 1 && (
+                <div className="inline-flex rounded-xl bg-slate-200/70 p-1" role="group" aria-label={`Opções de ${MEAL_NAMES[mealKey] ?? mealKey}`}>
+                  {options.map((_o, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      aria-pressed={idx === i}
+                      onClick={() => setOptionActiveTab((prev) => ({ ...prev, [mealKey]: i }))}
+                      className={cn(
+                        'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                        idx === i ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+                      )}
+                    >
+                      Opção {i + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-sm font-semibold text-slate-800">{current.description || `Opção ${idx + 1}`}</p>
+                {current.kcal > 0 && (
+                  <span className="shrink-0 text-sm text-slate-500"><span className="font-semibold tabular-nums text-slate-800">{current.kcal}</span> kcal</span>
+                )}
+              </div>
+              <ul className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+                {current.items?.map((item, i) => (
+                  <li key={i} className="flex gap-3 text-sm text-slate-600">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" aria-hidden="true" />
+                    <span>{typeof item === 'string' ? item : (item as unknown as { description?: string }).description}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("space-y-5", className)}>

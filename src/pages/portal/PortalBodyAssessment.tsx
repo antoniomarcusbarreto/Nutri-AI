@@ -133,7 +133,7 @@ const SubmitForm: React.FC<{ request: PortalBodyAssessment; patientId: string }>
   return (
     <div className={cn('grid grid-cols-1 items-start gap-5', wantsPhotos && 'lg:grid-cols-2')}>
       <div className="space-y-5">
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="body-basic">
+      <section className="space-y-4 rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm" aria-labelledby="body-basic">
         <h2 id="body-basic" className="text-base font-semibold text-slate-900">Peso e altura</h2>
         <div className="grid grid-cols-2 gap-3">
           <Input label="Peso (kg)" inputMode="decimal" placeholder="72,5" value={weight} onChange={(e) => setWeight(e.target.value)} />
@@ -143,7 +143,7 @@ const SubmitForm: React.FC<{ request: PortalBodyAssessment; patientId: string }>
       </section>
 
       {wantsTape && (
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="body-tape">
+        <section className="space-y-4 rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm" aria-labelledby="body-tape">
           <h2 id="body-tape" className="text-base font-semibold text-slate-900">Medidas com fita</h2>
           <p className="flex gap-2 text-sm text-slate-600">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
@@ -168,7 +168,7 @@ const SubmitForm: React.FC<{ request: PortalBodyAssessment; patientId: string }>
 
       <div className="space-y-5">
       {wantsPhotos && (
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="body-photos">
+        <section className="space-y-4 rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm" aria-labelledby="body-photos">
           <h2 id="body-photos" className="flex items-center gap-2 text-base font-semibold text-slate-900">
             <Camera className="h-4 w-4 text-teal-700" aria-hidden="true" /> Fotos
           </h2>
@@ -244,7 +244,7 @@ export const PortalBodyAssessmentPage: React.FC = () => {
           )}
 
           {latest && latestInputs && (
-            <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="body-result">
+            <section className="space-y-4 rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm" aria-labelledby="body-result">
               <div>
                 <h2 id="body-result" className="text-base font-semibold text-slate-900">Seu resultado</h2>
                 <p className="text-sm text-slate-500">Avaliação de {format(new Date(latest.assessed_at ?? latest.created_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>

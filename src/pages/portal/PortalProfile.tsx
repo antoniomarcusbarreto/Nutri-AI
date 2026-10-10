@@ -26,7 +26,7 @@ export const PortalProfile: React.FC = () => {
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
       <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white px-5 shadow-sm" aria-labelledby="profile-me">
+      <section className="rounded-3xl border border-slate-300/50 bg-white px-6 shadow-sm" aria-labelledby="profile-me">
         <h2 id="profile-me" className="pt-4 text-base font-semibold text-slate-900">Seus dados</h2>
         <dl className="divide-y divide-slate-100">
           <Row label="Nome">{p.name}</Row>
@@ -42,7 +42,7 @@ export const PortalProfile: React.FC = () => {
 
       <Link
         to="/portal/ficha"
-        className="lg:hidden flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+        className="lg:hidden flex items-center gap-3 rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm transition-colors hover:bg-slate-50"
       >
         <ClipboardList className="h-5 w-5 shrink-0 text-teal-700" aria-hidden="true" />
         <span className="min-w-0 flex-1">
@@ -54,7 +54,7 @@ export const PortalProfile: React.FC = () => {
 
       <Link
         to="/portal/avaliacao"
-        className="lg:hidden flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+        className="lg:hidden flex items-center gap-3 rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm transition-colors hover:bg-slate-50"
       >
         <Activity className="h-5 w-5 shrink-0 text-teal-700" aria-hidden="true" />
         <span className="min-w-0 flex-1">
@@ -67,7 +67,7 @@ export const PortalProfile: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white px-5 shadow-sm" aria-labelledby="profile-access">
+      <section className="rounded-3xl border border-slate-300/50 bg-white px-6 shadow-sm" aria-labelledby="profile-access">
         <h2 id="profile-access" className="pt-4 text-base font-semibold text-slate-900">Seu acompanhamento</h2>
         <dl className="divide-y divide-slate-100">
           {p.nutritionist_name && (
@@ -99,7 +99,7 @@ export const PortalProfile: React.FC = () => {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="profile-privacy">
+      <section className="rounded-3xl border border-slate-300/50 bg-white p-6 shadow-sm" aria-labelledby="profile-privacy">
         <h2 id="profile-privacy" className="text-base font-semibold text-slate-900">Privacidade</h2>
         <p className="mt-2 text-sm text-slate-600">
           {p.terms_accepted_at

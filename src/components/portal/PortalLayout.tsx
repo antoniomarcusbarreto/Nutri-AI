@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import {
-  Activity, Apple, CalendarDays, ClipboardList, Clock3, Home, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, UtensilsCrossed,
+  Activity, Apple, CalendarDays, ClipboardList, Home, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, UtensilsCrossed,
 } from 'lucide-react';
-import { differenceInCalendarDays, format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Wordmark } from '../brand/Wordmark';
@@ -39,8 +38,6 @@ const NAV = [
 
 const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'P';
-
-const EXPIRING_SOON_DAYS = 7;
 
 const CenteredCard: React.FC<{ icon: React.ReactNode; title: string; children: React.ReactNode }> = ({ icon, title, children }) => (
   <div className="flex min-h-screen flex-col bg-slate-50 font-sans">
@@ -118,37 +115,6 @@ const TermsGate: React.FC = () => {
         Sair
       </button>
     </CenteredCard>
-  );
-};
-
-const AccessBanner: React.FC<{ accessUntil: string; active: boolean; nutritionist: string | null }> = ({ accessUntil, active, nutritionist }) => {
-  const until = new Date(accessUntil);
-  const daysLeft = differenceInCalendarDays(until, new Date());
-  if (active && daysLeft > EXPIRING_SOON_DAYS) return null;
-
-  return (
-    <div
-      role="status"
-      className={cn(
-        'flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm',
-        active ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700',
-      )}
-    >
-      <Clock3 className={cn('mt-px h-4 w-4 shrink-0', active ? 'text-amber-600' : 'text-slate-500')} aria-hidden="true" />
-      <p>
-        {active ? (
-          <>
-            Seu acesso vence {daysLeft <= 0 ? 'hoje' : daysLeft === 1 ? 'amanhã' : `em ${daysLeft} dias`} (
-            {format(until, "d 'de' MMMM", { locale: ptBR })}). Para continuar, fale com {nutritionist || 'seu nutricionista'}.
-          </>
-        ) : (
-          <>
-            <strong className="font-semibold">Acesso somente leitura desde {format(until, "d 'de' MMMM", { locale: ptBR })}.</strong>{' '}
-            Você ainda vê seu plano e suas consultas. Para confirmar ou remarcar, peça a renovação a {nutritionist || 'seu nutricionista'}.
-          </>
-        )}
-      </p>
-    </div>
   );
 };
 
@@ -314,11 +280,6 @@ export const PortalLayout: React.FC = () => {
         <main id="conteudo" className="flex-1 bg-slate-200">
           <div className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
             <div className="space-y-6">
-              <AccessBanner
-                accessUntil={patientPortal.access_until}
-                active={patientPortal.active}
-                nutritionist={patientPortal.nutritionist_name}
-              />
               <Outlet />
             </div>
           </div>

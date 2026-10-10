@@ -26,6 +26,8 @@ export interface PortalAppointmentCardProps {
   canAct: boolean;
   /** Destaque maior (próxima consulta na tela inicial). */
   featured?: boolean;
+  /** Sem moldura própria: o cartão vive dentro de um card de seção. */
+  bare?: boolean;
   /** Pedido de remarcação desta consulta (aberto ou respondido há pouco). */
   request?: PortalRequest;
   /** O nutricionista tem grade configurada: dá para escolher horário pelo app. */
@@ -33,7 +35,7 @@ export interface PortalAppointmentCardProps {
   clinicPhone?: string | null;
 }
 
-export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ appointment: a, patientId, canAct, featured, request, bookingEnabled, clinicPhone }) => {
+export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ appointment: a, patientId, canAct, featured, bare, request, bookingEnabled, clinicPhone }) => {
   const { showToast } = useToast();
   const { confirm, cancel, requestReschedule } = usePortalAppointmentActions();
   const [dialog, setDialog] = useState<'cancel' | 'reschedule' | null>(null);
@@ -82,7 +84,7 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
     );
 
   return (
-    <article className={cn('rounded-2xl border border-slate-200 bg-white p-5 shadow-sm', featured && 'sm:p-6')}>
+    <article className={cn(!bare && 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm', !bare && featured && 'sm:p-6')}>
       <div className="flex items-start gap-4">
         <div className="grid w-14 shrink-0 place-items-center rounded-xl bg-teal-50 py-2 text-teal-800">
           <span className="text-[11px] font-medium uppercase tracking-wide">{format(date, 'MMM', { locale: ptBR })}</span>

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowRight, CheckCircle2, ChevronRight, Mail, Phone } from 'lucide-react';
+import { ArrowRight, CalendarX2, CheckCircle2, ChevronRight, Mail, Phone, UtensilsCrossed } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePortalAppointments, usePortalMealPlan, usePortalRequests } from '../../hooks/queries/usePortal';
-import { PortalBookingSection } from '../../components/portal/PortalBookingSection';
 import { latestRescheduleByAppointment } from '../../types/portal';
 import { PortalAppointmentCard } from '../../components/portal/PortalAppointmentCard';
-import { PortalPageHeader, PortalSection } from '../../components/portal/PortalPageHeader';
+import { PortalCard, PortalPageHeader } from '../../components/portal/PortalPageHeader';
+import { PortalRequestNotice } from '../../components/portal/PortalRequestNotice';
+import { BookAppointmentButton } from '../../components/portal/BookAppointmentButton';
 import { usePortalTasks } from '../../components/portal/usePortalTasks';
 import { MealPlanView } from '../../components/mealplan/MealPlanView';
 import { MEAL_NAMES, sortMealKeys } from '../../types/mealPlan';
@@ -41,18 +42,23 @@ const greeting = (now = new Date()) => {
 };
 
 const LinkMore: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
-  <Link to={to} className="inline-flex items-center gap-1 rounded text-sm font-medium text-[#5024fc] hover:text-[#431cdb]">
+  <Link to={to} className="inline-flex shrink-0 items-center gap-1 rounded text-sm font-medium text-[#5024fc] hover:text-[#431cdb]">
     {children}
     <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
   </Link>
 );
 
 const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
-  <div className={`animate-pulse rounded-2xl bg-slate-200/60 ${className ?? ''}`} />
+  <div className={`animate-pulse rounded-2xl bg-slate-200/70 ${className ?? ''}`} aria-hidden="true" />
 );
 
-const Empty: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">{children}</p>
+/** Estado vazio dentro de card: ícone + frase, sem segunda moldura. */
+const EmptyInCard: React.FC<{ icon: React.ReactNode; title: string; children?: React.ReactNode }> = ({ icon, title, children }) => (
+  <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center">
+    <span className="text-slate-400">{icon}</span>
+    <p className="mt-2 text-sm font-medium text-slate-700">{title}</p>
+    {children && <p className="mt-0.5 text-xs text-slate-500">{children}</p>}
+  </div>
 );
 
 export const PortalHome: React.FC = () => {
@@ -68,33 +74,83 @@ export const PortalHome: React.FC = () => {
   const next = (appointments.data ?? [])
     .filter((a) => new Date(a.date_time).getTime() > now && a.status !== 'cancelado' && a.status !== 'concluido')
     .sort((a, b) => a.date_time.localeCompare(b.date_time))[0];
+  const openBooking = requests.find((r) => r.kind === 'booking' && (r.status === 'pendente' || r.status === 'proposto'));
 
   const mealKey = plan.data ? currentMealKey(plan.data.meals) : null;
   const firstName = patientPortal?.name?.split(' ')[0] ?? '';
   const clinic = patientPortal?.clinic;
+  const nutri = patientPortal?.nutritionist_name || 'seu nutricionista';
+
+  const daysToNext = next ? differenceInCalendarDays(new Date(next.date_time), new Date(now)) : null;
+  const nextHint = next
+    ? daysToNext === 0 ? 'Hoje' : daysToNext === 1 ? 'Amanhã' : `Daqui a ${daysToNext} dias`
+    : openBooking
+      ? 'Seu pedido está com a clínica'
+      : 'Nenhuma consulta marcada';
 
   return (
     <>
       <PortalPageHeader
         title={<>{greeting()}{firstName ? `, ${firstName}` : ''}</>}
         description={<span className="first-letter:uppercase">{format(now, "EEEE, d 'de' MMMM", { locale: ptBR })}</span>}
+        actions={<BookAppointmentButton />}
       />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
-        {/* Para fazer: primeiro no DOM (no celular vem antes); no desktop vai para a coluna lateral. */}
-        <PortalSection id="home-tasks" title="Para fazer" className="lg:col-start-2 lg:row-start-1">
-          {tasksLoading ? (
-            <Skeleton className="h-24" />
-          ) : tasks.length === 0 ? (
-            <p className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-600">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-              Tudo em dia por aqui.
-            </p>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <PortalCard
+          id="home-next"
+          title="Próxima consulta"
+          hint={nextHint}
+          action={<LinkMore to="/portal/agenda">Consultas</LinkMore>}
+          className="lg:col-span-3"
+        >
+          {appointments.isLoading ? (
+            <Skeleton className="h-36" />
+          ) : appointments.isError ? (
+            <p className="text-sm text-slate-600">Não foi possível carregar suas consultas. Tente de novo em instantes.</p>
+          ) : next ? (
+            <PortalAppointmentCard
+              appointment={next}
+              patientId={patientId!}
+              canAct={!!patientPortal?.active}
+              request={requestFor.get(next.id)}
+              bookingEnabled={!!patientPortal?.booking_enabled}
+              clinicPhone={clinic?.phone}
+              featured
+              bare
+            />
+          ) : openBooking ? (
+            <PortalRequestNotice request={openBooking} canAct={!!patientPortal?.active} />
           ) : (
-            <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <EmptyInCard icon={<CalendarX2 className="h-7 w-7" aria-hidden="true" />} title="Agenda livre">
+              {patientPortal?.booking_enabled
+                ? 'Use "Marcar consulta" no topo para escolher um horário.'
+                : `Quando ${nutri} agendar, a consulta aparece aqui para você confirmar.`}
+            </EmptyInCard>
+          )}
+        </PortalCard>
+
+        <PortalCard
+          id="home-tasks"
+          title="Para fazer"
+          hint={tasksLoading ? 'Carregando…' : tasks.length === 0 ? 'Nada pedindo sua atenção' : `${tasks.length} ${tasks.length === 1 ? 'item pede' : 'itens pedem'} sua atenção`}
+          className="lg:col-span-2"
+        >
+          {tasksLoading ? (
+            <Skeleton className="h-28" />
+          ) : tasks.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-8 text-center">
+              <CheckCircle2 className="h-7 w-7 text-emerald-600" aria-hidden="true" />
+              <p className="mt-2 text-sm font-medium text-emerald-700">Tudo em dia</p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
               {tasks.map((t) => (
                 <li key={t.key}>
-                  <Link to={t.to} className="group flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50">
+                  <Link
+                    to={t.to}
+                    className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300"
+                  >
                     <span className="h-2 w-2 shrink-0 rounded-full bg-[#5024fc]" aria-hidden="true" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-slate-900">{t.title}</span>
@@ -106,86 +162,70 @@ export const PortalHome: React.FC = () => {
               ))}
             </ul>
           )}
-        </PortalSection>
+        </PortalCard>
+      </div>
 
-        <div className="space-y-8 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-          <PortalSection id="home-next" title="Próxima consulta" action={<LinkMore to="/portal/agenda">Todas</LinkMore>}>
-            {appointments.isLoading ? (
-              <Skeleton className="h-40" />
-            ) : appointments.isError ? (
-              <Empty>Não foi possível carregar suas consultas. Tente de novo em instantes.</Empty>
-            ) : next ? (
-              <PortalAppointmentCard
-                appointment={next}
-                patientId={patientId!}
-                canAct={!!patientPortal?.active}
-                request={requestFor.get(next.id)}
-                bookingEnabled={!!patientPortal?.booking_enabled}
-                clinicPhone={clinic?.phone}
-                featured
-              />
-            ) : (
-              <Empty>
-                Nenhuma consulta marcada.{patientPortal?.booking_enabled ? '' : ' Quando a clínica agendar, ela aparece aqui para você confirmar.'}
-              </Empty>
-            )}
-          </PortalSection>
-
-          {patientPortal && !appointments.isLoading && (
-            <PortalBookingSection portal={patientPortal} requests={requests} hasUpcoming={!!next} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <PortalCard
+          id="home-meal"
+          title={mealKey ? `Agora: ${MEAL_NAMES[mealKey] ?? mealKey}` : 'Seu plano alimentar'}
+          hint={plan.data ? `Do seu plano${plan.data.kcal ? ` de ${plan.data.kcal} kcal/dia` : ''}` : undefined}
+          action={<LinkMore to="/portal/plano">Plano completo</LinkMore>}
+          className="lg:col-span-3"
+        >
+          {plan.isLoading ? (
+            <Skeleton className="h-40" />
+          ) : plan.isError ? (
+            <p className="text-sm text-slate-600">Não foi possível carregar seu plano. Tente mais tarde.</p>
+          ) : plan.data && mealKey ? (
+            <MealPlanView meals={plan.data.meals} only={[mealKey]} plain />
+          ) : (
+            <EmptyInCard icon={<UtensilsCrossed className="h-7 w-7" aria-hidden="true" />} title="Plano ainda não publicado">
+              Ele aparece aqui assim que {nutri} montar.
+            </EmptyInCard>
           )}
-
-          <PortalSection
-            id="home-meal"
-            title={mealKey ? `Agora: ${MEAL_NAMES[mealKey] ?? mealKey}` : 'Seu plano'}
-            action={<LinkMore to="/portal/plano">Plano completo</LinkMore>}
-          >
-            {plan.isLoading ? (
-              <Skeleton className="h-48" />
-            ) : plan.isError ? (
-              <Empty>Não foi possível carregar seu plano. Tente mais tarde.</Empty>
-            ) : plan.data && mealKey ? (
-              <MealPlanView meals={plan.data.meals} only={[mealKey]} />
-            ) : (
-              <Empty>Seu plano alimentar aparece aqui assim que {patientPortal?.nutritionist_name || 'seu nutricionista'} publicar.</Empty>
-            )}
-          </PortalSection>
-        </div>
+        </PortalCard>
 
         {patientPortal && (
-          <PortalSection id="home-care" title="Seu acompanhamento" className="lg:col-start-2 lg:row-start-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <PortalCard id="home-care" title="Seu acompanhamento" hint="Quem cuida de você" className="lg:col-span-2">
+            <div className="space-y-4">
               {patientPortal.nutritionist_name && (
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{patientPortal.nutritionist_name}</p>
-                  <p className="text-xs text-slate-500">
-                    Nutricionista{patientPortal.nutritionist_crn ? ` · CRN ${patientPortal.nutritionist_crn}` : ''}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-teal-50 text-sm font-semibold text-teal-800" aria-hidden="true">
+                    {patientPortal.nutritionist_name.replace(/^(dra?\.?\s+)/i, '').slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{patientPortal.nutritionist_name}</p>
+                    <p className="text-xs text-slate-500">
+                      Nutricionista{patientPortal.nutritionist_crn ? ` · CRN ${patientPortal.nutritionist_crn}` : ''}
+                    </p>
+                  </div>
                 </div>
               )}
-              {clinic?.name && <p className="mt-3 text-sm text-slate-700">{clinic.name}</p>}
-              {(clinic?.phone || clinic?.email) && (
-                <div className="mt-3 space-y-1.5 text-sm">
-                  {clinic.phone && (
-                    <a href={`tel:${clinic.phone}`} className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
-                      <Phone className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" /> {clinic.phone}
-                    </a>
-                  )}
-                  {clinic.email && (
-                    <a href={`mailto:${clinic.email}`} className="flex min-w-0 items-center gap-2 text-slate-600 hover:text-slate-900">
-                      <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" /> <span className="truncate">{clinic.email}</span>
-                    </a>
-                  )}
+              {clinic?.name && (
+                <div className="border-t border-slate-200/70 pt-4 text-sm">
+                  <p className="font-medium text-slate-800">{clinic.name}</p>
+                  <div className="mt-2 space-y-1.5">
+                    {clinic.phone && (
+                      <a href={`tel:${clinic.phone}`} className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
+                        <Phone className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" /> {clinic.phone}
+                      </a>
+                    )}
+                    {clinic.email && (
+                      <a href={`mailto:${clinic.email}`} className="flex min-w-0 items-center gap-2 text-slate-600 hover:text-slate-900">
+                        <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" /> <span className="truncate">{clinic.email}</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
               )}
               {plan.data && (
-                <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                <p className="border-t border-slate-200/70 pt-4 text-xs text-slate-500">
                   Plano atualizado em {format(new Date(plan.data.created_at), 'dd/MM/yyyy')}
-                  {plan.data.kcal ? <> · <span className="tabular-nums">{plan.data.kcal}</span> kcal/dia</> : null}
                 </p>
               )}
             </div>
-          </PortalSection>
+          </PortalCard>
         )}
       </div>
     </>
