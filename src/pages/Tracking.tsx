@@ -20,6 +20,7 @@ import { PatientSummary } from '../components/tracking/PatientSummary';
 import { PeriodBar } from '../components/tracking/PeriodBar';
 import { CompositionSection } from '../components/tracking/CompositionSection';
 import { BodyAssessmentPanel } from '../components/body/BodyAssessmentPanel';
+import { MealDiaryPanel } from '../components/meals/MealDiaryPanel';
 import { BiomarkersSection } from '../components/tracking/BiomarkersSection';
 import { PredictionCard } from '../components/tracking/PredictionCard';
 import { JourneyTimeline } from '../components/tracking/JourneyTimeline';
@@ -343,6 +344,10 @@ export const Tracking: React.FC = () => {
                     <ExamInsightCard exam={latestExam} onOpenExam={setExamForModal} />
                     <PredictionCard latestExam={latestExam} mealPlans={mealPlans} now={now} />
                   </>
+                )}
+
+                {tab === 'diario' && (
+                  <MealDiaryPanel key={patient.id} patientId={patient.id} planKcal={latestPlan?.kcal ?? null} patientName={patient.name} />
                 )}
 
                 {tab === 'historico' && (

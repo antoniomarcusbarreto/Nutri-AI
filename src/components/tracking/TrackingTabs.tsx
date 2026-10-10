@@ -5,6 +5,7 @@ import { TAB_PANEL_ID, tabId, type TrackingTab } from './trackingModel';
 const TABS: { id: TrackingTab; label: string }[] = [
   { id: 'visao', label: 'Visão geral' },
   { id: 'corpo', label: 'Corpo' },
+  { id: 'diario', label: 'Diário alimentar' },
   { id: 'exames', label: 'Exames' },
   { id: 'historico', label: 'Histórico' },
 ];

@@ -170,7 +170,12 @@ export const PortalHome: React.FC = () => {
           id="home-meal"
           title={mealKey ? `Agora: ${MEAL_NAMES[mealKey] ?? mealKey}` : 'Seu plano alimentar'}
           hint={plan.data ? `Do seu plano${plan.data.kcal ? ` de ${plan.data.kcal} kcal/dia` : ''}` : undefined}
-          action={<LinkMore to="/portal/plano">Plano completo</LinkMore>}
+          action={
+            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-4">
+              {patientPortal?.active && <LinkMore to="/portal/refeicoes">Registrar refeição</LinkMore>}
+              <LinkMore to="/portal/plano">Plano completo</LinkMore>
+            </div>
+          }
           className="lg:col-span-3"
         >
           {plan.isLoading ? (

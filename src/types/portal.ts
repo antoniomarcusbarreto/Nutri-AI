@@ -11,6 +11,8 @@ export const PORTAL_TERMS_VERSION = 'portal-v1';
 
 export interface PortalContext {
   patient_id: string;
+  /** Clínica do paciente (migration 0036). */
+  clinic_id: string;
   name: string;
   email: string | null;
   phone: string | null;

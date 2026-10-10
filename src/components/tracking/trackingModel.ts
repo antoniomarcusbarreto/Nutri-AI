@@ -424,10 +424,10 @@ export const ALL_TIME: DateRange = { start: null, end: null };
 
 // --- Abas ------------------------------------------------------------------
 
-export type TrackingTab = 'visao' | 'corpo' | 'exames' | 'historico';
+export type TrackingTab = 'visao' | 'corpo' | 'diario' | 'exames' | 'historico';
 
 export const parseTab = (raw: string | null): TrackingTab =>
-  raw === 'corpo' || raw === 'exames' || raw === 'historico' ? raw : 'visao';
+  raw === 'corpo' || raw === 'diario' || raw === 'exames' || raw === 'historico' ? raw : 'visao';
 
 export const TAB_PANEL_ID = 'tracking-panel';
 export const tabId = (tab: TrackingTab) => `tracking-tab-${tab}`;

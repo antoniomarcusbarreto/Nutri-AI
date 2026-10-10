@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import {
-  Activity, Apple, CalendarDays, ClipboardList, Home, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, UtensilsCrossed,
+  Activity, Apple, CalendarDays, Camera, ClipboardList, Home, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, UtensilsCrossed,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,6 +30,7 @@ import { usePortalTasks } from './usePortalTasks';
 const NAV = [
   { to: '/portal', label: 'Início', short: 'Início', icon: Home, end: true, mobile: true },
   { to: '/portal/plano', label: 'Plano alimentar', short: 'Plano', icon: UtensilsCrossed, end: false, mobile: true },
+  { to: '/portal/refeicoes', label: 'Diário alimentar', short: 'Diário', icon: Camera, end: false, mobile: true },
   { to: '/portal/agenda', label: 'Consultas', short: 'Consultas', icon: CalendarDays, end: false, mobile: true },
   { to: '/portal/ficha', label: 'Ficha de saúde', short: 'Ficha', icon: ClipboardList, end: false, mobile: false },
   { to: '/portal/avaliacao', label: 'Avaliação corporal', short: 'Avaliação', icon: Activity, end: false, mobile: false },
@@ -205,7 +206,7 @@ const MobileTabs: React.FC = () => {
       aria-label="Seções"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-4">
+      <ul className="mx-auto grid max-w-lg grid-cols-5">
         {NAV.filter((n) => n.mobile).map(({ to, short, icon: Icon, end }) => {
           const count = countFor(to);
           return (
