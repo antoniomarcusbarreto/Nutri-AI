@@ -161,9 +161,11 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
           >
             Cancelar consulta
           </Button>
-          {!hasPendingReschedule && !bookingEnabled && clinicPhone && (
+          {!hasPendingReschedule && !bookingEnabled && (
             <p className="text-center text-sm text-slate-500 sm:basis-full sm:text-left">
-              Para remarcar, ligue para a clínica: <a className="font-medium text-[#5024fc]" href={`tel:${clinicPhone}`}>{clinicPhone}</a>
+              {clinicPhone
+                ? <>Para remarcar, fale com a clínica: <a className="font-medium text-[#5024fc]" href={`tel:${clinicPhone}`}>{clinicPhone}</a></>
+                : 'Para remarcar, fale com a clínica.'}
             </p>
           )}
         </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Clock } from 'lucide-react';
+import { cn } from '../../lib/cn';
 import { type MealOption, MEAL_NAMES, sortMealKeys } from '../../types/mealPlan';
 
 /**
@@ -56,14 +57,16 @@ export interface MealPlanViewProps {
   meals: Record<string, MealOption[]>;
   /** Mostra só estas refeições (ex.: a refeição do horário atual). */
   only?: string[];
+  /** Classes do contêiner (ex.: grade em duas colunas no desktop). */
+  className?: string;
 }
 
-export const MealPlanView: React.FC<MealPlanViewProps> = ({ meals, only }) => {
+export const MealPlanView: React.FC<MealPlanViewProps> = ({ meals, only, className }) => {
   const [optionActiveTab, setOptionActiveTab] = useState<Record<string, number>>({});
   const keys = sortMealKeys(meals).filter((k) => !only || only.includes(k));
 
   return (
-    <div className="space-y-5">
+    <div className={cn("space-y-5", className)}>
       {keys.map(mealKey => {
         const options: MealOption[] = meals[mealKey] || [];
         const activeOptionIdx = optionActiveTab[mealKey] ?? 0;

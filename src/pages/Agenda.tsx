@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { 
   Plus, 
   ChevronLeft, 
@@ -40,8 +40,9 @@ import { AgendaMonthGrid } from '../components/agenda/AgendaMonthGrid';
 import { AppointmentPaymentBlock } from '../components/financial/AppointmentPaymentBlock';
 import { useQueryClient } from '@tanstack/react-query';
 import { qk } from '../lib/queryKeys';
-import { usePendingChangeRequests, useHandleChangeRequest, useProposeChangeRequest } from '../hooks/queries/usePortal';
+import { usePendingChangeRequests, useHandleChangeRequest, useProposeChangeRequest, useAvailability } from '../hooks/queries/usePortal';
 import { PatientRequestsPanel } from '../components/agenda/PatientRequestsPanel';
+import { ConflictNotice, DurationSelect } from '../components/agenda/ScheduleFields';
 
 interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
 interface AgendaServiceLink { id?: string; name?: string | null; duration_minutes?: number | null; price?: number | null }
@@ -56,6 +57,8 @@ interface AgendaAppointment {
   nutritionist_id?: string | null;
   service_id?: string | null;
   public_token?: string | null;
+  /** Duração real (migration 0035); vazio = a do serviço. */
+  duration_minutes?: number | null;
   patients?: AgendaPatientLink | null;
   services?: AgendaServiceLink | null;
   consultations?: AgendaConsultationLink[] | null;
@@ -114,9 +117,11 @@ export const Agenda: React.FC = () => {
     nutritionist_id: '',
     date: '',
     time: '09:00',
-    status: 'pendente'
+    status: 'pendente',
+    // '' = duração do serviço (migration 0035)
+    duration: ''
   });
-  
+
   // Details Modal state
   const [selectedAppointment, setSelectedAppointment] = useState<AgendaAppointment | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -131,7 +136,8 @@ export const Agenda: React.FC = () => {
   const [rescheduleData, setRescheduleData] = useState({
     date: '',
     time: '',
-    reason: ''
+    reason: '',
+    duration: ''
   });
   const [rescheduling, setRescheduling] = useState(false);
 
@@ -224,6 +230,7 @@ export const Agenda: React.FC = () => {
           nutritionist_id,
           service_id,
           public_token,
+          duration_minutes,
           patients ( id, name, email, phone ),
           services ( id, name, duration_minutes, price ),
           consultations ( id, anamnese_notes )
@@ -246,15 +253,19 @@ export const Agenda: React.FC = () => {
   // Pedidos de pacientes pelo app (o RLS recorta pelo que o usuário enxerga).
   const { data: changeRequests = [] } = usePendingChangeRequests(clinic?.id);
   const resolveRequest = useHandleChangeRequest();
+  // Sem grade de horários, os pacientes não conseguem remarcar nem marcar pelo app.
+  const isProfessional = userRole === 'owner' || userRole === 'nutritionist';
+  const { data: availability } = useAvailability(isProfessional ? profile?.id : undefined);
+  const missingAvailability = isProfessional && !!availability && availability.ranges.length === 0;
   const proposeRequest = useProposeChangeRequest();
   const [resolvingRequestId, setResolvingRequestId] = useState<string | null>(null);
   const pendingRescheduleFor = (appointmentId: string | undefined) =>
     changeRequests.find((r) => r.appointment_id === appointmentId && r.kind === 'reschedule' && r.status === 'pendente');
 
-  const handleResolveRequest = (requestId: string, status: 'aceito' | 'recusado', silent = false) => {
+  const handleResolveRequest = (requestId: string, status: 'aceito' | 'recusado', silent = false, durationMinutes: number | null = null) => {
     setResolvingRequestId(requestId);
     resolveRequest.mutate(
-      { requestId, status },
+      { requestId, status, durationMinutes },
       {
         onSuccess: () => {
           if (!silent) showToast(status === 'recusado' ? 'Pedido recusado. O paciente vê o aviso no app.' : 'Pedido aceito. A consulta já está na agenda.', 'success');
@@ -266,9 +277,9 @@ export const Agenda: React.FC = () => {
     );
   };
 
-  const handleProposeRequest = (requestId: string, proposedAt: string, note: string, done: () => void) => {
+  const handleProposeRequest = (requestId: string, proposedAt: string, note: string, durationMinutes: number | null, done: () => void) => {
     proposeRequest.mutate(
-      { requestId, proposedAt, note },
+      { requestId, proposedAt, note, durationMinutes },
       {
         onSuccess: () => {
           done();
@@ -336,6 +347,7 @@ export const Agenda: React.FC = () => {
 
   const selectedApptId = selectedAppointment?.id;
   const selectedApptDateTime = selectedAppointment?.date_time;
+  const selectedApptDuration = selectedAppointment?.duration_minutes ?? null;
   useEffect(() => {
     if (selectedApptId && selectedApptDateTime) {
       fetchReschedules(selectedApptId);
@@ -345,7 +357,8 @@ export const Agenda: React.FC = () => {
       setRescheduleData({
         date: format(apptDate, 'yyyy-MM-dd'),
         time: format(apptDate, 'HH:mm'),
-        reason: ''
+        reason: '',
+        duration: selectedApptDuration ? String(selectedApptDuration) : ''
       });
       if (autoRescheduleRef.current === selectedApptId) {
         setIsRescheduleMode(true);
@@ -356,7 +369,7 @@ export const Agenda: React.FC = () => {
       setReschedules([]);
       setIsRescheduleMode(false);
     }
-  }, [selectedApptId, selectedApptDateTime, fetchReschedules]);
+  }, [selectedApptId, selectedApptDateTime, selectedApptDuration, fetchReschedules]);
 
   // Calendar dates generation
   const calendarDays = useMemo(() => {
@@ -461,7 +474,8 @@ export const Agenda: React.FC = () => {
       nutritionist_id: defaultNutri,
       date: formattedDate,
       time: '09:00',
-      status: 'pendente'
+      status: 'pendente',
+      duration: ''
     });
     setPatientSearch('');
     setIsNewModalOpen(true);
@@ -508,7 +522,7 @@ export const Agenda: React.FC = () => {
     if (isReadOnly || !clinic?.id) return;
     
     setFormError(null);
-    const { patient_id, service_id, nutritionist_id, date, time, status } = newAppointmentData;
+    const { patient_id, service_id, nutritionist_id, date, time, status, duration } = newAppointmentData;
     if (!patient_id || !service_id || !nutritionist_id || !date || !time) {
       setFormError('Por favor, preencha todos os campos obrigatórios.');
       return;
@@ -532,7 +546,8 @@ export const Agenda: React.FC = () => {
           service_id,
           nutritionist_id,
           date_time: combinedDateTime.toISOString(),
-          status
+          status,
+          duration_minutes: duration ? Number(duration) : null
         }]);
 
       if (error) throw error;
@@ -604,7 +619,10 @@ export const Agenda: React.FC = () => {
       // 1. Update the appointment's date_time in appointments
       const { error: updateError } = await supabase
         .from('appointments')
-        .update({ date_time: newDateTime.toISOString() })
+        .update({
+          date_time: newDateTime.toISOString(),
+          duration_minutes: rescheduleData.duration ? Number(rescheduleData.duration) : null,
+        })
         .eq('id', selectedAppointment.id);
 
       if (updateError) throw updateError;
@@ -625,10 +643,11 @@ export const Agenda: React.FC = () => {
       showToast('Consulta reagendada com sucesso!', 'success');
       
       // Update local appointments state with the new date_time
-      setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, date_time: newDateTime.toISOString() } : a));
+      const newDuration = rescheduleData.duration ? Number(rescheduleData.duration) : null;
+      setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, date_time: newDateTime.toISOString(), duration_minutes: newDuration } : a));
       
       // Update selectedAppointment so details modal reflects new date/time
-      setSelectedAppointment((prev) => prev ? { ...prev, date_time: newDateTime.toISOString() } : null);
+      setSelectedAppointment((prev) => prev ? { ...prev, date_time: newDateTime.toISOString(), duration_minutes: newDuration } : null);
       
       // Reset reschedule mode
       setIsRescheduleMode(false);
@@ -741,6 +760,18 @@ export const Agenda: React.FC = () => {
         </>}
       />
 
+      {missingAvailability && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-amber-900">
+            <span className="font-semibold">Seus pacientes ainda não conseguem marcar ou remarcar pelo app.</span>{' '}
+            Defina os dias e horários em que você atende.
+          </p>
+          <Link to="/settings?aba=horarios" className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-medium text-amber-900 ring-1 ring-inset ring-amber-300 hover:bg-amber-100">
+            Configurar horários
+          </Link>
+        </div>
+      )}
+
       <PatientRequestsPanel
         requests={changeRequests}
         appointmentById={(id) => (id ? appointments.find((a) => a.id === id) : undefined)}
@@ -748,7 +779,7 @@ export const Agenda: React.FC = () => {
         onPropose={handleProposeRequest}
         proposing={proposeRequest.isPending}
         onReschedule={openRescheduleFromRequest}
-        onResolve={(id, status) => handleResolveRequest(id, status)}
+        onResolve={(id, status, duration) => handleResolveRequest(id, status, false, duration ?? null)}
         resolvingId={resolvingRequestId}
         readOnly={isReadOnly}
       />
@@ -980,7 +1011,7 @@ export const Agenda: React.FC = () => {
                                 </span>
                                 <span className="text-xs font-semibold text-slate-400 mt-1 flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5" />
-                                  {apt.services?.duration_minutes || 60} min
+                                  {apt.duration_minutes || apt.services?.duration_minutes || 60} min
                                 </span>
                               </div>
                               
@@ -1143,7 +1174,7 @@ export const Agenda: React.FC = () => {
               <Select
                 label="Serviço / Procedimento"
                 value={newAppointmentData.service_id}
-                onChange={e => setNewAppointmentData(prev => ({ ...prev, service_id: e.target.value }))}
+                onChange={e => setNewAppointmentData(prev => ({ ...prev, service_id: e.target.value, duration: '' }))}
                 required
               >
                 <option value="">-- Selecione o Serviço --</option>
@@ -1183,6 +1214,17 @@ export const Agenda: React.FC = () => {
                   required
                 />
               </div>
+
+              <DurationSelect
+                value={newAppointmentData.duration}
+                serviceMinutes={services.find((sv) => sv.id === newAppointmentData.service_id)?.duration_minutes ?? null}
+                onChange={(duration) => setNewAppointmentData(prev => ({ ...prev, duration }))}
+              />
+              <ConflictNotice
+                nutritionistId={newAppointmentData.nutritionist_id || null}
+                start={newAppointmentData.date && newAppointmentData.time ? new Date(`${newAppointmentData.date}T${newAppointmentData.time}:00`) : null}
+                minutes={Number(newAppointmentData.duration) || services.find((sv) => sv.id === newAppointmentData.service_id)?.duration_minutes || 60}
+              />
 
               {/* Status Select */}
               <div className="space-y-1">
@@ -1334,6 +1376,18 @@ export const Agenda: React.FC = () => {
                         required
                       />
                     </div>
+
+                    <DurationSelect
+                      value={rescheduleData.duration}
+                      serviceMinutes={selectedAppointment.services?.duration_minutes ?? null}
+                      onChange={(duration) => setRescheduleData(prev => ({ ...prev, duration }))}
+                    />
+                    <ConflictNotice
+                      nutritionistId={selectedAppointment.nutritionist_id}
+                      start={rescheduleData.date && rescheduleData.time ? new Date(`${rescheduleData.date}T${rescheduleData.time}:00`) : null}
+                      minutes={Number(rescheduleData.duration) || selectedAppointment.services?.duration_minutes || 60}
+                      excludeAppointmentId={selectedAppointment.id}
+                    />
 
                     <Textarea
                       label="Motivo do Reagendamento"

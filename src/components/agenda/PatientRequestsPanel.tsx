@@ -4,6 +4,8 @@ import { ptBR } from 'date-fns/locale';
 import { CalendarClock, CalendarPlus, Hourglass, Smartphone, XCircle } from 'lucide-react';
 import { Button, DateInput, Input, Modal, Textarea } from '../ui';
 import { SlotPicker } from '../scheduling/SlotPicker';
+import { DurationSelect } from './ScheduleFields';
+import { fmtDuration } from '../../lib/duration';
 import { useStaffSlots } from '../../hooks/queries/usePortal';
 import type { AppointmentChangeRequest } from '../../types/portal';
 
@@ -28,8 +30,8 @@ export interface PatientRequestsPanelProps {
   /** Duração (min) do serviço — para achar horários livres ao sugerir data. */
   serviceMinutes: (serviceId: string | null) => number;
   onReschedule: (appointmentId: string) => void;
-  onResolve: (requestId: string, status: 'aceito' | 'recusado') => void;
-  onPropose: (requestId: string, proposedAt: string, note: string, done: () => void) => void;
+  onResolve: (requestId: string, status: 'aceito' | 'recusado', durationMinutes?: number | null) => void;
+  onPropose: (requestId: string, proposedAt: string, note: string, durationMinutes: number | null, done: () => void) => void;
   proposing: boolean;
   resolvingId: string | null;
   readOnly?: boolean;
@@ -41,7 +43,7 @@ const ProposeModal: React.FC<{
   request: AppointmentChangeRequest | null;
   minutes: number;
   onClose: () => void;
-  onSubmit: (proposedAt: string, note: string) => void;
+  onSubmit: (proposedAt: string, note: string, durationMinutes: number | null) => void;
   submitting: boolean;
 }> = ({ request, minutes, onClose, onSubmit, submitting }) => {
   const [today] = useState(() => new Date());
@@ -51,12 +53,15 @@ const ProposeModal: React.FC<{
   const [manualDate, setManualDate] = useState('');
   const [manualTime, setManualTime] = useState('');
   const [note, setNote] = useState('');
+  // '' = a duração reservada pelo pedido.
+  const [duration, setDuration] = useState('');
+  const effectiveMinutes = duration ? Number(duration) : minutes;
 
   const slots = useStaffSlots({
     nutritionistId: request?.nutritionist_id ?? null,
     from: format(today, 'yyyy-MM-dd'),
     to: format(addDays(today, windowDays), 'yyyy-MM-dd'),
-    minutes,
+    minutes: effectiveMinutes,
     excludeAppointmentId: request?.appointment_id ?? null,
     excludeRequestId: request?.id ?? null,
     enabled: !!request && !manual,
@@ -71,6 +76,7 @@ const ProposeModal: React.FC<{
     setManualDate('');
     setManualTime('');
     setNote('');
+    setDuration('');
     setWindowDays(13);
     onClose();
   };
@@ -84,7 +90,7 @@ const ProposeModal: React.FC<{
       footer={
         <>
           <Button variant="secondary" onClick={close}>Voltar</Button>
-          <Button variant="primary" disabled={!chosen} loading={submitting} onClick={() => chosen && onSubmit(chosen, note)}>
+          <Button variant="primary" disabled={!chosen} loading={submitting} onClick={() => chosen && onSubmit(chosen, note, duration ? Number(duration) : null)}>
             Enviar sugestão
           </Button>
         </>
@@ -96,6 +102,12 @@ const ProposeModal: React.FC<{
             {request.patients?.name ?? 'O paciente'} pediu <strong className="font-semibold text-slate-900">{fmtWhen(request.requested_at)}</strong>.
           </p>
         )}
+        <DurationSelect
+          label="Duração da consulta"
+          value={duration}
+          serviceMinutes={minutes}
+          onChange={(v) => { setDuration(v); setSlot(null); }}
+        />
         {manual ? (
           <div className="grid grid-cols-2 gap-3">
             <DateInput label="Data" value={manualDate} onChange={setManualDate} />
@@ -144,6 +156,8 @@ export const PatientRequestsPanel: React.FC<PatientRequestsPanelProps> = ({
   readOnly,
 }) => {
   const [proposeFor, setProposeFor] = useState<AppointmentChangeRequest | null>(null);
+  // Duração escolhida ao aceitar, por pedido (padrão = a reservada pelo pedido).
+  const [durations, setDurations] = useState<Record<string, string>>({});
   if (requests.length === 0) return null;
 
   const actionable = requests.filter((r) => r.status === 'pendente').length;
@@ -184,6 +198,7 @@ export const PatientRequestsPanel: React.FC<PatientRequestsPanelProps> = ({
                 {r.requested_at && !waitingPatient && (
                   <p className="text-sm text-slate-700">
                     <span className="text-slate-500">Horário escolhido:</span> <span className="font-medium">{fmtWhen(r.requested_at)}</span>
+                    {r.duration_minutes ? <span className="text-slate-500"> · {fmtDuration(r.duration_minutes)}</span> : null}
                   </p>
                 )}
                 {r.preferred_times && (
@@ -211,7 +226,17 @@ export const PatientRequestsPanel: React.FC<PatientRequestsPanelProps> = ({
                     </Button>
                   ) : r.requested_at ? (
                     <>
-                      <Button size="sm" variant="primary" loading={busy} onClick={() => onResolve(r.id, 'aceito')}>
+                      <select
+                        aria-label="Duração da consulta"
+                        value={durations[r.id] ?? String(r.duration_minutes || serviceMinutes(r.service_id))}
+                        onChange={(e) => setDurations((d) => ({ ...d, [r.id]: e.target.value }))}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:border-[#5024fc] focus:outline-none focus:ring-1 focus:ring-[#5024fc]"
+                      >
+                        {[...new Set([30, 45, 60, 75, 90, 105, 120, 150, 180, r.duration_minutes || serviceMinutes(r.service_id)])].sort((a, b) => a - b).map((m) => (
+                          <option key={m} value={m}>{fmtDuration(m)}</option>
+                        ))}
+                      </select>
+                      <Button size="sm" variant="primary" loading={busy} onClick={() => onResolve(r.id, 'aceito', durations[r.id] ? Number(durations[r.id]) : null)}>
                         Aceitar
                       </Button>
                       <Button size="sm" variant="secondary" disabled={busy} onClick={() => setProposeFor(r)}>
@@ -240,10 +265,10 @@ export const PatientRequestsPanel: React.FC<PatientRequestsPanelProps> = ({
 
       <ProposeModal
         request={proposeFor}
-        minutes={serviceMinutes(proposeFor?.service_id ?? null)}
+        minutes={proposeFor?.duration_minutes || serviceMinutes(proposeFor?.service_id ?? null)}
         onClose={() => setProposeFor(null)}
         submitting={proposing}
-        onSubmit={(at, note) => proposeFor && onPropose(proposeFor.id, at, note, () => setProposeFor(null))}
+        onSubmit={(at, note, dur) => proposeFor && onPropose(proposeFor.id, at, note, dur, () => setProposeFor(null))}
       />
     </section>
   );

@@ -31,7 +31,9 @@ export const PortalBookingSection: React.FC<{
   const recent = openBooking ? undefined : bookings.find((r) => r.status === 'aceito' || (r.status === 'recusado' && !r.declined_by_patient));
 
   const canBook = portal.active && portal.booking_enabled && !openBooking;
-  if (!openBooking && !recent && (!canBook || hasUpcoming)) {
+  // Sem grade de horários do nutricionista: explica em vez de esconder a opção.
+  const bookingOff = portal.active && !portal.booking_enabled && !openBooking && !recent;
+  if (!openBooking && !recent && (hasUpcoming || (!canBook && !bookingOff))) {
     return null;
   }
 
@@ -44,6 +46,15 @@ export const PortalBookingSection: React.FC<{
 
       {openBooking && <PortalRequestNotice request={openBooking} canAct={portal.active} />}
       {recent && <PortalRequestNotice request={recent} canAct={portal.active} />}
+
+      {bookingOff && (
+        <p className="text-sm text-slate-600">
+          O agendamento pelo app ainda não está disponível para {portal.nutritionist_name || 'seu nutricionista'}.
+          {portal.clinic.phone
+            ? <> Para marcar, fale com a clínica: <a className="font-medium text-[#5024fc]" href={`tel:${portal.clinic.phone}`}>{portal.clinic.phone}</a>.</>
+            : ' Para marcar, fale com a clínica.'}
+        </p>
+      )}
 
       {canBook && (
         <>

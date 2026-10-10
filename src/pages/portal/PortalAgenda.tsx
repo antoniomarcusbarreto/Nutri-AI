@@ -4,6 +4,7 @@ import { usePortalAppointments, usePortalRequests } from '../../hooks/queries/us
 import { PortalAppointmentCard } from '../../components/portal/PortalAppointmentCard';
 import { PortalBookingSection } from '../../components/portal/PortalBookingSection';
 import { latestRescheduleByAppointment } from '../../types/portal';
+import { PortalPageHeader } from '../../components/portal/PortalPageHeader';
 
 export const PortalAgenda: React.FC = () => {
   const { patientPortal } = useAuth();
@@ -22,13 +23,16 @@ export const PortalAgenda: React.FC = () => {
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Consultas</h1>
-        <p className="mt-1 text-sm text-slate-500">Confirme sua presença, peça outro horário ou cancele.</p>
-      </div>
+      <PortalPageHeader title="Consultas" description="Confirme sua presença, peça outro horário, cancele ou marque um retorno." />
 
-      {patientPortal && <PortalBookingSection portal={patientPortal} requests={requests} hasUpcoming={false} />}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
+      {patientPortal && (
+        <div className="lg:sticky lg:top-10 lg:col-start-2 lg:row-start-1">
+          <PortalBookingSection portal={patientPortal} requests={requests} hasUpcoming={false} />
+        </div>
+      )}
 
+      <div className="min-w-0 space-y-8 lg:col-start-1 lg:row-start-1">
       {isLoading ? (
         <div className="space-y-3" aria-busy="true">
           {[0, 1].map((i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-200/60" />)}
@@ -69,6 +73,8 @@ export const PortalAgenda: React.FC = () => {
           )}
         </>
       )}
+      </div>
+      </div>
     </>
   );
 };

@@ -74,6 +74,8 @@ export interface AppointmentChangeRequest {
   proposed_at: string | null;
   response_note: string | null;
   note: string | null;
+  /** Duração reservada (migration 0035). */
+  duration_minutes?: number | null;
   status: ChangeRequestStatus;
   created_at: string;
   patients?: { name?: string | null } | null;

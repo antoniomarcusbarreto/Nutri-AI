@@ -76,7 +76,7 @@ async function fetchMonthActivity(clinicId: string, month: Date, includeClinical
       : Promise.resolve(null),
     hasPast
       ? supabase.from('appointments')
-        .select('status, services ( duration_minutes )')
+        .select('status, duration_minutes, services ( duration_minutes )')
         .eq('clinic_id', clinicId).neq('status', 'cancelado')
         .gte('date_time', startISO).lte('date_time', pastUntil.toISOString())
       : Promise.resolve(null),
@@ -85,11 +85,11 @@ async function fetchMonthActivity(clinicId: string, month: Date, includeClinical
   if (mealPlans?.error) throw mealPlans.error;
   if (past?.error) throw past.error;
 
-  type PastRow = { status: string; services: One<{ duration_minutes?: number }> };
+  type PastRow = { status: string; duration_minutes?: number | null; services: One<{ duration_minutes?: number }> };
   const pastRows = (past?.data ?? []) as PastRow[];
   const concludedRows = pastRows.filter((r) => r.status === 'concluido');
   const totalMinutes = concludedRows.reduce(
-    (sum, row) => sum + (pickOne(row.services)?.duration_minutes ?? 60), // default 60 min quando sem serviço
+    (sum, row) => sum + (row.duration_minutes ?? pickOne(row.services)?.duration_minutes ?? 60), // default 60 min quando sem serviço
     0,
   );
 

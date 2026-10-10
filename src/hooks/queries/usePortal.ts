@@ -87,6 +87,16 @@ export function usePortalMealPlan(patientId: string | undefined) {
   });
 }
 
+/**
+ * Aviso por e-mail do pedido (Edge Function `schedule-notify`, migration 0035).
+ * Melhor esforço: não bloqueia a interface nem mostra erro — o pedido já foi
+ * gravado. `mine_latest` = o pedido mais recente do paciente logado (as RPCs
+ * do portal não devolvem o id).
+ */
+function notifySchedule(body: { request_id: string } | { mine_latest: true }) {
+  void supabase.functions.invoke('schedule-notify', { body }).catch(() => undefined);
+}
+
 /** Ações do paciente sobre consultas e pedidos — todas pelas RPCs do portal. */
 export function usePortalAppointmentActions() {
   const client = useQueryClient();
@@ -109,7 +119,10 @@ export function usePortalAppointmentActions() {
       });
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      notifySchedule({ mine_latest: true });
+      invalidate();
+    },
   });
 
   const requestReschedule = useMutation({
@@ -121,6 +134,7 @@ export function usePortalAppointmentActions() {
       });
       if (error) throw error;
     },
+    onSuccess: () => notifySchedule({ mine_latest: true }),
     onSettled: invalidate,
   });
 
@@ -132,6 +146,7 @@ export function usePortalAppointmentActions() {
       });
       if (error) throw error;
     },
+    onSuccess: () => notifySchedule({ mine_latest: true }),
     onSettled: invalidate,
   });
 
@@ -143,6 +158,7 @@ export function usePortalAppointmentActions() {
       });
       if (error) throw error;
     },
+    onSuccess: (_d, input) => notifySchedule({ request_id: input.requestId }),
     onSettled: invalidate,
   });
 
@@ -220,7 +236,7 @@ export function usePendingChangeRequests(clinicId: string | undefined) {
     queryFn: async (): Promise<AppointmentChangeRequest[]> => {
       const { data, error } = await supabase
         .from('appointment_change_requests')
-        .select('id, appointment_id, patient_id, clinic_id, nutritionist_id, service_id, kind, preferred_times, requested_at, proposed_at, response_note, note, status, created_at, patients(name)')
+        .select('id, appointment_id, patient_id, clinic_id, nutritionist_id, service_id, kind, preferred_times, requested_at, proposed_at, response_note, note, status, duration_minutes, created_at, patients(name)')
         .eq('clinic_id', clinicId!)
         .in('status', ['pendente', 'proposto'])
         .order('created_at', { ascending: true });
@@ -233,13 +249,15 @@ export function usePendingChangeRequests(clinicId: string | undefined) {
 export function useHandleChangeRequest() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { requestId: string; status: 'aceito' | 'recusado' }) => {
+    mutationFn: async (input: { requestId: string; status: 'aceito' | 'recusado'; durationMinutes?: number | null }) => {
       const { error } = await supabase.rpc('handle_change_request', {
         p_request_id: input.requestId,
         p_status: input.status,
+        p_duration_minutes: input.durationMinutes ?? null,
       });
       if (error) throw error;
     },
+    onSuccess: (_d, input) => notifySchedule({ request_id: input.requestId }),
     onSettled: () => {
       client.invalidateQueries({ queryKey: qk.changeRequests.all });
       client.invalidateQueries({ queryKey: qk.dashboard.all });
@@ -252,14 +270,16 @@ export function useHandleChangeRequest() {
 export function useProposeChangeRequest() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { requestId: string; proposedAt: string; note?: string }) => {
+    mutationFn: async (input: { requestId: string; proposedAt: string; note?: string; durationMinutes?: number | null }) => {
       const { error } = await supabase.rpc('propose_change_request', {
         p_request_id: input.requestId,
         p_proposed_at: input.proposedAt,
         p_note: input.note || null,
+        p_duration_minutes: input.durationMinutes ?? null,
       });
       if (error) throw error;
     },
+    onSuccess: (_d, input) => notifySchedule({ request_id: input.requestId }),
     onSettled: () => {
       client.invalidateQueries({ queryKey: qk.changeRequests.all });
       client.invalidateQueries({ queryKey: qk.dashboard.all });
@@ -311,34 +331,72 @@ export interface AvailabilityRange {
   end_time: string;
 }
 
+/**
+ * Bloqueio de agenda (migration 0035):
+ *   - toda semana: `weekday` + `start_time`/`end_time` (validade opcional em starts_on/ends_on);
+ *   - numa data com horário: starts_on = ends_on + `start_time`/`end_time`;
+ *   - dia inteiro / período: starts_on/ends_on sem horário.
+ */
 export interface TimeOff {
   id: string;
-  starts_on: string;
-  ends_on: string;
+  weekday: number | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  start_time: string | null;
+  end_time: string | null;
   reason: string | null;
 }
+
+export type NewTimeOff =
+  | { kind: 'weekly'; weekday: number; startTime: string; endTime: string; startsOn?: string; endsOn?: string; reason?: string }
+  | { kind: 'date'; date: string; startTime: string; endTime: string; reason?: string }
+  | { kind: 'period'; startsOn: string; endsOn: string; reason?: string };
+
+/** Regras da agenda online do profissional (padrões quando não configurado). */
+export interface ScheduleSettings {
+  buffer_minutes: number;
+  slot_step_minutes: number;
+  min_notice_hours: number;
+  max_days_ahead: number;
+}
+export const DEFAULT_SCHEDULE_SETTINGS: ScheduleSettings = {
+  buffer_minutes: 0,
+  slot_step_minutes: 30,
+  min_notice_hours: 12,
+  max_days_ahead: 60,
+};
+
+const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null);
 
 export function useAvailability(nutritionistId: string | undefined) {
   return useQuery({
     queryKey: qk.availability.byNutritionist(nutritionistId ?? 'none'),
     enabled: !!nutritionistId,
-    queryFn: async (): Promise<{ ranges: AvailabilityRange[]; timeOff: TimeOff[] }> => {
-      const [ranges, timeOff] = await Promise.all([
+    queryFn: async (): Promise<{ ranges: AvailabilityRange[]; timeOff: TimeOff[]; settings: ScheduleSettings }> => {
+      const today = new Date().toISOString().slice(0, 10);
+      const [ranges, timeOff, settings] = await Promise.all([
         supabase.from('nutritionist_availability')
           .select('id, weekday, start_time, end_time')
           .eq('nutritionist_id', nutritionistId!)
           .order('weekday').order('start_time'),
         supabase.from('nutritionist_time_off')
-          .select('id, starts_on, ends_on, reason')
+          .select('id, weekday, starts_on, ends_on, start_time, end_time, reason')
           .eq('nutritionist_id', nutritionistId!)
-          .gte('ends_on', new Date().toISOString().slice(0, 10))
-          .order('starts_on'),
+          // Bloqueios ainda vigentes (semanais sem fim sempre entram).
+          .or(`ends_on.is.null,ends_on.gte.${today}`)
+          .order('weekday', { nullsFirst: false }).order('starts_on').order('start_time'),
+        supabase.from('nutritionist_schedule_settings')
+          .select('buffer_minutes, slot_step_minutes, min_notice_hours, max_days_ahead')
+          .eq('nutritionist_id', nutritionistId!)
+          .maybeSingle(),
       ]);
       if (ranges.error) throw ranges.error;
       if (timeOff.error) throw timeOff.error;
+      if (settings.error) throw settings.error;
       return {
         ranges: (ranges.data ?? []).map((r) => ({ ...r, start_time: r.start_time.slice(0, 5), end_time: r.end_time.slice(0, 5) })),
-        timeOff: (timeOff.data ?? []) as TimeOff[],
+        timeOff: ((timeOff.data ?? []) as TimeOff[]).map((t) => ({ ...t, start_time: hhmm(t.start_time), end_time: hhmm(t.end_time) })),
+        settings: (settings.data as ScheduleSettings | null) ?? DEFAULT_SCHEDULE_SETTINGS,
       };
     },
   });
@@ -370,15 +428,16 @@ export function useAvailabilityMutations(clinicId: string | undefined, nutrition
   });
 
   const addTimeOff = useMutation({
-    mutationFn: async (input: { startsOn: string; endsOn: string; reason?: string }) => {
+    mutationFn: async (input: NewTimeOff) => {
       if (!clinicId || !nutritionistId) throw new Error('Sem clínica.');
-      const { error } = await supabase.from('nutritionist_time_off').insert({
-        clinic_id: clinicId,
-        nutritionist_id: nutritionistId,
-        starts_on: input.startsOn,
-        ends_on: input.endsOn,
-        reason: input.reason || null,
-      });
+      const base = { clinic_id: clinicId, nutritionist_id: nutritionistId, reason: input.reason || null };
+      const row =
+        input.kind === 'weekly'
+          ? { ...base, weekday: input.weekday, start_time: input.startTime, end_time: input.endTime, starts_on: input.startsOn || null, ends_on: input.endsOn || null }
+          : input.kind === 'date'
+            ? { ...base, starts_on: input.date, ends_on: input.date, start_time: input.startTime, end_time: input.endTime }
+            : { ...base, starts_on: input.startsOn, ends_on: input.endsOn };
+      const { error } = await supabase.from('nutritionist_time_off').insert(row as Record<string, unknown>);
       if (error) throw error;
     },
     onSuccess: invalidate,
@@ -392,7 +451,51 @@ export function useAvailabilityMutations(clinicId: string | undefined, nutrition
     onSuccess: invalidate,
   });
 
-  return { saveRanges, addTimeOff, removeTimeOff };
+  const saveSettings = useMutation({
+    mutationFn: async (settings: ScheduleSettings) => {
+      if (!clinicId || !nutritionistId) throw new Error('Sem clínica.');
+      const { error } = await supabase.from('nutritionist_schedule_settings').upsert(
+        { ...settings, nutritionist_id: nutritionistId, clinic_id: clinicId, updated_at: new Date().toISOString() },
+        { onConflict: 'nutritionist_id' },
+      );
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { saveRanges, addTimeOff, removeTimeOff, saveSettings };
+}
+
+export type ScheduleConflict = 'consulta' | 'bloqueio' | 'fora_da_grade' | null;
+
+/**
+ * Aviso de conflito ao agendar pela Agenda (não impede salvar — encaixe é
+ * decisão da equipe). Consulta só quando data, hora e profissional estão completos.
+ */
+export function useScheduleConflict(input: {
+  nutritionistId: string | null | undefined;
+  start: Date | null;
+  minutes: number | null;
+  excludeAppointmentId?: string | null;
+}) {
+  const { nutritionistId, start, minutes, excludeAppointmentId } = input;
+  const startIso = start && !Number.isNaN(start.getTime()) ? start.toISOString() : null;
+  return useQuery({
+    queryKey: ['availability', 'conflict', nutritionistId ?? '', startIso ?? '', minutes ?? 0, excludeAppointmentId ?? ''],
+    enabled: !!nutritionistId && !!startIso && !!minutes,
+    staleTime: 15_000,
+    queryFn: async (): Promise<{ conflict: ScheduleConflict; withTime: string | null }> => {
+      const { data, error } = await supabase.rpc('check_schedule_conflict', {
+        p_nutritionist_id: nutritionistId,
+        p_start: startIso,
+        p_minutes: minutes,
+        p_exclude_appointment: excludeAppointmentId ?? null,
+      });
+      if (error) throw error;
+      const d = (data ?? {}) as { conflict?: ScheduleConflict; with_time?: string | null };
+      return { conflict: d.conflict ?? null, withTime: d.with_time ?? null };
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import { inputsFromRow, PERIMETERS, type PerimeterKey } from '../../lib/bodyComp
 import { prepareImage } from '../../lib/imageResize';
 import { BodyReport } from '../../components/body/BodyReport';
 import { Button, Input } from '../../components/ui';
+import { PortalPageHeader } from '../../components/portal/PortalPageHeader';
 import { cn } from '../../lib/cn';
 
 /**
@@ -130,7 +131,8 @@ const SubmitForm: React.FC<{ request: PortalBodyAssessment; patientId: string }>
   };
 
   return (
-    <div className="space-y-5">
+    <div className={cn('grid grid-cols-1 items-start gap-5', wantsPhotos && 'lg:grid-cols-2')}>
+      <div className="space-y-5">
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="body-basic">
         <h2 id="body-basic" className="text-base font-semibold text-slate-900">Peso e altura</h2>
         <div className="grid grid-cols-2 gap-3">
@@ -162,6 +164,9 @@ const SubmitForm: React.FC<{ request: PortalBodyAssessment; patientId: string }>
         </section>
       )}
 
+      </div>
+
+      <div className="space-y-5">
       {wantsPhotos && (
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="body-photos">
           <h2 id="body-photos" className="flex items-center gap-2 text-base font-semibold text-slate-900">
@@ -184,9 +189,10 @@ const SubmitForm: React.FC<{ request: PortalBodyAssessment; patientId: string }>
           </label>
         </section>
       )}
+      </div>
 
-      {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
-      <Button variant="primary" fullWidth className="h-11 sm:w-auto" loading={submit.isPending} onClick={send}>
+      {error && <p role="alert" className="lg:col-span-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
+      <Button variant="primary" fullWidth className="h-11 sm:w-auto lg:col-span-2 lg:justify-self-start" loading={submit.isPending} onClick={send}>
         Enviar avaliação
       </Button>
     </div>
@@ -207,10 +213,7 @@ export const PortalBodyAssessmentPage: React.FC = () => {
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Avaliação corporal</h1>
-        <p className="mt-1 text-sm text-slate-500">Medidas e fotos pedidas pelo seu nutricionista.</p>
-      </div>
+      <PortalPageHeader title="Avaliação corporal" description="Medidas e fotos pedidas pelo seu nutricionista, e os resultados que ele liberar." />
 
       {isLoading ? (
         <div className="h-48 animate-pulse rounded-2xl bg-slate-200/60" />

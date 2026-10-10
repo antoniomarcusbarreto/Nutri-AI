@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, Camera, ClipboardList, UtensilsCrossed } from 'lucide-react';
-import { usePortalBodyAssessments } from '../../hooks/queries/useBodyAssessments';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { ArrowRight, CheckCircle2, ChevronRight, Mail, Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { isHealthComplete, usePortalAppointments, usePortalHealth, usePortalMealPlan, usePortalRequests } from '../../hooks/queries/usePortal';
+import { usePortalAppointments, usePortalMealPlan, usePortalRequests } from '../../hooks/queries/usePortal';
 import { PortalBookingSection } from '../../components/portal/PortalBookingSection';
 import { latestRescheduleByAppointment } from '../../types/portal';
 import { PortalAppointmentCard } from '../../components/portal/PortalAppointmentCard';
+import { PortalPageHeader, PortalSection } from '../../components/portal/PortalPageHeader';
+import { usePortalTasks } from '../../components/portal/usePortalTasks';
 import { MealPlanView } from '../../components/mealplan/MealPlanView';
 import { MEAL_NAMES, sortMealKeys } from '../../types/mealPlan';
 
@@ -37,21 +40,19 @@ const greeting = (now = new Date()) => {
   return 'Boa noite';
 };
 
-const SectionTitle: React.FC<{ id: string; icon: React.ReactNode; title: string; to: string; linkLabel: string }> = ({ id, icon, title, to, linkLabel }) => (
-  <div className="mb-3 flex items-center justify-between gap-3">
-    <h2 id={id} className="flex items-center gap-2 text-base font-semibold text-slate-900">
-      <span className="text-teal-700">{icon}</span>
-      {title}
-    </h2>
-    <Link to={to} className="inline-flex items-center gap-1 rounded text-sm font-medium text-[#5024fc] hover:text-[#431cdb]">
-      {linkLabel}
-      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-    </Link>
-  </div>
+const LinkMore: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
+  <Link to={to} className="inline-flex items-center gap-1 rounded text-sm font-medium text-[#5024fc] hover:text-[#431cdb]">
+    {children}
+    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+  </Link>
 );
 
 const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
   <div className={`animate-pulse rounded-2xl bg-slate-200/60 ${className ?? ''}`} />
+);
+
+const Empty: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">{children}</p>
 );
 
 export const PortalHome: React.FC = () => {
@@ -60,10 +61,7 @@ export const PortalHome: React.FC = () => {
   const appointments = usePortalAppointments(patientId);
   const plan = usePortalMealPlan(patientId);
   const { data: requests = [] } = usePortalRequests(patientId);
-  const health = usePortalHealth(patientId);
-  const body = usePortalBodyAssessments(patientId);
-  const bodyRequested = !!patientPortal?.active && (body.data ?? []).some((a) => a.status === 'solicitada');
-  const needsHealthForm = health.isSuccess && !isHealthComplete(health.data) && !!patientPortal?.active;
+  const { tasks, loading: tasksLoading } = usePortalTasks();
   const requestFor = latestRescheduleByAppointment(requests);
   const [now] = useState(() => Date.now());
 
@@ -73,97 +71,123 @@ export const PortalHome: React.FC = () => {
 
   const mealKey = plan.data ? currentMealKey(plan.data.meals) : null;
   const firstName = patientPortal?.name?.split(' ')[0] ?? '';
+  const clinic = patientPortal?.clinic;
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          {greeting()}{firstName ? `, ${firstName}` : ''}
-        </h1>
-        {patientPortal?.nutritionist_name && (
-          <p className="mt-1 text-sm text-slate-500">Acompanhamento com {patientPortal.nutritionist_name}</p>
+      <PortalPageHeader
+        title={<>{greeting()}{firstName ? `, ${firstName}` : ''}</>}
+        description={<span className="first-letter:uppercase">{format(now, "EEEE, d 'de' MMMM", { locale: ptBR })}</span>}
+      />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
+        {/* Para fazer: primeiro no DOM (no celular vem antes); no desktop vai para a coluna lateral. */}
+        <PortalSection id="home-tasks" title="Para fazer" className="lg:col-start-2 lg:row-start-1">
+          {tasksLoading ? (
+            <Skeleton className="h-24" />
+          ) : tasks.length === 0 ? (
+            <p className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-600">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+              Tudo em dia por aqui.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              {tasks.map((t) => (
+                <li key={t.key}>
+                  <Link to={t.to} className="group flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-[#5024fc]" aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-slate-900">{t.title}</span>
+                      <span className="block text-xs text-slate-500">{t.detail}</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </PortalSection>
+
+        <div className="space-y-8 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+          <PortalSection id="home-next" title="Próxima consulta" action={<LinkMore to="/portal/agenda">Todas</LinkMore>}>
+            {appointments.isLoading ? (
+              <Skeleton className="h-40" />
+            ) : appointments.isError ? (
+              <Empty>Não foi possível carregar suas consultas. Tente de novo em instantes.</Empty>
+            ) : next ? (
+              <PortalAppointmentCard
+                appointment={next}
+                patientId={patientId!}
+                canAct={!!patientPortal?.active}
+                request={requestFor.get(next.id)}
+                bookingEnabled={!!patientPortal?.booking_enabled}
+                clinicPhone={clinic?.phone}
+                featured
+              />
+            ) : (
+              <Empty>
+                Nenhuma consulta marcada.{patientPortal?.booking_enabled ? '' : ' Quando a clínica agendar, ela aparece aqui para você confirmar.'}
+              </Empty>
+            )}
+          </PortalSection>
+
+          {patientPortal && !appointments.isLoading && (
+            <PortalBookingSection portal={patientPortal} requests={requests} hasUpcoming={!!next} />
+          )}
+
+          <PortalSection
+            id="home-meal"
+            title={mealKey ? `Agora: ${MEAL_NAMES[mealKey] ?? mealKey}` : 'Seu plano'}
+            action={<LinkMore to="/portal/plano">Plano completo</LinkMore>}
+          >
+            {plan.isLoading ? (
+              <Skeleton className="h-48" />
+            ) : plan.isError ? (
+              <Empty>Não foi possível carregar seu plano. Tente mais tarde.</Empty>
+            ) : plan.data && mealKey ? (
+              <MealPlanView meals={plan.data.meals} only={[mealKey]} />
+            ) : (
+              <Empty>Seu plano alimentar aparece aqui assim que {patientPortal?.nutritionist_name || 'seu nutricionista'} publicar.</Empty>
+            )}
+          </PortalSection>
+        </div>
+
+        {patientPortal && (
+          <PortalSection id="home-care" title="Seu acompanhamento" className="lg:col-start-2 lg:row-start-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              {patientPortal.nutritionist_name && (
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{patientPortal.nutritionist_name}</p>
+                  <p className="text-xs text-slate-500">
+                    Nutricionista{patientPortal.nutritionist_crn ? ` · CRN ${patientPortal.nutritionist_crn}` : ''}
+                  </p>
+                </div>
+              )}
+              {clinic?.name && <p className="mt-3 text-sm text-slate-700">{clinic.name}</p>}
+              {(clinic?.phone || clinic?.email) && (
+                <div className="mt-3 space-y-1.5 text-sm">
+                  {clinic.phone && (
+                    <a href={`tel:${clinic.phone}`} className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
+                      <Phone className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" /> {clinic.phone}
+                    </a>
+                  )}
+                  {clinic.email && (
+                    <a href={`mailto:${clinic.email}`} className="flex min-w-0 items-center gap-2 text-slate-600 hover:text-slate-900">
+                      <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" /> <span className="truncate">{clinic.email}</span>
+                    </a>
+                  )}
+                </div>
+              )}
+              {plan.data && (
+                <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                  Plano atualizado em {format(new Date(plan.data.created_at), 'dd/MM/yyyy')}
+                  {plan.data.kcal ? <> · <span className="tabular-nums">{plan.data.kcal}</span> kcal/dia</> : null}
+                </p>
+              )}
+            </div>
+          </PortalSection>
         )}
       </div>
-
-      {bodyRequested && (
-        <Link
-          to="/portal/avaliacao"
-          className="flex items-center gap-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4 transition-colors hover:bg-teal-50"
-        >
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-teal-700 ring-1 ring-teal-200">
-            <Camera className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-teal-900">Avaliação corporal pedida</span>
-            <span className="block text-sm text-teal-800">Seu nutricionista pediu medidas e/ou fotos. Veja o passo a passo.</span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-teal-700" aria-hidden="true" />
-        </Link>
-      )}
-
-      {needsHealthForm && (
-        <Link
-          to="/portal/ficha"
-          className="flex items-center gap-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4 transition-colors hover:bg-teal-50"
-        >
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-teal-700 ring-1 ring-teal-200">
-            <ClipboardList className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-teal-900">Preencha sua ficha de saúde</span>
-            <span className="block text-sm text-teal-800">Ajuda a preparar sua consulta. Leva uns 3 minutos.</span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-teal-700" aria-hidden="true" />
-        </Link>
-      )}
-
-      <section aria-labelledby="home-next">
-        <SectionTitle id="home-next" icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />} title="Próxima consulta" to="/portal/agenda" linkLabel="Todas" />
-        {appointments.isLoading ? (
-          <Skeleton className="h-36" />
-        ) : appointments.isError ? (
-          <p className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">Não foi possível carregar suas consultas. Tente de novo em instantes.</p>
-        ) : next ? (
-          <PortalAppointmentCard
-            appointment={next}
-            patientId={patientId!}
-            canAct={!!patientPortal?.active}
-            request={requestFor.get(next.id)}
-            bookingEnabled={!!patientPortal?.booking_enabled}
-            clinicPhone={patientPortal?.clinic.phone}
-            featured
-          />
-        ) : (
-          <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
-            Nenhuma consulta marcada.{patientPortal?.booking_enabled ? '' : ' Quando a clínica agendar, ela aparece aqui para você confirmar.'}
-          </p>
-        )}
-      </section>
-
-      {patientPortal && !appointments.isLoading && (
-        <PortalBookingSection portal={patientPortal} requests={requests} hasUpcoming={!!next} />
-      )}
-
-      <section aria-labelledby="home-meal">
-        <SectionTitle
-          id="home-meal"
-          icon={<UtensilsCrossed className="h-4 w-4" aria-hidden="true" />}
-          title={mealKey ? `Agora: ${MEAL_NAMES[mealKey] ?? mealKey}` : 'Seu plano'}
-          to="/portal/plano"
-          linkLabel="Plano completo"
-        />
-        {plan.isLoading ? (
-          <Skeleton className="h-48" />
-        ) : plan.isError ? (
-          <p className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">Não foi possível carregar seu plano. Tente mais tarde.</p>
-        ) : plan.data && mealKey ? (
-          <MealPlanView meals={plan.data.meals} only={[mealKey]} />
-        ) : (
-          <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
-            Seu plano alimentar aparece aqui assim que {patientPortal?.nutritionist_name || 'seu nutricionista'} publicar.
-          </p>
-        )}
-      </section>
     </>
   );
 };

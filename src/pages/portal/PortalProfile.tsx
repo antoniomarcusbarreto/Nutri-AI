@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import { Activity, ChevronRight, ClipboardList, LogOut, Mail, Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui';
+import { PortalPageHeader } from '../../components/portal/PortalPageHeader';
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="flex flex-col gap-0.5 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
@@ -21,8 +22,10 @@ export const PortalProfile: React.FC = () => {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Perfil</h1>
+      <PortalPageHeader title="Perfil" description="Seus dados, seu acompanhamento e privacidade." />
 
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+      <div className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white px-5 shadow-sm" aria-labelledby="profile-me">
         <h2 id="profile-me" className="pt-4 text-base font-semibold text-slate-900">Seus dados</h2>
         <dl className="divide-y divide-slate-100">
@@ -39,7 +42,7 @@ export const PortalProfile: React.FC = () => {
 
       <Link
         to="/portal/ficha"
-        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+        className="lg:hidden flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
       >
         <ClipboardList className="h-5 w-5 shrink-0 text-teal-700" aria-hidden="true" />
         <span className="min-w-0 flex-1">
@@ -51,7 +54,7 @@ export const PortalProfile: React.FC = () => {
 
       <Link
         to="/portal/avaliacao"
-        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+        className="lg:hidden flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
       >
         <Activity className="h-5 w-5 shrink-0 text-teal-700" aria-hidden="true" />
         <span className="min-w-0 flex-1">
@@ -61,6 +64,9 @@ export const PortalProfile: React.FC = () => {
         <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
       </Link>
 
+      </div>
+
+      <div className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white px-5 shadow-sm" aria-labelledby="profile-access">
         <h2 id="profile-access" className="pt-4 text-base font-semibold text-slate-900">Seu acompanhamento</h2>
         <dl className="divide-y divide-slate-100">
@@ -106,8 +112,10 @@ export const PortalProfile: React.FC = () => {
           <Link to="/privacidade" className="font-medium text-[#5024fc] hover:text-[#431cdb]">Política de Privacidade</Link>
         </p>
       </section>
+      </div>
+      </div>
 
-      <Button variant="secondary" fullWidth className="h-11" leftIcon={<LogOut className="h-4 w-4" />} onClick={signOut}>
+      <Button variant="secondary" fullWidth className="h-11 lg:hidden" leftIcon={<LogOut className="h-4 w-4" />} onClick={signOut}>
         Sair
       </Button>
     </>

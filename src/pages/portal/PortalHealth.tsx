@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { usePortalHealth, useSavePortalHealth, type PortalHealth } from '../../hooks/queries/usePortal';
 import { Button, Input, Select, Textarea } from '../../components/ui';
+import { PortalPageHeader } from '../../components/portal/PortalPageHeader';
 
 /**
  * Ficha de saúde (pré-consulta) preenchida pelo paciente dentro do portal —
@@ -67,7 +68,7 @@ const HealthForm: React.FC<{ initial: PortalHealth; canEdit: boolean; patientId:
 
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
-      <fieldset disabled={!canEdit} className="space-y-5">
+      <fieldset disabled={!canEdit} className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="health-clinical">
           <h2 id="health-clinical" className="text-base font-semibold text-slate-900">Saúde e restrições</h2>
           <Textarea
@@ -153,14 +154,12 @@ export const PortalHealthPage: React.FC = () => {
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Ficha de saúde</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {health.data?.updated_at
-            ? `Atualizada em ${format(new Date(health.data.updated_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}. Mudou algo? Atualize aqui.`
-            : 'Essas informações ajudam a preparar sua consulta. Leva uns 3 minutos.'}
-        </p>
-      </div>
+      <PortalPageHeader
+        title="Ficha de saúde"
+        description={health.data?.updated_at
+          ? `Atualizada em ${format(new Date(health.data.updated_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}. Mudou algo? Atualize aqui.`
+          : 'Essas informações ajudam a preparar sua consulta. Leva uns 3 minutos.'}
+      />
 
       {health.isLoading ? (
         <div className="space-y-4" aria-busy="true">
