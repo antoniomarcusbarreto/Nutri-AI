@@ -22,6 +22,8 @@ export const ConfirmAppointment: React.FC = () => {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
+  // Instante em que a página abriu: base para "o horário já passou" (migration 0040).
+  const [openedAt] = useState(() => Date.now());
 
   // Detalhes públicos via TanStack Query (antes: useEffect + 4 setState).
   const {
@@ -124,6 +126,8 @@ export const ConfirmAppointment: React.FC = () => {
   const capitalizedDay = formattedDay.charAt(0).toUpperCase() + formattedDay.slice(1);
   const formattedDate = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   const formattedTime = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  // Confirmar/desmarcar só até o horário da consulta (migration 0040).
+  const isPast = dateObj.getTime() <= openedAt;
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-50 via-primary-50/25 to-teal-50/40 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
@@ -204,7 +208,17 @@ export const ConfirmAppointment: React.FC = () => {
         {/* Dynamic Status / Actions Area */}
         <div className="mt-2">
           
-          {appointment.status === 'pendente' && (
+          {appointment.status === 'pendente' && isPast && (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5.5 text-center flex flex-col items-center gap-2">
+              <Clock className="w-10 h-10 text-slate-400" />
+              <h3 className="text-base font-bold text-slate-700">O horário desta consulta já passou</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                Não é mais possível confirmar ou desmarcar por aqui. Se precisar, fale com a clínica.
+              </p>
+            </div>
+          )}
+
+          {appointment.status === 'pendente' && !isPast && (
             <div className="flex flex-col gap-3">
               <button
                 type="button"
