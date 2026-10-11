@@ -43,6 +43,7 @@ import { qk } from '../lib/queryKeys';
 import { usePendingChangeRequests, useHandleChangeRequest, useProposeChangeRequest, useAvailability } from '../hooks/queries/usePortal';
 import { PatientRequestsPanel } from '../components/agenda/PatientRequestsPanel';
 import { WhatsAppReminderStatus } from '../components/agenda/WhatsAppReminderStatus';
+import { DayRemindersCard } from '../components/agenda/DayRemindersCard';
 import { ConflictNotice, DurationSelect } from '../components/agenda/ScheduleFields';
 
 interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
@@ -1063,6 +1064,7 @@ export const Agenda: React.FC = () => {
                   
                   {/* Right Column: Day analytics/summary */}
                   <div className="w-full lg:w-80 space-y-6 shrink-0">
+                    <DayRemindersCard appointments={selectedDayAppointments} disabled={isReadOnly} />
                     <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
                       <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-amber-500" />
@@ -1325,7 +1327,12 @@ export const Agenda: React.FC = () => {
                   <span className="text-xs font-bold text-primary-800 uppercase tracking-wider">Link de Confirmação</span>
                   <span className="text-xs text-primary-650 font-semibold">Envie por WhatsApp</span>
                 </div>
-                <WhatsAppReminderStatus appointmentId={selectedAppointment.id} />
+                <WhatsAppReminderStatus
+                  appointmentId={selectedAppointment.id}
+                  status={selectedAppointment.status}
+                  dateTime={selectedAppointment.date_time}
+                  canSend={!isReadOnly}
+                />
                 <button
                   type="button"
                   onClick={() => {
