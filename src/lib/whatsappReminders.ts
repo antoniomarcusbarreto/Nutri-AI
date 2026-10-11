@@ -30,7 +30,7 @@ export const SKIP_REASON_LABEL: Record<ReminderSkipReason, string> = {
 
 /**
  * Pede o lembrete de confirmação pelo WhatsApp. Só consultas pendentes entram;
- * o envio sai pelo workflow do n8n em até 15 minutos.
+ * o workflow do n8n reserva a fila a cada minuto.
  */
 export async function requestWhatsAppReminders(appointmentIds: string[]): Promise<ReminderRequestResult> {
   const { data, error } = await supabase.rpc('whatsapp_request_reminders', { p_appointment_ids: appointmentIds });
@@ -44,7 +44,7 @@ export function describeReminderResult(r: ReminderRequestResult): { text: string
     const extra = r.skipped.length ? ` ${r.skipped.length} ficaram de fora.` : '';
     const plural = r.requested > 1;
     return {
-      text: `${r.requested} lembrete${plural ? 's' : ''} na fila. ${plural ? 'Saem' : 'Sai'} em até 15 minutos.${extra}`,
+      text: `${r.requested} lembrete${plural ? 's' : ''} na fila. ${plural ? 'Saem' : 'Sai'} em alguns minutos.${extra}`,
       type: 'success',
     };
   }

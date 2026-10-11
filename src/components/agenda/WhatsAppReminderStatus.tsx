@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { MessageCircle, Send } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
+import { WhatsAppIcon } from '../ui/WhatsAppIcon';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/cn';
 import { logger } from '../../lib/logger';
@@ -80,7 +81,7 @@ export const WhatsAppReminderStatus: React.FC<Props> = ({ appointmentId, status,
     } else if (data.response === 'opt_out') {
       text = 'Paciente pediu para não receber mais lembretes';
     } else if (inQueue) {
-      text = 'Lembrete na fila, sai em até 15 minutos';
+      text = 'Lembrete na fila, sai em alguns minutos';
     } else if (data.status === 'sent') {
       text = `Lembrete ${data.kind === 'manual' ? 'enviado pela equipe' : 'automático enviado'} em ${when(data.sent_at)}`;
     } else if (data.status === 'failed') {
@@ -110,7 +111,7 @@ export const WhatsAppReminderStatus: React.FC<Props> = ({ appointmentId, status,
           disabled={sending}
           className="w-full bg-white hover:bg-primary-50 border border-primary-200 hover:border-primary-300 text-primary-750 font-extrabold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow active:scale-[0.99] disabled:opacity-60 cursor-pointer"
         >
-          <Send className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <WhatsAppIcon className="w-4 h-4 shrink-0 text-[#25D366]" />
           {sending ? 'Pedindo lembrete…' : data?.status === 'sent' ? 'Reenviar lembrete pelo WhatsApp' : 'Enviar lembrete pelo WhatsApp'}
         </button>
       )}

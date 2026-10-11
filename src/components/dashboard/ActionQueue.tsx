@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ClipboardList, Copy, FlaskConical, MessageCircle, Send, Smartphone, UserRoundX, Utensils } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Copy, FlaskConical, MessageCircle, Smartphone, UserRoundX, Utensils } from 'lucide-react';
+import { WhatsAppIcon } from '../ui/WhatsAppIcon';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { DashboardActions } from '../../hooks/queries/useDashboard';
 import { cn } from '../../lib/cn';
@@ -67,14 +68,14 @@ const Group: React.FC<GroupProps> = ({ icon: Icon, tone, title, rows, more, grou
   );
 };
 
-const IconButton: React.FC<{ icon: React.ElementType; label: string; onClick: () => void; disabled?: boolean }> = ({ icon: Icon, label, onClick, disabled }) => (
+const IconButton: React.FC<{ icon: React.ElementType; label: string; onClick: () => void; disabled?: boolean; className?: string }> = ({ icon: Icon, label, onClick, disabled, className }) => (
   <button
     type="button"
     onClick={onClick}
     disabled={disabled}
     aria-label={label}
     title={label}
-    className="shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-default disabled:opacity-40"
+    className={cn('shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-default disabled:opacity-40', className)}
   >
     <Icon className="h-3.5 w-3.5" aria-hidden="true" />
   </button>
@@ -140,7 +141,8 @@ export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmat
                 <>
                   {onSendReminders && (
                     <IconButton
-                      icon={Send}
+                      icon={WhatsAppIcon}
+                      className="hover:bg-[#25D366]/10 hover:text-[#128C7E]"
                       label={`Enviar lembrete pelo WhatsApp para ${c.patientName}`}
                       onClick={() => onSendReminders([c.id])}
                       disabled={sendingIds?.has(c.id)}
@@ -158,7 +160,7 @@ export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmat
                 disabled={a.confirmations.some((c) => sendingIds?.has(c.id))}
                 className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-[#5024fc] hover:underline disabled:cursor-default disabled:opacity-50"
               >
-                <Send className="h-3 w-3" aria-hidden="true" /> Enviar lembrete a todos ({a.confirmations.length})
+                <WhatsAppIcon className="h-3.5 w-3.5 text-[#25D366]" /> Enviar lembrete a todos ({a.confirmations.length})
               </button>
             )}
           />

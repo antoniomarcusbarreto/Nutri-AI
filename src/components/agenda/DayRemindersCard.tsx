@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { MessageCircle, Send } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
+import { WhatsAppIcon } from '../ui/WhatsAppIcon';
 import { useToast } from '../../contexts/ToastContext';
 import { logger } from '../../lib/logger';
 import { describeReminderResult, reminderQueryKey, requestWhatsAppReminders } from '../../lib/whatsappReminders';
@@ -51,7 +52,7 @@ export const DayRemindersCard: React.FC<{ appointments: DayAppointment[]; disabl
         {n} consulta{n > 1 ? 's' : ''} ainda sem confirmação. Quem já confirmou não recebe.
       </p>
       <Button type="button" className="w-full" onClick={send} disabled={sending || disabled}>
-        <Send className="w-4 h-4 shrink-0" aria-hidden="true" />
+        <WhatsAppIcon className="w-4 h-4 shrink-0" />
         {sending ? 'Pedindo lembretes…' : `Enviar aos não confirmados (${n})`}
       </Button>
     </div>

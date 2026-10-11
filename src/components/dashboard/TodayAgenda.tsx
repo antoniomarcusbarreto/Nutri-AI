@@ -146,7 +146,7 @@ export const TodayAgenda: React.FC<TodayAgendaProps> = ({ query, userId, clinica
                   const { patient, service } = names(apt);
                   return (
                     <li key={apt.id} className="flex items-center gap-3 px-3.5 py-2.5 text-sm">
-                      <span className="w-28 shrink-0 tabular-nums text-slate-600 first-letter:uppercase">{fmtWhen(apt.date_time)}</span>
+                      <span className="w-36 shrink-0 whitespace-nowrap tabular-nums text-slate-600 first-letter:uppercase">{fmtWhen(apt.date_time)}</span>
                       <span className="min-w-0 flex-1 truncate text-slate-900">
                         {patient}
                         {service && <span className="text-slate-500"> · {service}</span>}
