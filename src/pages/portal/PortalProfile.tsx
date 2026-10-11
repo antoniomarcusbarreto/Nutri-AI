@@ -6,6 +6,7 @@ import { Activity, ChevronRight, ClipboardList, LogOut, Mail, Phone } from 'luci
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui';
 import { PortalPageHeader } from '../../components/portal/PortalPageHeader';
+import { ReportProblemCard } from '../../components/portal/ReportProblemCard';
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="flex flex-col gap-0.5 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
@@ -22,7 +23,7 @@ export const PortalProfile: React.FC = () => {
 
   return (
     <>
-      <PortalPageHeader title="Perfil" description="Seus dados, seu acompanhamento e privacidade." />
+      <PortalPageHeader title="Perfil" description="Seus dados, seu acompanhamento, privacidade e suporte." />
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
       <div className="space-y-6">
@@ -112,6 +113,8 @@ export const PortalProfile: React.FC = () => {
           <Link to="/privacidade" className="font-medium text-[#5024fc] hover:text-[#431cdb]">Política de Privacidade</Link>
         </p>
       </section>
+
+      <ReportProblemCard />
       </div>
       </div>
 

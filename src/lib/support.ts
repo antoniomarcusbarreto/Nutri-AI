@@ -8,12 +8,24 @@ import { logger } from './logger';
  */
 export type SupportRequestType = 'duvida' | 'problema' | 'erro';
 
+/**
+ * Quem está relatando. O n8n usa isso pra escolher o ramo: a base de
+ * conhecimento é escrita para a equipe da clínica, então relatos de paciente
+ * não recebem resposta da IA — só confirmação de recebimento e escalonamento.
+ */
+export type SupportUserRole = 'equipe' | 'paciente';
+
+/** Rotas do lado do paciente (portal e convite) — usado quando o papel não é informado, ex.: ErrorBoundary. */
+const inferRole = (): SupportUserRole =>
+  /^\/(portal|convite)(\/|$)/.test(window.location.pathname) ? 'paciente' : 'equipe';
+
 interface ReportToSupportInput {
   type: SupportRequestType;
   message: string;
   userId?: string | null;
   userName?: string | null;
   userEmail?: string | null;
+  userRole?: SupportUserRole;
   extra?: Record<string, unknown>;
 }
 
@@ -31,6 +43,7 @@ export async function reportToSupport(input: ReportToSupportInput): Promise<bool
       body: JSON.stringify({
         appSource: 'Nutri-AI',
         type: input.type,
+        userRole: input.userRole ?? inferRole(),
         userId: input.userId ?? null,
         userName: input.userName ?? null,
         userEmail: input.userEmail ?? null,
