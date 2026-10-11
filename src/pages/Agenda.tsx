@@ -42,6 +42,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { qk } from '../lib/queryKeys';
 import { usePendingChangeRequests, useHandleChangeRequest, useProposeChangeRequest, useAvailability } from '../hooks/queries/usePortal';
 import { PatientRequestsPanel } from '../components/agenda/PatientRequestsPanel';
+import { WhatsAppReminderStatus } from '../components/agenda/WhatsAppReminderStatus';
 import { ConflictNotice, DurationSelect } from '../components/agenda/ScheduleFields';
 
 interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
@@ -1324,6 +1325,7 @@ export const Agenda: React.FC = () => {
                   <span className="text-xs font-bold text-primary-800 uppercase tracking-wider">Link de Confirmação</span>
                   <span className="text-xs text-primary-650 font-semibold">Envie por WhatsApp</span>
                 </div>
+                <WhatsAppReminderStatus appointmentId={selectedAppointment.id} />
                 <button
                   type="button"
                   onClick={() => {

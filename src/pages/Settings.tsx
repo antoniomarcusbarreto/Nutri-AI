@@ -9,6 +9,7 @@ import { reportToSupport, type SupportRequestType } from '../lib/support';
 import { AccessSharingPanel } from '../components/settings/AccessSharingPanel';
 import { PortalAccessModal } from '../components/patients/PortalAccessModal';
 import { AvailabilityPanel } from '../components/settings/AvailabilityPanel';
+import { WhatsAppRemindersPanel } from '../components/settings/WhatsAppRemindersPanel';
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : '');
 
@@ -760,6 +761,8 @@ export const Settings: React.FC = () => {
           </div>
         </Card>
       )}
+
+      {activeTab === 'clinic' && <WhatsAppRemindersPanel />}
 
       {activeTab === 'team' && (
         <Card as="section" padding="none" radius="2xl" className="overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">

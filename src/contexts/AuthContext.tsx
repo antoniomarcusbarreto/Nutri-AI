@@ -33,6 +33,8 @@ interface Clinic {
   operating_hours?: string;
   email?: string;
   phone?: string;
+  whatsapp_reminders_enabled?: boolean;
+  whatsapp_reminder_hours?: number;
 }
 
 interface AuthContextType {
