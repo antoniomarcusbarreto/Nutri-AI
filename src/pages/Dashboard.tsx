@@ -12,6 +12,8 @@ import { MonthResults } from '../components/dashboard/MonthResults';
 import { FinanceSnapshot } from '../components/dashboard/FinanceSnapshot';
 import { RemindersCard } from '../components/dashboard/RemindersCard';
 import { SetupChecklist } from '../components/dashboard/SetupChecklist';
+import { logger } from '../lib/logger';
+import { describeReminderResult, requestWhatsAppReminders } from '../lib/whatsappReminders';
 
 /**
  * Painel inicial: responde "o que eu faço agora?" antes de "como foi o mês".
@@ -47,6 +49,21 @@ export const Dashboard: React.FC = () => {
     void copyLink(`/confirmar/${token}`, `Link de confirmação de ${patientName} copiado. Envie pelo WhatsApp.`);
   };
 
+  // Lembrete pelo WhatsApp (migration 0039): só pendentes entram, o banco refaz a checagem.
+  const [sendingIds, setSendingIds] = useState<ReadonlySet<string>>(new Set());
+  const sendReminders = async (ids: string[]) => {
+    setSendingIds((prev) => new Set([...prev, ...ids]));
+    try {
+      const msg = describeReminderResult(await requestWhatsAppReminders(ids));
+      showToast(msg.text, msg.type);
+    } catch (err) {
+      logger.error(err);
+      showToast('Não foi possível pedir o lembrete pelo WhatsApp.', 'error');
+    } finally {
+      setSendingIds((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
+    }
+  };
+
   const now = new Date();
   const firstName = profile?.full_name?.split(' ')[0];
 
@@ -76,7 +93,12 @@ export const Dashboard: React.FC = () => {
           <TodayAgenda query={agendaQuery} userId={profile?.id} clinical={isClinical} canSchedule={!isReadOnly} onCopyConfirmation={copyConfirmation} />
         </div>
         <div className="lg:col-span-2">
-          <ActionQueue query={actionsQuery} onCopyConfirmation={copyConfirmation} />
+          <ActionQueue
+            query={actionsQuery}
+            onCopyConfirmation={copyConfirmation}
+            onSendReminders={isReadOnly ? undefined : sendReminders}
+            sendingIds={sendingIds}
+          />
         </div>
       </div>
 

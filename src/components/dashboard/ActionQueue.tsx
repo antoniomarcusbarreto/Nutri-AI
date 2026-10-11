@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ClipboardList, Copy, FlaskConical, MessageCircle, Smartphone, UserRoundX, Utensils } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Copy, FlaskConical, MessageCircle, Send, Smartphone, UserRoundX, Utensils } from 'lucide-react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { DashboardActions } from '../../hooks/queries/useDashboard';
 import { cn } from '../../lib/cn';
@@ -25,9 +25,11 @@ interface GroupProps {
   title: string;
   rows: Row[];
   more?: { to: string; label: string };
+  /** Ação do grupo inteiro, ao lado do link de "mais" (ex.: enviar a todos). */
+  groupAction?: React.ReactNode;
 }
 
-const Group: React.FC<GroupProps> = ({ icon: Icon, tone, title, rows, more }) => {
+const Group: React.FC<GroupProps> = ({ icon: Icon, tone, title, rows, more, groupAction }) => {
   if (rows.length === 0) return null;
   return (
     <li className="rounded-2xl border border-slate-200 bg-white p-3.5">
@@ -51,34 +53,44 @@ const Group: React.FC<GroupProps> = ({ icon: Icon, tone, title, rows, more }) =>
           </li>
         ))}
       </ul>
-      {more && (
-        <Link to={more.to} className="mt-1.5 ml-[42px] inline-block text-xs font-medium text-[#5024fc] hover:underline">
-          {rows.length > VISIBLE ? `+${rows.length - VISIBLE} · ${more.label}` : more.label}
-        </Link>
+      {(more || groupAction) && (
+        <div className="mt-1.5 ml-[42px] flex flex-wrap items-center gap-x-4 gap-y-1">
+          {more && (
+            <Link to={more.to} className="text-xs font-medium text-[#5024fc] hover:underline">
+              {rows.length > VISIBLE ? `+${rows.length - VISIBLE} · ${more.label}` : more.label}
+            </Link>
+          )}
+          {groupAction}
+        </div>
       )}
     </li>
   );
 };
 
-const CopyButton: React.FC<{ label: string; onClick: () => void }> = ({ label, onClick }) => (
+const IconButton: React.FC<{ icon: React.ElementType; label: string; onClick: () => void; disabled?: boolean }> = ({ icon: Icon, label, onClick, disabled }) => (
   <button
     type="button"
     onClick={onClick}
+    disabled={disabled}
     aria-label={label}
     title={label}
-    className="shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+    className="shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-default disabled:opacity-40"
   >
-    <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
   </button>
 );
 
 export interface ActionQueueProps {
   query: UseQueryResult<DashboardActions>;
   onCopyConfirmation: (token: string | null, patientName: string) => void;
+  /** Pede o lembrete pelo WhatsApp (só pendentes; o banco refaz a checagem). Ausente = sem permissão. */
+  onSendReminders?: (appointmentIds: string[]) => void;
+  /** Ids com pedido em andamento (desabilita o botão). */
+  sendingIds?: ReadonlySet<string>;
 }
 
 /** "O que precisa da minha atenção" — cada grupo leva direto à ação. */
-export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmation }) => {
+export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmation, onSendReminders, sendingIds }) => {
   const a = query.data;
   const total = a
     ? a.patientRequests.length + a.confirmations.length + a.missingForms.length + a.pendingExams.length + a.withoutPlan.length + a.withoutReturn.length
@@ -124,9 +136,31 @@ export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmat
               key: c.id,
               primary: c.patientName,
               secondary: fmtWhen(c.dateTime),
-              action: <CopyButton label={`Copiar link de confirmação de ${c.patientName}`} onClick={() => onCopyConfirmation(c.token, c.patientName)} />,
+              action: (
+                <>
+                  {onSendReminders && (
+                    <IconButton
+                      icon={Send}
+                      label={`Enviar lembrete pelo WhatsApp para ${c.patientName}`}
+                      onClick={() => onSendReminders([c.id])}
+                      disabled={sendingIds?.has(c.id)}
+                    />
+                  )}
+                  <IconButton icon={Copy} label={`Copiar link de confirmação de ${c.patientName}`} onClick={() => onCopyConfirmation(c.token, c.patientName)} />
+                </>
+              ),
             }))}
             more={{ to: '/agenda', label: 'Abrir agenda' }}
+            groupAction={onSendReminders && a.confirmations.length > 1 && (
+              <button
+                type="button"
+                onClick={() => onSendReminders(a.confirmations.map((c) => c.id))}
+                disabled={a.confirmations.some((c) => sendingIds?.has(c.id))}
+                className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-[#5024fc] hover:underline disabled:cursor-default disabled:opacity-50"
+              >
+                <Send className="h-3 w-3" aria-hidden="true" /> Enviar lembrete a todos ({a.confirmations.length})
+              </button>
+            )}
           />
           <Group
             icon={ClipboardList}
