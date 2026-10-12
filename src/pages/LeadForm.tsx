@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Apple, ArrowLeft, ArrowRight, Check, CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
+import { Apple, ArrowLeft, ArrowRight, Check, ClipboardCheck, Lock, Send, ShieldCheck } from 'lucide-react';
+import { WhatsAppIcon } from '../components/ui/WhatsAppIcon';
 import { Button, DateInput, Input, Textarea } from '../components/ui';
 import { cn } from '../lib/cn';
 import { usePublicLeadForm, useSubmitLead } from '../hooks/queries/useLeads';
@@ -77,13 +78,50 @@ const Chip: React.FC<{ on: boolean; onClick: () => void; children: React.ReactNo
     onClick={onClick}
     className={cn(
       'min-h-11 rounded-xl border px-3.5 py-2 text-left text-sm font-medium transition-colors cursor-pointer',
-      on ? 'border-[#5024fc] bg-[#5024fc]/5 text-[#3a17c4]' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
+      on ? 'border-[#5024fc] bg-[#5024fc] text-white shadow-sm hover:bg-[#431cdb]' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
       className,
     )}
   >
     {children}
   </button>
 );
+
+/**
+ * "O que acontece depois": a jornada real depois do envio, no teal da marca.
+ * Responde a dúvida de quem chega pelo Instagram antes de ela virar desistência.
+ */
+const Journey: React.FC<{ nutri: string; sent?: boolean }> = ({ nutri, sent = false }) => {
+  const items = [
+    { icon: sent ? Check : Send, title: sent ? 'Respostas enviadas' : 'Você envia suas respostas', text: sent ? 'Tudo certo por aqui.' : 'Leva uns 3 minutos.' },
+    { icon: ClipboardCheck, title: `${nutri} analisa com calma`, text: 'Sua história chega organizada antes da primeira conversa.' },
+    { icon: WhatsAppIcon, title: 'Contato pelo WhatsApp', text: 'Para combinar o dia e o horário da sua consulta.' },
+  ];
+  return (
+    <section aria-labelledby="journey-title" className="rounded-3xl bg-sidebar-teal p-6 text-white shadow-sm">
+      <h2 id="journey-title" className="text-lg font-semibold">{sent ? 'Próximos passos' : 'O que acontece depois'}</h2>
+      <ol className="mt-5">
+        {items.map(({ icon: Icon, title, text }, i) => (
+          <li key={title} className="relative pb-6 pl-12 last:pb-0">
+            {i < items.length - 1 && <span className="absolute bottom-0 left-[17px] top-9 w-px bg-white/20" aria-hidden="true" />}
+            <span
+              className={cn(
+                'absolute left-0 top-0 grid h-9 w-9 place-items-center rounded-full ring-1',
+                sent && i === 0 ? 'bg-teal-300/30 text-white ring-teal-200/40' : 'bg-white/10 text-teal-100 ring-white/20',
+              )}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <p className="pt-1.5 text-sm font-semibold text-white">{title}</p>
+            <p className="mt-0.5 text-sm leading-relaxed text-teal-100/90">{text}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-6 border-t border-white/15 pt-4 text-xs leading-relaxed text-teal-100/80">
+        A consulta é combinada depois, no horário que for melhor para você.
+      </p>
+    </section>
+  );
+};
 
 const Group: React.FC<{ label: string; hint?: string; required?: boolean; error?: string; children: React.ReactNode }> = ({ label, hint, required, error, children }) => (
   <fieldset>
@@ -207,11 +245,14 @@ export const LeadForm: React.FC = () => {
     </header>
   );
 
-  const centered = (children: React.ReactNode) => (
+  const centered = (children: React.ReactNode, after?: React.ReactNode) => (
     <div className="flex min-h-screen flex-col bg-slate-200 font-sans text-slate-800 antialiased">
       {topBar(false)}
       <div role="main" className="flex flex-1 items-start justify-center px-4 py-10 sm:items-center">
-        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">{children}</div>
+        <div className="w-full max-w-md space-y-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">{children}</div>
+          {after}
+        </div>
       </div>
     </div>
   );
@@ -240,8 +281,8 @@ export const LeadForm: React.FC = () => {
   if (done) {
     return centered(
       <>
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-teal-50 text-teal-700">
-          <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+        <div className="ia-pop grid h-14 w-14 place-items-center rounded-full bg-[#5024fc] text-white shadow-sm">
+          <Check className="h-7 w-7" strokeWidth={2.5} aria-hidden="true" />
         </div>
         <h1 className="mt-5 text-2xl font-semibold tracking-tight text-slate-900">Recebemos suas informações</h1>
         <p className="mt-3 text-[15px] leading-relaxed text-slate-600">
@@ -252,6 +293,7 @@ export const LeadForm: React.FC = () => {
           {info.nutritionist_name} · {info.clinic_name}
         </p>
       </>,
+      <Journey nutri={nutriFirst || 'O(a) nutricionista'} sent />,
     );
   }
 
@@ -343,29 +385,34 @@ export const LeadForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="mb-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-teal-700">Etapa {step + 1} de {STEPS.length}</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 lg:text-3xl">{current.title}</h1>
-              <p className="mt-1 text-sm text-slate-500">{current.hint}</p>
-              <ol className="mt-4 grid grid-cols-4 gap-1.5 lg:hidden" aria-hidden="true">
-                {STEPS.map((s, i) => (
-                  <li key={s.label} className={cn('h-1.5 rounded-full', i <= step ? 'bg-[#5024fc]' : 'bg-slate-300')} />
-                ))}
-              </ol>
+            <div className="mb-6 lg:mb-8">
+              <h1 className="text-balance text-3xl font-semibold tracking-tight text-slate-900 lg:text-4xl">
+                {step === 0 && nutriFirst ? `Comece seu acompanhamento com ${nutriFirst}` : current.title}
+              </h1>
+              <p className="mt-2 max-w-2xl text-[15px] text-slate-600">{current.hint}</p>
+              <div className="mt-4 flex items-center gap-3 lg:hidden">
+                <ol className="grid flex-1 grid-cols-4 gap-1.5" aria-hidden="true">
+                  {STEPS.map((s, i) => (
+                    <li key={s.label} className={cn('h-1.5 rounded-full', i <= step ? 'bg-[#5024fc]' : 'bg-slate-300')} />
+                  ))}
+                </ol>
+                <span className="text-xs tabular-nums text-slate-500">{step + 1} de {STEPS.length} · {current.label}</span>
+              </div>
             </div>
 
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start">
             <form onSubmit={onSubmit} noValidate className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7 lg:p-10">
               {/* Campo isca: invisível para pessoas, preenchido por robôs. */}
               <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
                 <label>Site<input tabIndex={-1} autoComplete="off" value={f.website} onChange={(e) => set('website', e.target.value)} /></label>
               </div>
 
-              <div className="space-y-6">
+              <div key={step} className="animate-in fade-in duration-300 space-y-6">
                 {step === 0 && (
                   <>
                     <Input label="Nome completo" required autoComplete="name" value={f.name} error={errors.name}
                       onChange={(e) => set('name', e.target.value)} />
-                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-5 sm:grid-cols-2">
                       <Input label="WhatsApp" required type="tel" inputMode="tel" autoComplete="tel-national" placeholder="(11) 91234-5678"
                         value={f.phone} error={errors.phone} onChange={(e) => set('phone', maskPhone(e.target.value))} />
                       <Input label="E-mail" type="email" inputMode="email" autoComplete="email" value={f.email} error={errors.email}
@@ -448,7 +495,7 @@ export const LeadForm: React.FC = () => {
 
                 {step === 3 && (
                   <>
-                    <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-6 sm:grid-cols-2">
                       <Group label="Quais dias costumam ser melhores?" hint="A consulta é combinada depois.">
                         {WEEKDAYS.map((d) => (
                           <Chip key={d.value} className="min-w-[3.25rem] text-center" on={f.preferred_days.includes(d.value)}
@@ -510,6 +557,11 @@ export const LeadForm: React.FC = () => {
                 </Button>
               </div>
             </form>
+
+            <aside className={cn('xl:sticky xl:top-24', step !== 0 && 'hidden xl:block')}>
+              <Journey nutri={nutriFirst || 'O(a) nutricionista'} />
+            </aside>
+            </div>
 
             <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-slate-500 lg:hidden">
               <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Só {nutriFirst || 'o(a) nutricionista'} vê suas respostas.
