@@ -30,6 +30,7 @@ type DigestBase = {
     overdue: DigestList<DigestCharge>;
     overdueTotal: number;
   };
+  newLeads?: DigestList<DigestPatientNote>;  // só nutricionista (triagem, migration 0042)
   clinical?: {             // só nutricionista
     newExams: DigestList<DigestPatientNote>;
     withoutPlan: DigestList<DigestPatientNote>;
@@ -128,6 +129,13 @@ ${stats.map(([v, l]) => `<td width="${w}%" align="center" valign="top" style="pa
 function commonSections(d: DigestBase, opts: { financeTodayTitle: string; birthdaysTitle: string }) {
   const parts: string[] = [];
 
+  if (d.newLeads?.total) {
+    parts.push(section("Novos pedidos na triagem", d.newLeads.total,
+      rows(d.newLeads.items.map(noteRow), more(d.newLeads)) +
+      `<p style="margin:8px 0 0;font-size:14px;"><a href="${APP_URL}/triagem" style="color:${C.action};font-weight:600;text-decoration:none;">Abrir a triagem →</a></p>`,
+    ));
+  }
+
   if (d.portalRequests.total) {
     parts.push(section("Pedidos do portal aguardando resposta", d.portalRequests.total, rows(
       d.portalRequests.items.map((r) => `<strong style="color:${C.ink};">${escapeHtml(r.patient)}</strong> ${badge(r.what, C.action, "#ede9fe")}<br>${escapeHtml(r.when)}`),
@@ -204,6 +212,12 @@ function textAgenda(t: string[], groups: DigestAgendaGroup[]) {
 }
 function textCommon(t: string[], d: DigestBase, financeTodayTitle: string, birthdaysTitle: string) {
   const listMore = <T>(l: DigestList<T>) => { if (more(l)) t.push(`  e mais ${more(l)}…`); };
+  if (d.newLeads?.total) {
+    t.push("", `NOVOS PEDIDOS NA TRIAGEM (${d.newLeads.total})`);
+    d.newLeads.items.forEach((n) => t.push(`  ${n.patient}: ${n.note}`));
+    listMore(d.newLeads);
+    t.push(`  ${APP_URL}/triagem`);
+  }
   if (d.portalRequests.total) {
     t.push("", `PEDIDOS DO PORTAL (${d.portalRequests.total})`);
     d.portalRequests.items.forEach((r) => t.push(`  ${r.patient}: ${r.what} · ${r.when}`));

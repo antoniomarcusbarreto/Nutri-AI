@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ClipboardList, Copy, FlaskConical, MessageCircle, Smartphone, UserRoundX, Utensils } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Copy, FlaskConical, Inbox, MessageCircle, Smartphone, UserRoundX, Utensils } from 'lucide-react';
 import { WhatsAppIcon } from '../ui/WhatsAppIcon';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { DashboardActions } from '../../hooks/queries/useDashboard';
@@ -94,7 +94,7 @@ export interface ActionQueueProps {
 export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmation, onSendReminders, sendingIds }) => {
   const a = query.data;
   const total = a
-    ? a.patientRequests.length + a.confirmations.length + a.missingForms.length + a.pendingExams.length + a.withoutPlan.length + a.withoutReturn.length
+    ? a.newLeads.length + a.patientRequests.length + a.confirmations.length + a.missingForms.length + a.pendingExams.length + a.withoutPlan.length + a.withoutReturn.length
     : 0;
 
   return (
@@ -117,6 +117,18 @@ export const ActionQueue: React.FC<ActionQueueProps> = ({ query, onCopyConfirmat
         </div>
       ) : (
         <ul className="space-y-2.5">
+          <Group
+            icon={Inbox}
+            tone="blue"
+            title="Novos pedidos na triagem"
+            rows={a.newLeads.map((l) => ({
+              key: l.id,
+              primary: l.name,
+              secondary: `chegou ${fmtAgo(l.createdAt)}`,
+              to: `/triagem?lead=${l.id}`,
+            }))}
+            more={{ to: '/triagem', label: 'Abrir triagem' }}
+          />
           <Group
             icon={Smartphone}
             tone="rose"

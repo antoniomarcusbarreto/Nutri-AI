@@ -196,6 +196,7 @@ export interface PendingConfirmation { id: string; patientName: string; dateTime
 export interface MissingForm { patientId: string; patientName: string; dateTime: string; hasApp: boolean }
 export interface PendingExam { id: string; patientId: string; patientName: string; uploadedAt: string }
 export interface PatientSince { patientId: string; patientName: string; since: string }
+export interface NewLead { id: string; name: string; createdAt: string }
 export interface PatientRequest { id: string; appointmentId: string | null; patientName: string; kind: 'reschedule' | 'cancel' | 'booking'; dateTime: string | null }
 
 export interface DashboardActions {
@@ -211,6 +212,8 @@ export interface DashboardActions {
   withoutReturn: PatientSince[];
   /** Pedidos feitos pelo paciente no app (reagendar / cancelou) — migration 0031. */
   patientRequests: PatientRequest[];
+  /** Pedidos novos do formulário de triagem (migration 0042). Só do próprio nutricionista. */
+  newLeads: NewLead[];
 }
 
 const HEALTH_FIELDS = ['allergies', 'dietary_restrictions', 'pathologies', 'medications', 'physical_activity_level', 'profession', 'sleep_quality'] as const;
@@ -259,10 +262,10 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
         const [{ data, error }, requests] = await Promise.all([confirmationsQuery, requestsQuery]);
         if (error) throw error;
         if (requests.error) throw requests.error;
-        return { confirmations: mapConfirmations(data), missingForms: [], pendingExams: [], withoutPlan: [], withoutReturn: [], patientRequests: mapRequests(requests.data) };
+        return { confirmations: mapConfirmations(data), missingForms: [], pendingExams: [], withoutPlan: [], withoutReturn: [], patientRequests: mapRequests(requests.data), newLeads: [] };
       }
 
-      const [confirmations, upcoming, exams, consultations, plans, history, requests] = await Promise.all([
+      const [confirmations, upcoming, exams, consultations, plans, history, requests, leads] = await Promise.all([
         confirmationsQuery,
         supabase.from('appointments')
           .select(`patient_id, date_time, patients:patient_id(name, portal_access_until, patient_health(${HEALTH_FIELDS.join(', ')}))`)
@@ -288,10 +291,18 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
           .order('date_time', { ascending: false })
           .limit(1000),
         requestsQuery,
+        supabase.from('leads')
+          .select('id, name, created_at')
+          .eq('nutritionist_id', userId!).eq('status', 'novo')
+          .order('created_at', { ascending: true }),
       ]);
       for (const r of [confirmations, upcoming, exams, consultations, plans, history, requests]) {
         if (r.error) throw r.error;
       }
+      // Triagem é opcional: sem a tabela (migration 0042 ainda não aplicada) não derruba o painel.
+      type LeadRow = { id: string; name: string; created_at: string };
+      const newLeads = ((leads.error ? [] : leads.data ?? []) as LeadRow[])
+        .map((l) => ({ id: l.id, name: l.name, createdAt: l.created_at }));
 
       // Ficha de saúde: um item por paciente, na consulta mais próxima.
       type UpcomingRow = { patient_id: string; date_time: string; patients: One<{ name?: string; portal_access_until?: string | null; patient_health?: One<HealthRow> }> };
@@ -350,6 +361,7 @@ export function useDashboardActions(clinicId: string | undefined, userId: string
         withoutPlan,
         withoutReturn,
         patientRequests: mapRequests(requests.data),
+        newLeads,
       };
     },
   });

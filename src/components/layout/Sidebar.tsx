@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, Settings, LogOut, Apple, Shield, DollarSign, FileText, Activity, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, Settings, LogOut, Apple, Shield, DollarSign, FileText, Activity, ClipboardList, Inbox } from 'lucide-react';
+import { useNewLeadsCount } from '../../hooks/queries/useLeads';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface SidebarProps {
@@ -10,13 +11,16 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   const location = useLocation();
-  const { signOut, clinic, profile, userRole } = useAuth();
+  const { signOut, clinic, profile, userRole, user } = useAuth();
+  const isProfessional = userRole === 'owner' || userRole === 'nutritionist';
+  const newLeads = useNewLeadsCount(user?.id, !!clinic && isProfessional);
 
   interface NavItem {
     name: string;
     href: string;
     icon: React.ComponentType<{ className?: string }>;
     roles?: ('owner' | 'nutritionist' | 'secretary')[];
+    badge?: number;
   }
 
   const navigation: NavItem[] = [
@@ -27,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     { name: 'Exames', href: '/exames', icon: ClipboardList, roles: ['owner', 'nutritionist'] },
     { name: 'Financeiro', href: '/financeiro', icon: DollarSign },
     { name: 'Pacientes', href: '/pacientes', icon: Users },
+    { name: 'Triagem', href: '/triagem', icon: Inbox, roles: ['owner', 'nutritionist'], badge: newLeads },
     { name: 'Planos Alimentares', href: '/planos', icon: Apple, roles: ['owner', 'nutritionist'] },
   ];
 
@@ -164,6 +169,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
                       aria-hidden="true"
                     />
                     {item.name}
+                    {!!item.badge && (
+                      <span className="ml-auto self-center rounded-full bg-[#5024fc] px-2 py-0.5 text-xs font-semibold leading-none text-white tabular-nums" aria-label={`${item.badge} novos`}>
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );

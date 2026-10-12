@@ -250,6 +250,24 @@ async function receivedBetween(c: Ctx, from: Ymd, to: Ymd): Promise<number> {
   return ((data ?? []) as unknown as PaymentRow[]).reduce((s, r) => s + Number(r.net_amount), 0);
 }
 
+const LEAD_GOAL: Record<string, string> = {
+  emagrecimento: "Emagrecimento", ganho_massa: "Ganho de massa", saude: "Saúde e exames",
+  gestacao: "Gestação/amamentação", esporte: "Performance esportiva", comportamento: "Relação com a comida", outro: "Outro objetivo",
+};
+
+/** Pedidos novos do formulário de triagem (migration 0042). Só nome e objetivo: nada de saúde no e-mail. */
+async function fetchNewLeads(c: Ctx): Promise<DigestList<DigestPatientNote>> {
+  const { data, error } = await c.admin.from("leads")
+    .select("name, goal, created_at")
+    .eq("nutritionist_id", c.userId).eq("status", "novo")
+    .order("created_at", { ascending: true }).limit(200);
+  if (error) return list([]); // tabela ausente (0042 não aplicada) não derruba o resumo
+  return list(((data ?? []) as { name: string; goal: string; created_at: string }[]).map((l) => ({
+    patient: l.name,
+    note: `${LEAD_GOAL[l.goal] ?? "Pedido de atendimento"} · chegou ${fmtWhen(c.tz, l.created_at)}`,
+  })));
+}
+
 async function fetchClinical(c: Ctx) {
   const ago30 = new Date(c.now.getTime() - 30 * DAY).toISOString();
   const [exams, consultations, plans, portalPatients] = await Promise.all([
@@ -366,7 +384,7 @@ async function fetchBirthdays(c: Ctx, days: Ymd[]): Promise<DigestList<DigestPat
 
 async function buildDaily(c: Ctx, firstName: string): Promise<DailyDigest> {
   const yesterday = addDays(c.today, -1);
-  const [agenda, portalRequests, finance, clinical, returnsDue, birthdays, receivedYesterday] = await Promise.all([
+  const [agenda, portalRequests, finance, clinical, returnsDue, birthdays, receivedYesterday, newLeads] = await Promise.all([
     fetchAgenda(c, c.today, addDays(c.today, 1)),
     fetchPortalRequests(c),
     fetchFinance(c, c.today, c.today),
@@ -374,13 +392,14 @@ async function buildDaily(c: Ctx, firstName: string): Promise<DailyDigest> {
     fetchReturnsDue(c),
     fetchBirthdays(c, [c.today]),
     isNutri(c) ? receivedBetween(c, yesterday, yesterday) : Promise.resolve(undefined),
+    isNutri(c) ? fetchNewLeads(c) : Promise.resolve(undefined),
   ]);
   return {
     audience: isNutri(c) ? "nutri" : "secretary",
     recipientFirstName: firstName,
     dateLabel: dateLabelOf(c.today),
     agenda: groupAgenda(c, agenda),
-    portalRequests, finance, clinical, returnsDue, birthdays, receivedYesterday,
+    portalRequests, finance, clinical, returnsDue, birthdays, receivedYesterday, newLeads,
     preferencesUrl: PREFERENCES_URL,
   };
 }
@@ -405,7 +424,7 @@ async function buildWeekly(c: Ctx, firstName: string): Promise<WeeklyDigest> {
     .lt("created_at", localMidnight(c.tz, monday).toISOString());
   if (isNutri(c)) newPatientsQ = newPatientsQ.eq("nutritionist_id", c.userId);
 
-  const [agenda, portalRequests, finance, clinical, returnsDue, birthdays, lastWeek, newPatients, revenue, revenuePrev] = await Promise.all([
+  const [agenda, portalRequests, finance, clinical, returnsDue, birthdays, lastWeek, newPatients, revenue, revenuePrev, newLeads] = await Promise.all([
     fetchAgenda(c, monday, addDays(sunday, 1)),
     fetchPortalRequests(c),
     fetchFinance(c, c.today, sunday),
@@ -416,6 +435,7 @@ async function buildWeekly(c: Ctx, firstName: string): Promise<WeeklyDigest> {
     newPatientsQ,
     isNutri(c) ? receivedBetween(c, prevMonday, prevSunday) : Promise.resolve(undefined),
     isNutri(c) ? receivedBetween(c, addDays(prevMonday, -7), addDays(prevMonday, -1)) : Promise.resolve(undefined),
+    isNutri(c) ? fetchNewLeads(c) : Promise.resolve(undefined),
   ]);
   const statuses = ((check(lastWeek).data ?? []) as { status: string }[]).map((r) => r.status);
   const held = statuses.filter((s) => s === "concluido").length;
@@ -441,7 +461,7 @@ async function buildWeekly(c: Ctx, firstName: string): Promise<WeeklyDigest> {
       newPatients: check(newPatients).count ?? 0,
       revenue, revenuePrev,
     },
-    portalRequests, finance, clinical, returnsDue, birthdays,
+    portalRequests, finance, clinical, returnsDue, birthdays, newLeads,
     preferencesUrl: PREFERENCES_URL,
   };
 }

@@ -41,6 +41,8 @@ const PortalBodyAssessmentPage = lazy(() => import('./pages/portal/PortalBodyAss
 const PortalMealsPage = lazy(() => import('./pages/portal/PortalMeals').then(m => ({ default: m.PortalMealsPage })));
 const PortalHealthPage = lazy(() => import('./pages/portal/PortalHealth').then(m => ({ default: m.PortalHealthPage })));
 const PortalAssistant = lazy(() => import('./pages/portal/PortalAssistant').then(m => ({ default: m.PortalAssistant })));
+const Leads = lazy(() => import('./pages/Leads').then(m => ({ default: m.Leads })));
+const LeadForm = lazy(() => import('./pages/LeadForm').then(m => ({ default: m.LeadForm })));
 const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(m => ({ default: m.ConfirmAppointment })));
 
 const CLINICAL: ('owner' | 'nutritionist')[] = ['owner', 'nutritionist'];
@@ -60,6 +62,8 @@ function App() {
               <Route path="/plano/:id" element={<PublicPlanViewer />} />
               <Route path="/confirmar/:token" element={<ConfirmAppointment />} />
               <Route path="/convite/:token" element={<PortalInvite />} />
+              {/* Formulário público de triagem (migration 0042) */}
+              <Route path="/n/:slug" element={<LeadForm />} />
               <Route path="/login" element={<Login />} />
               <Route path="/termos" element={<TermsOfService />} />
               <Route path="/privacidade" element={<PrivacyPolicy />} />
@@ -97,6 +101,7 @@ function App() {
                 <Route path="/consultas" element={<RequireRole roles={CLINICAL}><Consultations /></RequireRole>} />
                 <Route path="/acompanhamento" element={<RequireRole roles={CLINICAL}><Tracking /></RequireRole>} />
                 <Route path="/planos" element={<RequireRole roles={CLINICAL}><MealPlans /></RequireRole>} />
+                <Route path="/triagem" element={<RequireRole roles={CLINICAL}><Leads /></RequireRole>} />
                 <Route path="/exames" element={<RequireRole roles={CLINICAL}><Exams /></RequireRole>} />
                 <Route path="/admin" element={<RequireRole superadminOnly><AdminDashboard /></RequireRole>} />
                 <Route path="/settings" element={<Settings />} />

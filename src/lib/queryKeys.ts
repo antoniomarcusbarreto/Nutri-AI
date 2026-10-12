@@ -75,6 +75,13 @@ export const qk = {
   emailDigest: {
     settings: (userId: string) => ['email_digest', userId] as const,
   },
+  leads: {
+    all: ['leads'] as const,
+    list: (userId: string) => ['leads', 'list', userId] as const,
+    form: (userId: string) => ['leads', 'form', userId] as const,
+    publicForm: (slug: string) => ['leads', 'public_form', slug] as const,
+    patientHistory: (patientId: string) => ['leads', 'patient_history', patientId] as const,
+  },
   changeRequests: {
     all: ['change_requests'] as const,
     pending: (clinicId: string) => ['change_requests', 'pending', clinicId] as const,
