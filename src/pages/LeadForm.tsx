@@ -275,8 +275,8 @@ export const LeadForm: React.FC = () => {
           <div className="flex items-center gap-3 rounded-2xl bg-teal-700/40 p-3">
             {avatar('h-12 w-12', 'bg-white/15 text-white ring-1 ring-white/30')}
             <div className="min-w-0 text-sm">
-              <p className="truncate font-semibold text-white">{info.nutritionist_name}</p>
-              <p className="truncate text-xs text-teal-100">{['Nutricionista', info.crn ? `CRN ${info.crn}` : null].filter(Boolean).join(' · ')}</p>
+              <p className="break-words font-semibold text-white">{info.nutritionist_name}</p>
+              <p className="break-words text-xs leading-snug text-teal-100">{['Nutricionista', info.crn ? `CRN ${info.crn}` : null].filter(Boolean).join(' · ')}</p>
             </div>
           </div>
           <p className="mt-3 px-3 text-xs leading-relaxed text-teal-100/80">
@@ -331,7 +331,7 @@ export const LeadForm: React.FC = () => {
         {topBar(true)}
 
         <div role="main" className="flex-1">
-          <div className="mx-auto max-w-3xl px-4 pb-12 pt-6 sm:px-6 lg:px-8 lg:pt-10">
+          <div className="mx-auto max-w-6xl px-4 pb-12 pt-6 sm:px-6 lg:px-8 lg:pt-10">
             {/* Celular/tablet: quem atende + progresso. */}
             <div className="mb-5 flex items-center gap-3.5 lg:hidden">
               {avatar('h-12 w-12', 'bg-teal-50 text-teal-700')}
@@ -354,7 +354,7 @@ export const LeadForm: React.FC = () => {
               </ol>
             </div>
 
-            <form onSubmit={onSubmit} noValidate className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7 lg:p-8">
+            <form onSubmit={onSubmit} noValidate className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7 lg:p-10">
               {/* Campo isca: invisível para pessoas, preenchido por robôs. */}
               <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
                 <label>Site<input tabIndex={-1} autoComplete="off" value={f.website} onChange={(e) => set('website', e.target.value)} /></label>
@@ -365,7 +365,7 @@ export const LeadForm: React.FC = () => {
                   <>
                     <Input label="Nome completo" required autoComplete="name" value={f.name} error={errors.name}
                       onChange={(e) => set('name', e.target.value)} />
-                    <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                       <Input label="WhatsApp" required type="tel" inputMode="tel" autoComplete="tel-national" placeholder="(11) 91234-5678"
                         value={f.phone} error={errors.phone} onChange={(e) => set('phone', maskPhone(e.target.value))} />
                       <Input label="E-mail" type="email" inputMode="email" autoComplete="email" value={f.email} error={errors.email}
@@ -448,7 +448,7 @@ export const LeadForm: React.FC = () => {
 
                 {step === 3 && (
                   <>
-                    <div className="grid gap-6 sm:grid-cols-2">
+                    <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                       <Group label="Quais dias costumam ser melhores?" hint="A consulta é combinada depois.">
                         {WEEKDAYS.map((d) => (
                           <Chip key={d.value} className="min-w-[3.25rem] text-center" on={f.preferred_days.includes(d.value)}
@@ -461,12 +461,12 @@ export const LeadForm: React.FC = () => {
                             onClick={() => set('preferred_periods', toggle(f.preferred_periods, p.value))}>{p.label}</Chip>
                         ))}
                       </Group>
+                      <Group label="Como você conheceu o trabalho?" hint="Ajuda a entender onde você nos achou.">
+                        {SOURCES.map((s) => (
+                          <Chip key={s.value} on={f.source === s.value} onClick={() => set('source', f.source === s.value ? '' : s.value)}>{s.label}</Chip>
+                        ))}
+                      </Group>
                     </div>
-                    <Group label="Como você conheceu o trabalho?">
-                      {SOURCES.map((s) => (
-                        <Chip key={s.value} on={f.source === s.value} onClick={() => set('source', f.source === s.value ? '' : s.value)}>{s.label}</Chip>
-                      ))}
-                    </Group>
 
                     <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <label className="flex items-start gap-3">
