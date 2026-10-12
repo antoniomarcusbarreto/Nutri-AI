@@ -72,6 +72,9 @@ export const qk = {
     staffSlots: (nutritionistId: string, from: string, to: string, minutes: number, excludeAppointment: string, excludeRequest: string) =>
       ['availability', 'slots', nutritionistId, from, to, minutes, excludeAppointment, excludeRequest] as const,
   },
+  emailDigest: {
+    settings: (userId: string) => ['email_digest', userId] as const,
+  },
   changeRequests: {
     all: ['change_requests'] as const,
     pending: (clinicId: string) => ['change_requests', 'pending', clinicId] as const,
