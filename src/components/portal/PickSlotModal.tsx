@@ -3,6 +3,8 @@ import { addDays, format } from 'date-fns';
 import { Button, Modal, Textarea } from '../ui';
 import { SlotPicker } from '../scheduling/SlotPicker';
 import { usePortalSlots } from '../../hooks/queries/usePortal';
+import { ModalityToggle } from '../teleconsult/ModalityToggle';
+import type { Modality } from '../../lib/teleconsult';
 
 /**
  * Janela em que o paciente escolhe um horário livre da agenda do
@@ -23,8 +25,10 @@ export interface PickSlotModalProps {
   intro?: React.ReactNode;
   submitLabel: string;
   submitting: boolean;
-  onSubmit: (slot: string, note: string) => void;
+  onSubmit: (slot: string, note: string, modality: Modality) => void;
   clinicPhone?: string | null;
+  /** Agendamento novo: o paciente escolhe presencial ou online (migration 0043). */
+  askModality?: boolean;
 }
 
 export const PickSlotModal: React.FC<PickSlotModalProps> = ({
@@ -39,10 +43,12 @@ export const PickSlotModal: React.FC<PickSlotModalProps> = ({
   submitting,
   onSubmit,
   clinicPhone,
+  askModality = false,
 }) => {
   const [windowDays, setWindowDays] = useState(FIRST_WINDOW_DAYS);
   const [slot, setSlot] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [modality, setModality] = useState<Modality>('presencial');
   const [today] = useState(() => new Date());
 
   const from = format(today, 'yyyy-MM-dd');
@@ -52,6 +58,7 @@ export const PickSlotModal: React.FC<PickSlotModalProps> = ({
   const close = () => {
     setSlot(null);
     setNote('');
+    setModality('presencial');
     setWindowDays(FIRST_WINDOW_DAYS);
     onClose();
   };
@@ -65,7 +72,7 @@ export const PickSlotModal: React.FC<PickSlotModalProps> = ({
       footer={
         <>
           <Button variant="secondary" onClick={close}>Voltar</Button>
-          <Button variant="primary" disabled={!slot} loading={submitting} onClick={() => slot && onSubmit(slot, note)}>
+          <Button variant="primary" disabled={!slot} loading={submitting} onClick={() => slot && onSubmit(slot, note, modality)}>
             {submitLabel}
           </Button>
         </>
@@ -92,6 +99,15 @@ export const PickSlotModal: React.FC<PickSlotModalProps> = ({
             )
           }
         />
+        {slot && askModality && (
+          <ModalityToggle
+            name="portal-booking-modality"
+            label="Como prefere a consulta?"
+            value={modality}
+            onChange={setModality}
+            large
+          />
+        )}
         {slot && (
           <Textarea
             label="Observação (opcional)"

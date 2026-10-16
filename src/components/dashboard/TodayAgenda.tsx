@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarCheck, Copy } from 'lucide-react';
+import { ArrowRight, CalendarCheck, Copy, Video } from 'lucide-react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { AgendaAppointment, AgendaWindow } from '../../hooks/queries/useDashboard';
 import { pickOne } from '../../types/clinical';
@@ -8,6 +8,7 @@ import { cn } from '../../lib/cn';
 import { Card } from '../ui';
 import { ListSkeleton, LoadError, SectionTitle, StatusPill } from './dashboardUi';
 import { fmtTime, fmtWhen } from './dashboardFormat';
+import { teleconsultPath, teleconsultWindow } from '../../lib/teleconsult';
 
 export interface TodayAgendaProps {
   query: UseQueryResult<AgendaWindow>;
@@ -82,6 +83,9 @@ export const TodayAgenda: React.FC<TodayAgendaProps> = ({ query, userId, clinica
                 const status = displayStatus(apt, now);
                 const isNext = apt.id === nextId;
                 const isMine = clinical && apt.nutritionist_id === userId;
+                const online = apt.modality === 'online';
+                const roomOpen = online && isMine && status !== 'concluido'
+                  && teleconsultWindow(apt.date_time, apt.duration_minutes ?? pickOne(apt.services)?.duration_minutes, now).state === 'aberta';
                 return (
                   <li
                     key={apt.id}
@@ -98,8 +102,9 @@ export const TodayAgenda: React.FC<TodayAgendaProps> = ({ query, userId, clinica
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-base font-medium text-slate-900">{patient}</p>
-                      <p className="truncate text-sm text-slate-500">
-                        {[service, prof && `Dr(a). ${prof}`].filter(Boolean).join(' · ') || 'Consulta'}
+                      <p className="flex items-center gap-1 truncate text-sm text-slate-500">
+                        {online && <Video className="h-3.5 w-3.5 shrink-0 text-[#5024fc]" aria-label="Online" />}
+                        <span className="truncate">{[service, prof && `Dr(a). ${prof}`].filter(Boolean).join(' · ') || 'Consulta'}</span>
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -114,6 +119,14 @@ export const TodayAgenda: React.FC<TodayAgendaProps> = ({ query, userId, clinica
                         >
                           <Copy className="h-4 w-4" aria-hidden="true" />
                         </button>
+                      )}
+                      {roomOpen && (
+                        <Link
+                          to={teleconsultPath(apt.id)}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#5024fc] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#431cdb]"
+                        >
+                          <Video className="h-3.5 w-3.5" aria-hidden="true" /> Entrar
+                        </Link>
                       )}
                       {isMine && status !== 'concluido' && (
                         <Link

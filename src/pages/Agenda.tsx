@@ -17,7 +17,8 @@ import {
   Sparkles, 
   Info,
   ChevronRight as ChevronRightIcon,
-  Copy
+  Copy,
+  Video
 } from 'lucide-react';
 import { 
   format, 
@@ -45,6 +46,10 @@ import { PatientRequestsPanel } from '../components/agenda/PatientRequestsPanel'
 import { WhatsAppReminderStatus } from '../components/agenda/WhatsAppReminderStatus';
 import { DayRemindersCard } from '../components/agenda/DayRemindersCard';
 import { ConflictNotice, DurationSelect } from '../components/agenda/ScheduleFields';
+import { ModalityToggle } from '../components/teleconsult/ModalityToggle';
+import { TeleconsultJoinButton } from '../components/teleconsult/TeleconsultJoinButton';
+import { modalityFromService, type Modality } from '../lib/teleconsult';
+import { hasFeature } from '../lib/features';
 
 interface AgendaPatientLink { id?: string; name?: string | null; email?: string | null; phone?: string | null }
 interface AgendaServiceLink { id?: string; name?: string | null; duration_minutes?: number | null; price?: number | null }
@@ -61,6 +66,8 @@ interface AgendaAppointment {
   public_token?: string | null;
   /** Duração real (migration 0035); vazio = a do serviço. */
   duration_minutes?: number | null;
+  /** Presencial ou online (migration 0043). */
+  modality?: Modality | null;
   patients?: AgendaPatientLink | null;
   services?: AgendaServiceLink | null;
   consultations?: AgendaConsultationLink[] | null;
@@ -73,8 +80,12 @@ interface AgendaProfessional {
   is_active?: boolean | null;
   role?: string | null;
 }
-interface AgendaPatient { id: string; name: string; email?: string | null; phone?: string | null }
-interface AgendaService { id: string; name: string; duration_minutes?: number | null; price?: number | null }
+interface AgendaPatient {
+  id: string; name: string; email?: string | null; phone?: string | null;
+  /** Portal do Paciente (0031): sem acesso ativo, o paciente não entra na teleconsulta. */
+  user_id?: string | null; portal_access_until?: string | null;
+}
+interface AgendaService { id: string; name: string; duration_minutes?: number | null; price?: number | null; modality?: string | null }
 interface AgendaReschedule {
   id: string;
   reason?: string | null;
@@ -84,6 +95,10 @@ interface AgendaReschedule {
   rescheduled_by?: string | null;
   profiles?: { full_name?: string | null } | null;
 }
+
+/** Paciente com acesso ativo ao portal: é por lá que ele entra na teleconsulta. */
+const hasActivePortal = (p?: AgendaPatient) =>
+  Boolean(p?.user_id && p.portal_access_until && new Date(p.portal_access_until) > new Date());
 
 export const Agenda: React.FC = () => {
   const { clinic, isReadOnly, profile, userRole } = useAuth();
@@ -121,7 +136,8 @@ export const Agenda: React.FC = () => {
     time: '09:00',
     status: 'pendente',
     // '' = duração do serviço (migration 0035)
-    duration: ''
+    duration: '',
+    modality: 'presencial' as Modality
   });
 
   // Details Modal state
@@ -169,7 +185,7 @@ export const Agenda: React.FC = () => {
       // profissional, só para os que acessa (próprios ou concedidos — 0029).
       let patientsQuery = supabase
         .from('patients')
-        .select('id, name, email, phone')
+        .select('id, name, email, phone, user_id, portal_access_until')
         .eq('clinic_id', clinic.id);
       if (userRole !== 'secretary') patientsQuery = patientsQuery.eq('has_clinical_access', true);
       const { data: patientsData } = await patientsQuery.order('name');
@@ -178,7 +194,7 @@ export const Agenda: React.FC = () => {
       // 2. Fetch services
       const { data: servicesData } = await supabase
         .from('services')
-        .select('id, name, duration_minutes, price')
+        .select('id, name, duration_minutes, price, modality')
         .eq('clinic_id', clinic.id)
         .order('name');
       if (servicesData) setServices(servicesData as AgendaService[]);
@@ -233,6 +249,7 @@ export const Agenda: React.FC = () => {
           service_id,
           public_token,
           duration_minutes,
+          modality,
           patients ( id, name, email, phone ),
           services ( id, name, duration_minutes, price ),
           consultations ( id, anamnese_notes )
@@ -477,7 +494,8 @@ export const Agenda: React.FC = () => {
       date: formattedDate,
       time: '09:00',
       status: 'pendente',
-      duration: ''
+      duration: '',
+      modality: modalityFromService(services[0]?.modality)
     });
     setPatientSearch('');
     setIsNewModalOpen(true);
@@ -524,7 +542,7 @@ export const Agenda: React.FC = () => {
     if (isReadOnly || !clinic?.id) return;
     
     setFormError(null);
-    const { patient_id, service_id, nutritionist_id, date, time, status, duration } = newAppointmentData;
+    const { patient_id, service_id, nutritionist_id, date, time, status, duration, modality } = newAppointmentData;
     if (!patient_id || !service_id || !nutritionist_id || !date || !time) {
       setFormError('Por favor, preencha todos os campos obrigatórios.');
       return;
@@ -549,7 +567,8 @@ export const Agenda: React.FC = () => {
           nutritionist_id,
           date_time: combinedDateTime.toISOString(),
           status,
-          duration_minutes: duration ? Number(duration) : null
+          duration_minutes: duration ? Number(duration) : null,
+          modality
         }]);
 
       if (error) throw error;
@@ -594,6 +613,28 @@ export const Agenda: React.FC = () => {
       showToast('Falha ao atualizar o status no servidor.', 'error');
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  // Presencial/online (migration 0043)
+  const [updatingModality, setUpdatingModality] = useState(false);
+  const handleUpdateModality = async (modality: Modality) => {
+    if (isReadOnly || !selectedAppointment || selectedAppointment.modality === modality) return;
+    setUpdatingModality(true);
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ modality })
+        .eq('id', selectedAppointment.id);
+      if (error) throw error;
+      setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, modality } : a));
+      setSelectedAppointment((prev) => prev ? { ...prev, modality } : null);
+      showToast(modality === 'online' ? 'Consulta marcada como online.' : 'Consulta marcada como presencial.', 'success');
+    } catch (err) {
+      logger.error('Erro ao alterar modalidade:', err);
+      showToast('Falha ao alterar a modalidade no servidor.', 'error');
+    } finally {
+      setUpdatingModality(false);
     }
   };
 
@@ -946,7 +987,10 @@ export const Agenda: React.FC = () => {
                                     )}
                                   </div>
                                   <p className="text-xs font-bold truncate">{apt.patients?.name || 'Paciente'}</p>
-                                  <p className="text-xs text-slate-500 truncate mt-0.5">{apt.services?.name || 'Serviço'}</p>
+                                  <p className="text-xs text-slate-500 truncate mt-0.5 flex items-center gap-1">
+                                    {apt.modality === 'online' && <Video className="h-3 w-3 shrink-0 text-[#5024fc]" aria-label="Online" />}
+                                    <span className="truncate">{apt.services?.name || 'Serviço'}</span>
+                                  </p>
                                   {prof && (
                                     <div className="mt-2 pt-1.5 border-t border-slate-100/50 flex items-center gap-1 text-xs font-semibold text-slate-400">
                                       <span className="truncate">Nutri: {(prof.full_name ?? '').split(' ')[0]}</span>
@@ -1036,8 +1080,13 @@ export const Agenda: React.FC = () => {
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm font-semibold text-slate-500 mt-1">
+                                <p className="text-sm font-semibold text-slate-500 mt-1 flex items-center gap-1.5">
                                   {apt.services?.name || 'Serviço'}
+                                  {apt.modality === 'online' && (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[#5024fc]">
+                                      <Video className="h-3.5 w-3.5" aria-hidden="true" /> Online
+                                    </span>
+                                  )}
                                 </p>
                                 
                                 {/* Show professional details */}
@@ -1177,7 +1226,11 @@ export const Agenda: React.FC = () => {
               <Select
                 label="Serviço / Procedimento"
                 value={newAppointmentData.service_id}
-                onChange={e => setNewAppointmentData(prev => ({ ...prev, service_id: e.target.value, duration: '' }))}
+                onChange={e => {
+                  const service_id = e.target.value;
+                  const svc = services.find((sv) => sv.id === service_id);
+                  setNewAppointmentData(prev => ({ ...prev, service_id, duration: '', modality: svc ? modalityFromService(svc.modality) : prev.modality }));
+                }}
                 required
               >
                 <option value="">-- Selecione o Serviço --</option>
@@ -1187,6 +1240,25 @@ export const Agenda: React.FC = () => {
                   </option>
                 ))}
               </Select>
+
+              {hasFeature(clinic, 'teleconsulta') && (
+                <div className="space-y-2">
+                  <ModalityToggle
+                    name="new-appointment-modality"
+                    value={newAppointmentData.modality}
+                    onChange={(modality) => setNewAppointmentData(prev => ({ ...prev, modality }))}
+                  />
+                  {newAppointmentData.modality === 'online' && newAppointmentData.patient_id && !hasActivePortal(patients.find(p => p.id === newAppointmentData.patient_id)) && (
+                    <p role="status" className="flex gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span>
+                        Este paciente ainda não tem acesso ativo ao Portal do Paciente, que é por onde ele entra na teleconsulta.
+                        Libere em <Link to="/pacientes" className="font-medium underline underline-offset-2">Pacientes</Link> antes do horário.
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
 
               <Select
                 label="Nutricionista Responsável"
@@ -1350,6 +1422,48 @@ export const Agenda: React.FC = () => {
                   Copiar Link para WhatsApp
                 </button>
               </div>
+
+              {/* Teleconsulta (migration 0043) */}
+              {hasFeature(clinic, 'teleconsulta') && selectedAppointment.status !== 'cancelado' && (
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                  {!isReadOnly && ['pendente', 'confirmado'].includes(selectedAppointment.status) ? (
+                    <ModalityToggle
+                      name="detail-appointment-modality"
+                      value={selectedAppointment.modality ?? 'presencial'}
+                      onChange={handleUpdateModality}
+                      disabled={updatingModality}
+                    />
+                  ) : (
+                    <p className="flex items-center gap-2 text-sm text-slate-600">
+                      <span className="font-semibold text-slate-700">Modalidade:</span>
+                      {selectedAppointment.modality === 'online' ? 'Online' : 'Presencial'}
+                    </p>
+                  )}
+                  {selectedAppointment.modality === 'online' && (
+                    <>
+                      {!hasActivePortal(patients.find(p => p.id === selectedAppointment.patient_id)) && (
+                        <p role="status" className="flex gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          <span>O paciente entra pela conta do Portal do Paciente, que não está ativa. Libere o acesso em Pacientes antes do horário.</span>
+                        </p>
+                      )}
+                      {profile?.id === selectedAppointment.nutritionist_id ? (
+                        <TeleconsultJoinButton
+                          appointmentId={selectedAppointment.id}
+                          dateTime={selectedAppointment.date_time}
+                          durationMinutes={selectedAppointment.duration_minutes ?? selectedAppointment.services?.duration_minutes}
+                          fullWidth
+                        />
+                      ) : (
+                        <p className="flex items-center gap-2 text-xs text-slate-500">
+                          <Video className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          Só o nutricionista responsável e o paciente entram na sala de vídeo.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Reschedule Option */}
               {!isReadOnly && (

@@ -140,6 +140,8 @@ export interface AgendaAppointment {
   nutritionist_id: string | null;
   date_time: string;
   status: string;
+  duration_minutes?: number | null;
+  modality?: 'presencial' | 'online' | null;
   patients: One<{ name?: string | null }>;
   services: One<{ name?: string | null; duration_minutes?: number | null }>;
   profiles: One<{ full_name?: string | null }>;
@@ -166,7 +168,7 @@ export function useAgendaWindow(clinicId: string | undefined) {
       const { data, error } = await supabase
         .from('appointments')
         .select(`
-          id, public_token, patient_id, nutritionist_id, date_time, status,
+          id, public_token, patient_id, nutritionist_id, date_time, status, duration_minutes, modality,
           patients:patient_id(name),
           services:service_id(name, duration_minutes),
           profiles:nutritionist_id(full_name)

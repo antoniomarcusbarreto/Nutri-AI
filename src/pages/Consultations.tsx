@@ -33,6 +33,7 @@ import { AiAnalysisPanel } from '../components/exams/AiAnalysisPanel';
 import { ExamHistoryList } from '../components/exams/ExamHistoryList';
 import { AppointmentList } from '../components/consultations/AppointmentList';
 import { StatusBadge } from '../components/consultations/StatusBadge';
+import { TeleconsultJoinButton } from '../components/teleconsult/TeleconsultJoinButton';
 import { ConsultationForm, type ConsultationFormHandle } from '../components/consultations/ConsultationForm';
 import { logger } from '../lib/logger';
 import { pickOne, withHealth } from '../types/clinical';
@@ -134,6 +135,8 @@ export const Consultations: React.FC = () => {
           patient_id,
           nutritionist_id,
           service_id,
+          duration_minutes,
+          modality,
           patients ( 
             id, 
             name, 
@@ -844,7 +847,16 @@ ${insights}`;
 
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {selectedAppointment.modality === 'online' && selectedAppointment.nutritionist_id === profile?.id && selectedAppointment.status !== 'cancelado' && (
+                <TeleconsultJoinButton
+                  appointmentId={selectedAppointment.id}
+                  dateTime={selectedAppointment.date_time}
+                  durationMinutes={selectedAppointment.duration_minutes ?? selectedAppointment.services?.duration_minutes}
+                  label="Iniciar teleconsulta"
+                  size="sm"
+                />
+              )}
               <span className="text-xs font-bold text-slate-400">Status atual:</span>
               {selectedAppointment.status === 'concluido' ? (
                 <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-xl">Atendimento Concluído</span>

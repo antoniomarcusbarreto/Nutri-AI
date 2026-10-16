@@ -150,6 +150,9 @@ export interface ConsultationAppointment {
   patient_id?: string | null;
   nutritionist_id?: string | null;
   service_id?: string | null;
+  /** Duração real (0035) e presencial/online (0043). */
+  duration_minutes?: number | null;
+  modality?: 'presencial' | 'online' | null;
   patients?: ConsultationPatient | null;
   services?: ServiceLite | null;
 }

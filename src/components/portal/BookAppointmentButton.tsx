@@ -39,9 +39,10 @@ export const BookAppointmentButton: React.FC = () => {
         submitLabel="Pedir este horário"
         submitting={requestBooking.isPending}
         clinicPhone={p.clinic.phone}
-        onSubmit={(slot, note) =>
+        askModality
+        onSubmit={(slot, note, modality) =>
           requestBooking.mutate(
-            { slot, note },
+            { slot, note, modality },
             {
               onSuccess: () => {
                 setOpen(false);

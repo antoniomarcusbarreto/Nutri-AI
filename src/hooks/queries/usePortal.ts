@@ -139,10 +139,11 @@ export function usePortalAppointmentActions() {
   });
 
   const requestBooking = useMutation({
-    mutationFn: async (input: { slot: string; note?: string }) => {
+    mutationFn: async (input: { slot: string; note?: string; modality?: 'presencial' | 'online' }) => {
       const { error } = await supabase.rpc('portal_request_booking', {
         p_slot: input.slot,
         p_note: input.note || null,
+        p_modality: input.modality ?? 'presencial',
       });
       if (error) throw error;
     },
@@ -236,7 +237,7 @@ export function usePendingChangeRequests(clinicId: string | undefined) {
     queryFn: async (): Promise<AppointmentChangeRequest[]> => {
       const { data, error } = await supabase
         .from('appointment_change_requests')
-        .select('id, appointment_id, patient_id, clinic_id, nutritionist_id, service_id, kind, preferred_times, requested_at, proposed_at, response_note, note, status, duration_minutes, created_at, patients(name)')
+        .select('id, appointment_id, patient_id, clinic_id, nutritionist_id, service_id, kind, preferred_times, requested_at, proposed_at, response_note, note, status, duration_minutes, modality, created_at, patients(name)')
         .eq('clinic_id', clinicId!)
         .in('status', ['pendente', 'proposto'])
         .order('created_at', { ascending: true });

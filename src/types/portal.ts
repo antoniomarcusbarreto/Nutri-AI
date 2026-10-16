@@ -78,6 +78,8 @@ export interface AppointmentChangeRequest {
   note: string | null;
   /** Duração reservada (migration 0035). */
   duration_minutes?: number | null;
+  /** Presencial/online escolhido no pedido de consulta (migration 0043). */
+  modality?: 'presencial' | 'online' | null;
   status: ChangeRequestStatus;
   created_at: string;
   patients?: { name?: string | null } | null;

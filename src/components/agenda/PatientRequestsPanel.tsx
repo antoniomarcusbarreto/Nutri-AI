@@ -199,6 +199,7 @@ export const PatientRequestsPanel: React.FC<PatientRequestsPanelProps> = ({
                   <p className="text-sm text-slate-700">
                     <span className="text-slate-500">Horário escolhido:</span> <span className="font-medium">{fmtWhen(r.requested_at)}</span>
                     {r.duration_minutes ? <span className="text-slate-500"> · {fmtDuration(r.duration_minutes)}</span> : null}
+                    {r.kind === 'booking' && r.modality === 'online' ? <span className="text-slate-500"> · online</span> : null}
                   </p>
                 )}
                 {r.preferred_times && (

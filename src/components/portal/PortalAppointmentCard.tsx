@@ -9,6 +9,7 @@ import { isActionable, type AppointmentStatus, type PortalAppointment, type Port
 import { PickSlotModal } from './PickSlotModal';
 import { PortalRequestNotice } from './PortalRequestNotice';
 import { cn } from '../../lib/cn';
+import { TeleconsultJoinButton } from '../teleconsult/TeleconsultJoinButton';
 
 const STATUS: Record<AppointmentStatus, { label: string; className: string }> = {
   pendente: { label: 'Aguardando sua confirmação', className: 'bg-amber-50 text-amber-800 ring-amber-200' },
@@ -125,6 +126,20 @@ export const PortalAppointmentCard: React.FC<PortalAppointmentCardProps> = ({ ap
           </div>
         </div>
       </div>
+
+      {online && (a.status === 'pendente' || a.status === 'confirmado') && (
+        <div className="mt-4">
+          <TeleconsultJoinButton
+            appointmentId={a.id}
+            dateTime={a.date_time}
+            durationMinutes={a.duration_minutes}
+            asPatient
+            label="Entrar na consulta"
+            className="h-11"
+            fullWidth
+          />
+        </div>
+      )}
 
       {request && a.status !== 'cancelado' && (
         <div className="mt-4">

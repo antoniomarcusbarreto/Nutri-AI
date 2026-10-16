@@ -44,6 +44,7 @@ const PortalAssistant = lazy(() => import('./pages/portal/PortalAssistant').then
 const Leads = lazy(() => import('./pages/Leads').then(m => ({ default: m.Leads })));
 const LeadForm = lazy(() => import('./pages/LeadForm').then(m => ({ default: m.LeadForm })));
 const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(m => ({ default: m.ConfirmAppointment })));
+const Teleconsult = lazy(() => import('./pages/Teleconsult').then(m => ({ default: m.Teleconsult })));
 
 const CLINICAL: ('owner' | 'nutritionist')[] = ['owner', 'nutritionist'];
 
@@ -67,6 +68,18 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/termos" element={<TermsOfService />} />
               <Route path="/privacidade" element={<PrivacyPolicy />} />
+
+              {/* Teleconsulta em tela cheia, fora das molduras (migration 0043) */}
+              <Route path="/portal/teleconsulta/:appointmentId" element={
+                <ProtectedRoute>
+                  <Teleconsult asPatient />
+                </ProtectedRoute>
+              } />
+              <Route path="/teleconsulta/:appointmentId" element={
+                <ProtectedRoute>
+                  <RequireRole roles={CLINICAL}><Teleconsult /></RequireRole>
+                </ProtectedRoute>
+              } />
 
               {/* Portal do Paciente (sem sidebar; migration 0031) */}
               <Route path="/portal" element={
