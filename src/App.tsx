@@ -45,6 +45,7 @@ const Leads = lazy(() => import('./pages/Leads').then(m => ({ default: m.Leads }
 const LeadForm = lazy(() => import('./pages/LeadForm').then(m => ({ default: m.LeadForm })));
 const ConfirmAppointment = lazy(() => import('./pages/ConfirmAppointment').then(m => ({ default: m.ConfirmAppointment })));
 const Teleconsult = lazy(() => import('./pages/Teleconsult').then(m => ({ default: m.Teleconsult })));
+const TeleconsultReview = lazy(() => import('./pages/TeleconsultReview').then(m => ({ default: m.TeleconsultReview })));
 
 const CLINICAL: ('owner' | 'nutritionist')[] = ['owner', 'nutritionist'];
 
@@ -116,6 +117,7 @@ function App() {
                 <Route path="/planos" element={<RequireRole roles={CLINICAL}><MealPlans /></RequireRole>} />
                 <Route path="/triagem" element={<RequireRole roles={CLINICAL}><Leads /></RequireRole>} />
                 <Route path="/exames" element={<RequireRole roles={CLINICAL}><Exams /></RequireRole>} />
+                <Route path="/teleconsulta/:appointmentId/revisao" element={<RequireRole roles={CLINICAL}><TeleconsultReview /></RequireRole>} />
                 <Route path="/admin" element={<RequireRole superadminOnly><AdminDashboard /></RequireRole>} />
                 <Route path="/settings" element={<Settings />} />
                 {/* Catch-all redirect to dashboard for logged in users */}

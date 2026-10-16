@@ -55,6 +55,12 @@ export const qk = {
   mealPlans: {
     byPatient: (patientId: string) => ['meal_plans', patientId] as const,
   },
+  /** Transcrições de teleconsulta (migration 0044). */
+  teleconsults: {
+    byPatient: (patientId: string) => ['teleconsults', patientId] as const,
+    segments: (transcriptId: string) => ['teleconsults', 'segments', transcriptId] as const,
+    shares: (transcriptId: string) => ['teleconsults', 'shares', transcriptId] as const,
+  },
   portal: {
     all: ['portal'] as const,
     appointments: (patientId: string) => ['portal', 'appointments', patientId] as const,

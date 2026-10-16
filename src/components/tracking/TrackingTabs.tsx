@@ -8,6 +8,7 @@ const TABS: { id: TrackingTab; label: string }[] = [
   { id: 'diario', label: 'Diário alimentar' },
   { id: 'exames', label: 'Exames' },
   { id: 'historico', label: 'Histórico' },
+  { id: 'teleconsultas', label: 'Teleconsultas' },
 ];
 
 export interface TrackingTabsProps {

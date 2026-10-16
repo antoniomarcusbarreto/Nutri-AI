@@ -1,6 +1,7 @@
 // supabase/functions/teleconsult-cleanup/index.ts
 // Faxina das salas de teleconsulta (migration 0043). Roda pelo pg_cron a cada
 // 30 min e apaga no Daily.co as salas que já expiraram e ninguém encerrou.
+// Transcrições que ficaram abertas viram rascunho para revisão (0044).
 //
 // Publicar com --no-verify-jwt (o cron não manda JWT): a autorização é o
 // header x-cron-secret, igual ao email-digest.
@@ -45,6 +46,11 @@ Deno.serve(async (req: Request) => {
       }
       await admin.from("teleconsult_rooms")
         .update({ deleted_at: new Date().toISOString() }).eq("appointment_id", room.appointment_id);
+      // Navegador do nutricionista fechou no meio: a transcrição fica como
+      // rascunho, esperando a revisão dele (migration 0044).
+      await admin.from("teleconsult_transcripts")
+        .update({ status: "rascunho", ended_at: new Date().toISOString() })
+        .eq("appointment_id", room.appointment_id).eq("status", "em_andamento");
       deleted++;
     } catch (err) {
       console.error("[teleconsult-cleanup]", room.room_name, err instanceof Error ? err.message : String(err));

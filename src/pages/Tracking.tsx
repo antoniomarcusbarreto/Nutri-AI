@@ -25,6 +25,7 @@ import { BiomarkersSection } from '../components/tracking/BiomarkersSection';
 import { PredictionCard } from '../components/tracking/PredictionCard';
 import { JourneyTimeline } from '../components/tracking/JourneyTimeline';
 import { TrackingTabs } from '../components/tracking/TrackingTabs';
+import { TeleconsultsTab } from '../components/tracking/TeleconsultsTab';
 import { OverviewTab } from '../components/tracking/OverviewTab';
 import { PlanEffectTable } from '../components/tracking/PlanEffectTable';
 import { ExamInsightCard } from '../components/tracking/ExamInsightCard';
@@ -285,7 +286,7 @@ export const Tracking: React.FC = () => {
             <>
               <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <TrackingTabs value={tab} onChange={(t) => goTab(t)} badges={{ exames: alteredNow }} />
-                {tab === 'visao' ? (
+                {tab === 'teleconsultas' ? null : tab === 'visao' ? (
                   <p className="text-xs text-slate-500">Situação atual, considerando todo o histórico.</p>
                 ) : (
                   <PeriodBar period={period} onChange={setPeriod} years={years} />
@@ -349,6 +350,8 @@ export const Tracking: React.FC = () => {
                 {tab === 'diario' && (
                   <MealDiaryPanel key={patient.id} patientId={patient.id} planKcal={latestPlan?.kcal ?? null} patientName={patient.name} />
                 )}
+
+                {tab === 'teleconsultas' && <TeleconsultsTab key={patient.id} patientId={patient.id} />}
 
                 {tab === 'historico' && (
                   <JourneyTimeline
