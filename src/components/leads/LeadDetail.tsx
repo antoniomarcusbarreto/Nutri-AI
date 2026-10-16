@@ -42,12 +42,10 @@ interface Props {
   /** Depois de aceitar: abrir o convite do portal para este paciente. */
   onAccepted: (patientId: string) => void;
   onInvite: (patientId: string) => void;
-  /** Limite de pacientes do plano atingido (só bloqueia cadastro novo). */
-  limitReached: boolean;
   userId: string;
 }
 
-export const LeadDetail: React.FC<Props> = ({ lead, services, onBack, onAccepted, onInvite, limitReached, userId }) => {
+export const LeadDetail: React.FC<Props> = ({ lead, services, onBack, onAccepted, onInvite, userId }) => {
   const { showToast } = useToast();
   const { setStatus, accept, remove, triage } = useLeadMutations(userId);
   const history = usePatientHistory(lead.matched_patient_id);
@@ -143,8 +141,6 @@ export const LeadDetail: React.FC<Props> = ({ lead, services, onBack, onAccepted
             <Button
               onClick={() => onAccept(null)}
               loading={accept.isPending}
-              disabled={limitReached}
-              title={limitReached ? 'Limite de pacientes do seu plano atingido' : undefined}
               leftIcon={<UserPlus className="h-4 w-4" />}
             >
               Aceitar como paciente
@@ -185,9 +181,6 @@ export const LeadDetail: React.FC<Props> = ({ lead, services, onBack, onAccepted
             </>
           )}
         </div>
-        {open && !lead.matched_patient_id && limitReached && (
-          <p className="mt-2 text-xs text-rose-600">Limite de pacientes do seu plano atingido. Libere espaço ou mude de plano para aceitar.</p>
-        )}
         {open && (
           <p className="mt-2 text-xs text-slate-500">
             {lead.matched_patient_id

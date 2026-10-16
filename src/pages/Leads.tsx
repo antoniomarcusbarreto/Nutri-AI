@@ -28,7 +28,7 @@ const TABS: { id: Tab; label: string; match: (l: Lead) => boolean }[] = [
 ];
 
 export const Leads: React.FC = () => {
-  const { user, clinic, isTrialActive } = useAuth();
+  const { user, clinic } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const leadsQuery = useLeads(user?.id);
   const { data: patients = [] } = usePatients(clinic?.id);
@@ -51,9 +51,6 @@ export const Leads: React.FC = () => {
   const selected = leads.find((l) => l.id === selectedId) ?? null;
   const visible = leads.filter(TABS.find((t) => t.id === tab)!.match);
   const invitePatient = patients.find((p) => p.id === invitePatientId) ?? null;
-
-  // Mesma regra da tela de Pacientes.
-  const limitReached = isTrialActive ? patients.length >= 5 : clinic?.plan_level === 'starter' && patients.length >= 50;
 
   const select = (id: string | null) => {
     const next = new URLSearchParams(searchParams);
@@ -149,7 +146,6 @@ export const Leads: React.FC = () => {
               lead={selected}
               services={services}
               userId={user.id}
-              limitReached={!!limitReached}
               onBack={() => select(null)}
               onAccepted={(pid) => setInvitePatientId(pid)}
               onInvite={(pid) => setInvitePatientId(pid)}

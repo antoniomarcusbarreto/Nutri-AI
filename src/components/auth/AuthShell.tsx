@@ -21,21 +21,21 @@ const CLAIMS = [
   {
     eyebrow: 'Gestão de Consultório',
     title: 'Construído para escala.',
-    text: 'Agenda, prontuário e financeiro em um fluxo contínuo, para você focar no paciente.',
+    text: 'Agenda com lembretes pelo WhatsApp, prontuário, teleconsulta e financeiro em um fluxo contínuo.',
   },
   {
     eyebrow: 'Inteligência Clínica',
     title: 'Sua IA residente.',
-    text: 'Laudos de exames lidos em segundos, com biomarcadores interpretados e parecer estruturado.',
+    text: 'Laudos lidos em segundos, resumo da teleconsulta e um co-piloto que responde sobre seus pacientes.',
   },
   {
     eyebrow: 'Engajamento',
     title: 'Conexão direta com o paciente.',
-    text: 'Portal exclusivo, ficha de pré-consulta digital e plano alimentar na palma da mão.',
+    text: 'Portal com plano alimentar, agenda online e diário de refeições por foto na palma da mão.',
   },
 ];
 
-const TRUST = ['Isolado por clínica', 'Dados sob a LGPD', 'Suporte em português', 'Sem instalação'];
+const TRUST = ['Isolado por clínica e por nutricionista', 'Dados sob a LGPD', 'Suporte em português', 'Sem instalação'];
 
 const CLAIM_INTERVAL_MS = 6000;
 

@@ -11,13 +11,18 @@ import {
   CheckCircle2,
   ArrowRight,
   ShieldCheck,
-  Lock,
+  Inbox,
+  Video,
+  Smartphone,
+  Mic,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '../components/ui';
 import { Wordmark } from '../components/brand/Wordmark';
 import { HERO_VIDEO_URL } from '../components/brand/media';
 
 const CTA_LABEL = 'Começar teste grátis';
+const CONTACT_EMAIL = 'suporte@codehatch.com.br';
 
 const ctaBase =
   'inline-flex items-center justify-center gap-2 rounded-full bg-primary-600 font-semibold text-white shadow-sm shadow-primary-600/20 transition-[background-color,box-shadow,transform] duration-200 hover:bg-primary-500 hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2';
@@ -28,7 +33,7 @@ const HERO_PANELS = [
     eyebrow: 'Gestão de Consultório',
     title: 'Construído para escala.',
     subtitle:
-      'Agenda inteligente, prontuário eletrônico completo e controle financeiro integrados em um fluxo contínuo para você focar no paciente.',
+      'Agenda com lembretes pelo WhatsApp, prontuário com ditado por voz, teleconsulta e financeiro integrados em um fluxo contínuo para você focar no paciente.',
     cta: 'Explorar recursos',
     to: '#recursos',
     isAnchor: true,
@@ -37,7 +42,7 @@ const HERO_PANELS = [
     eyebrow: 'Inteligência Clínica',
     title: 'Sua IA residente.',
     subtitle:
-      'Leitura automatizada de laudos de exames em PDF, interpretação de biomarcadores e pareceres clínicos estruturados em poucos segundos.',
+      'Laudos de exames lidos em segundos, resumo da teleconsulta pronto para revisar e um co-piloto que responde sobre sua agenda e seus pacientes.',
     cta: 'Ver os planos',
     to: '#pricing',
     isAnchor: true,
@@ -46,7 +51,7 @@ const HERO_PANELS = [
     eyebrow: 'Engajamento',
     title: 'Conexão direta com o paciente.',
     subtitle:
-      'Portal web e mobile exclusivo, ficha de pré-consulta digital e planos alimentares interativos com substituições na palma da mão.',
+      'Portal próprio com plano alimentar, agenda online, diário de refeições por foto e um assistente que sugere receitas e trocas dentro do plano.',
     cta: 'Começar agora',
     to: '/login?mode=signup',
     isAnchor: false,
@@ -54,15 +59,16 @@ const HERO_PANELS = [
 ];
 
 const flow = [
-  { icon: Calendar, label: 'Agenda', note: 'Confirmação por link' },
-  { icon: ClipboardList, label: 'Prontuário', note: 'Anamnese e antropometria' },
-  { icon: Salad, label: 'Plano alimentar', note: 'Montado e compartilhado' },
+  { icon: Inbox, label: 'Triagem', note: 'Link público para novos pacientes' },
+  { icon: Calendar, label: 'Agenda', note: 'Confirmação pelo WhatsApp' },
+  { icon: ClipboardList, label: 'Consulta', note: 'Presencial ou online' },
+  { icon: Salad, label: 'Plano alimentar', note: 'Direto no portal do paciente' },
   { icon: FlaskConical, label: 'Exames', note: 'Laudo lido pela IA' },
   { icon: RefreshCw, label: 'Retorno', note: 'Evolução acompanhada' },
 ];
 
 const trustStrip = [
-  'Isolado por clínica',
+  'Isolado por clínica e por nutricionista',
   'Dados sob a LGPD',
   'Suporte em português',
   'Sem instalação',
@@ -70,73 +76,102 @@ const trustStrip = [
 
 const features = [
   {
-    name: 'Prontuário e anamnese',
+    name: 'Teleconsulta',
     description:
-      'Registro rápido da consulta: histórico, dados antropométricos, metas e evolução — versionados e sob a LGPD.',
-    icon: ClipboardList,
+      'Videochamada dentro do próprio app, sem Zoom. Com o consentimento do paciente, a IA transcreve e resume, e você revisa antes de salvar.',
+    icon: Video,
   },
   {
-    name: 'Agenda e retornos',
+    name: 'Agenda online e WhatsApp',
     description:
-      'Calendário com confirmação por link, lembretes e controle de quem já deveria ter voltado.',
+      'O paciente marca ou remarca nos seus horários livres, recebe o lembrete no WhatsApp e confirma respondendo à mensagem.',
     icon: Calendar,
+  },
+  {
+    name: 'Portal do paciente',
+    description:
+      'Plano alimentar, consultas, ficha de saúde e diário de refeições por foto, analisado pela IA, no celular do paciente.',
+    icon: Smartphone,
+  },
+  {
+    name: 'Prontuário e anamnese',
+    description:
+      'Histórico, antropometria e metas, com ditado por voz e o texto organizado pela IA no formato SOAP.',
+    icon: Mic,
+  },
+  {
+    name: 'Exames lidos pela IA',
+    description:
+      'Envie o laudo em PDF ou foto: os biomarcadores são extraídos, comparados à referência e acompanhados ao longo do tempo.',
+    icon: FlaskConical,
   },
   {
     name: 'Planos alimentares',
     description:
-      'Monte o plano, ajuste refeição por refeição e compartilhe com o paciente por um link público.',
+      'Monte o plano refeição por refeição; o paciente vê no portal e tira dúvidas de receitas e trocas com o assistente.',
     icon: Salad,
   },
   {
-    name: 'Evolução do paciente',
+    name: 'Evolução e avaliação corporal',
     description:
-      'Peso, medidas e adesão em gráficos que você lê em voz alta durante a consulta.',
+      'Peso, medidas, fotos e exames na mesma linha do tempo, com pontos de atenção para ler durante a consulta.',
     icon: TrendingUp,
   },
   {
     name: 'Financeiro do consultório',
     description:
-      'Serviços, recebimentos e a visão do mês sem precisar abrir a planilha de novo.',
+      'A cobrança nasce ao agendar. Recebimentos, despesas, recibo e a visão do mês sem abrir a planilha.',
     icon: Wallet,
   },
   {
-    name: 'LGPD',
+    name: 'Co-piloto',
     description:
-      'Consentimento registrado e exclusão real dos dados do paciente quando ele pede. Dado sensível de saúde tratado como tal.',
-    icon: Lock,
+      'Pergunte "quem não voltou há dois meses?" ou "quanto recebi este mês?" e tenha a resposta a partir dos seus dados.',
+    icon: Sparkles,
   },
 ];
 
+type Billing = 'mensal' | 'anual';
+
+// Anual = 10 mensalidades (2 meses grátis). `annualMonthly` é o equivalente por mês.
 const plans = [
   {
     name: 'Autônomo',
-    audience: 'Para quem atende sozinho e está começando.',
-    price: 'R$ 89,90',
+    audience: 'Para quem atende sozinho.',
+    monthly: 'R$ 99,90',
+    annual: 'R$ 999',
+    annualMonthly: 'R$ 83,25',
     to: '/login?mode=signup&plan=starter',
     highlighted: false,
     features: [
-      'Até 50 pacientes ativos no mês',
-      '1 usuário (apenas o nutricionista)',
-      'Recursos de IA inclusos (cota mensal por paciente)',
+      '1 nutricionista + 1 secretária',
+      'Pacientes sem limite',
+      'Portal do paciente com plano, agenda online e diário alimentar',
+      'Teleconsulta e lembretes pelo WhatsApp',
+      'Exames, prontuário e co-piloto com IA',
     ],
   },
   {
     name: 'Clínica / Equipe',
-    audience: 'Para clínicas, consultórios compartilhados ou alta rotatividade.',
-    price: 'R$ 249,90',
+    audience: 'Para clínicas e consultórios compartilhados.',
+    monthly: 'R$ 249,90',
+    annual: 'R$ 2.499',
+    annualMonthly: 'R$ 208,25',
     to: '/login?mode=signup&plan=pro',
     highlighted: true,
     features: [
-      'Pacientes ilimitados',
-      'Até 3 profissionais (ex.: 2 nutris + 1 secretária)',
-      'Recursos de IA com cota estendida',
-      'Papéis e isolamento de dados por clínica',
+      'Tudo do Autônomo',
+      'Até 3 nutricionistas',
+      'Secretárias sem limite, sem acesso a dados clínicos',
+      'Compartilhamento de pacientes entre nutricionistas',
+      'Agenda e financeiro da clínica inteira numa visão só',
     ],
   },
 ];
 
 export const Landing: React.FC = () => {
   const [activePanel, setActivePanel] = useState(0);
+  const [billing, setBilling] = useState<Billing>('mensal');
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -323,13 +358,13 @@ export const Landing: React.FC = () => {
               Do agendamento ao retorno, em uma única plataforma
             </h2>
             <p className="mt-4 text-base sm:text-lg leading-relaxed text-slate-300">
-              Sem ferramentas fragmentadas ou planilhas improvisadas. Prontuário, exames com IA,
-              planos alimentares e financeiro conectados no mesmo lugar.
+              Sem ferramentas fragmentadas ou planilhas improvisadas. Prontuário, teleconsulta,
+              exames com IA, portal do paciente e financeiro conectados no mesmo lugar.
             </p>
           </div>
 
           {/* Trilha do Ciclo Clínico */}
-          <div className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {flow.map((step, i) => (
               <div
                 key={step.label}
@@ -349,7 +384,7 @@ export const Landing: React.FC = () => {
             ))}
           </div>
 
-          {/* Grade de Recursos (6 Cards - Retângulo 2x3) */}
+          {/* Grade de Recursos (9 Cards - 3x3) */}
           <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature) => (
               <article
@@ -384,7 +419,42 @@ export const Landing: React.FC = () => {
             </p>
           </div>
 
-          <div className="mx-auto mt-14 grid max-w-md grid-cols-1 items-stretch gap-8 lg:max-w-4xl lg:grid-cols-2">
+          {/* Seletor mensal / anual */}
+          <div className="mt-10 flex justify-center">
+            <div
+              role="radiogroup"
+              aria-label="Período de cobrança"
+              className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/70 p-1 backdrop-blur-md"
+            >
+              {(['mensal', 'anual'] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={billing === option}
+                  onClick={() => setBilling(option)}
+                  className={
+                    'inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ' +
+                    (billing === option ? 'bg-teal-400 text-slate-950' : 'text-white hover:bg-white/10')
+                  }
+                >
+                  {option === 'mensal' ? 'Mensal' : 'Anual'}
+                  {option === 'anual' && (
+                    <span
+                      className={
+                        'rounded-full px-2 py-0.5 text-xs font-bold ' +
+                        (billing === 'anual' ? 'bg-slate-950/15 text-slate-950' : 'bg-teal-400/15 text-teal-300')
+                      }
+                    >
+                      2 meses grátis
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mx-auto mt-10 grid max-w-md grid-cols-1 items-stretch gap-8 lg:max-w-4xl lg:grid-cols-2">
             {plans.map((plan) => (
               <div
                 key={plan.name}
@@ -411,11 +481,16 @@ export const Landing: React.FC = () => {
                   </p>
                   <p className="mt-6 flex items-baseline gap-x-1">
                     <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">
-                      {plan.price}
+                      {billing === 'mensal' ? plan.monthly : plan.annualMonthly}
                     </span>
                     <span className="text-sm font-semibold text-slate-400">
                       /mês
                     </span>
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {billing === 'mensal'
+                      ? 'Cobrado mensalmente. Cancele quando quiser.'
+                      : `${plan.annual} cobrados por ano.`}
                   </p>
 
                   <Link
@@ -447,14 +522,15 @@ export const Landing: React.FC = () => {
           </div>
 
           <p className="mx-auto mt-12 max-w-2xl text-center text-sm text-slate-900 font-medium">
-            Mais de 3 profissionais na sua equipe?{' '}
-            <Link
-              to="/login?mode=signup&plan=pro"
+            Mais de 3 nutricionistas? R$ 79,90/mês por nutricionista adicional no plano Clínica.
+            Quer o WhatsApp com o número da sua clínica?{' '}
+            <a
+              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Nutri-AI: plano para minha clínica')}`}
               className="font-semibold text-teal-700 underline underline-offset-4 hover:text-teal-800"
             >
               Fale com a gente
-            </Link>{' '}
-              — montamos o plano ideal para a sua clínica.
+            </a>
+            .
           </p>
         </div>
       </section>

@@ -21,7 +21,7 @@ const errMessage = (err: unknown): string => {
 };
 
 export const Patients: React.FC = () => {
-  const { clinic, profile, userRole, isReadOnly, isTrialActive } = useAuth();
+  const { clinic, profile, userRole, isReadOnly } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -87,11 +87,8 @@ export const Patients: React.FC = () => {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const isLimitReached = isTrialActive 
-    ? patients.length >= 5 
-    : (clinic?.plan_level === 'starter' && patients.length >= 50);
-    
-  const isButtonDisabled = isReadOnly || isLimitReached;
+  // Sem limite de pacientes por plano: só o modo somente leitura bloqueia o cadastro.
+  const isButtonDisabled = isReadOnly;
 
   const formatCPF = (value: string) => {
     return value
@@ -331,16 +328,11 @@ export const Patients: React.FC = () => {
           ? 'Cadastro dos pacientes da clínica. Prontuários ficam restritos a cada nutricionista.'
           : 'Gerencie seus pacientes e prontuários.'}
         actions={<>
-          {isLimitReached && (
-            <span className="text-sm text-red-600 bg-red-50 px-3 py-1 rounded-full font-medium">
-              {isTrialActive ? 'Limite de 5 pacientes do Trial atingido' : 'Limite de 50 pacientes atingido'}
-            </span>
-          )}
-          <button 
+          <button
             disabled={isButtonDisabled}
             onClick={() => handleOpenModal()}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#5024fc] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#431cdb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5024fc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={isLimitReached ? 'Faça upgrade para adicionar mais pacientes' : isReadOnly ? 'Sistema em modo somente leitura' : ''}
+            title={isReadOnly ? 'Sistema em modo somente leitura' : ''}
           >
             {isButtonDisabled ? <Lock className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
             Novo Paciente
