@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, ClipboardList, KeyRound, Smartphone } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Lock, Edit, Power, PowerOff, ClipboardList, KeyRound, Send, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -356,7 +356,8 @@ export const Patients: React.FC = () => {
             </div>
             <input
               type="text"
-              className="block w-full rounded-xl border-0 py-2 pl-10 pr-3 text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+              aria-label="Buscar paciente pelo nome"
+              className="block w-full rounded-xl border-0 py-2 pl-12 pr-3 text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
               placeholder="Buscar pelo nome..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -457,10 +458,10 @@ export const Patients: React.FC = () => {
                           <button
                             onClick={() => setPortalPatientId(patient.id)}
                             className="transition-colors flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-slate-500 hover:text-primary-600 hover:bg-slate-50"
-                            title="Acesso do paciente ao app"
+                            title="Link de acesso do paciente ao painel (convite ou entrada)"
                           >
-                            <Smartphone className="h-4 w-4" />
-                            App
+                            <Send className="h-4 w-4" />
+                            Enviar link
                           </button>
                         )}
                         {!hasAccess && !isSecretary && (
